@@ -1,0 +1,30 @@
+# 수업 시간표 (매주 반복)
+# semester_start / semester_end: 학기 기간 (미정)
+semester_start: null
+semester_end: null
+
+classes:
+  - name: 유기반응메커니즘
+    day: mon
+    start: "09:00"
+    end: "10:00"
+  - name: 생화학
+    day: mon
+    start: "10:30"
+    end: "11:45"
+  - name: 물리약학
+    day: mon
+    start: "13:30"
+    end: "14:45"
+  - name: 생화학
+    day: wed
+    start: "10:30"
+    end: "11:45"
+  - name: 물리약학
+    day: wed
+    start: "13:30"
+    end: "14:45"
+  - name: 약학실습
+    day: thu
+    start: "15:00"
+    end: "18:00"
