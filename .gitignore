@@ -30,3 +30,9 @@ Thumbs.db
 .vscode/
 .idea/
 client_secret*.json
+
+# 개인 입력·생성 파일
+inbox.md
+TODAY.md
+dashboard/data.js
+.pytest_cache/

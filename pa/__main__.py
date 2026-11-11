@@ -2,6 +2,7 @@
 
   bin/pa list                 남은 할 일 (마감 순, 맨 앞이 키)
   bin/pa sync                 Canvas 확인 → 저장소 반영
+  bin/pa inbox                inbox.md → 저장소 반영
   bin/pa plan [--dry-run]     학습 계획 → '학습 계획' 캘린더
   bin/pa done <키>            완료 표시
   bin/pa ignore <키>          계속 제외 / unignore 로 되돌리기
@@ -11,7 +12,7 @@
 import argparse
 import sys
 
-from pa import collect_canvas, db, plan
+from pa import collect_canvas, db, inbox, plan
 from pa.model import KIND_LABEL, fmt, kday, label
 
 
@@ -24,6 +25,11 @@ def cmd_sync(conn, args):
     n = collect_canvas.sync(conn)
     conn.commit()
     print(f"Canvas 확인: {n}건")
+
+
+def cmd_inbox(conn, args):
+    warnings = inbox.sync(conn)
+    print("inbox.md 반영 완료" + "".join(f"\n⚠️ {w}" for w in warnings))
 
 
 def cmd_plan(conn, args):
@@ -65,6 +71,7 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list").set_defaults(fn=cmd_list)
     sub.add_parser("sync").set_defaults(fn=cmd_sync)
+    sub.add_parser("inbox").set_defaults(fn=cmd_inbox)
     sp = sub.add_parser("plan")
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(fn=cmd_plan)
