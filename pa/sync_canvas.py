@@ -8,19 +8,11 @@ import os
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
-from pa.gcal import ROOT, get_or_create_calendar, get_service
+from pa.config import load_env
+from pa.gcal import get_or_create_calendar, get_service
 
 TZ = "Asia/Seoul"
 CALENDAR_NAME = "과제"
-
-
-def load_env():
-    env = ROOT / ".env"
-    if env.exists():
-        for line in env.read_text().splitlines():
-            if "=" in line and not line.lstrip().startswith("#"):
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
 
 
 def unescape(s):

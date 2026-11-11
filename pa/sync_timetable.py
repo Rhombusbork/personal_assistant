@@ -6,9 +6,8 @@
 import argparse
 from datetime import date, datetime, timedelta
 
-import yaml
-
-from pa.gcal import ROOT, get_or_create_calendar, get_service
+from pa.config import load_timetable
+from pa.gcal import get_or_create_calendar, get_service
 
 TZ = "Asia/Seoul"
 CALENDAR_NAME = "수업 시간표"
@@ -35,7 +34,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Google 에 쓰지 않고 출력만")
     args = parser.parse_args()
 
-    cfg = yaml.safe_load((ROOT / "config" / "timetable.yaml").read_text())
+    cfg = load_timetable()
     sem_start = date.fromisoformat(cfg["semester_start"])
     sem_end = date.fromisoformat(cfg["semester_end"])
     events = [build_event(c, sem_start, sem_end) for c in cfg["classes"]]

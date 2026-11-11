@@ -1,13 +1,12 @@
 """Google Calendar 연동: OAuth 인증과 서비스 객체 생성."""
-from pathlib import Path
-
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from pa.config import ROOT
+
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
-ROOT = Path(__file__).resolve().parent.parent
 CREDENTIALS = ROOT / "credentials.json"  # Google Cloud 콘솔에서 받은 OAuth 클라이언트 파일
 TOKEN = ROOT / "token.json"  # 최초 인증 후 자동 생성
 
