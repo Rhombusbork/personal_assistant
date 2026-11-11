@@ -1,5 +1,8 @@
 """비서 명령 모음. 프로젝트 폴더에서 `bin/pa <명령>` 으로 실행한다.
 
+  bin/pa watch                자동 감시 (VSCode 를 열면 자동 실행)
+  bin/pa run [--full]         한 번 실행: inbox → (Canvas) → 계획 → TODAY.md
+  bin/pa today                TODAY.md 다시 만들고 출력
   bin/pa list                 남은 할 일 (마감 순, 맨 앞이 키)
   bin/pa sync                 Canvas 확인 → 저장소 반영
   bin/pa inbox                inbox.md → 저장소 반영
@@ -12,7 +15,7 @@
 import argparse
 import sys
 
-from pa import collect_canvas, db, inbox, plan
+from pa import collect_canvas, db, inbox, pipeline, plan, render
 from pa.model import KIND_LABEL, fmt, kday, label
 
 
@@ -30,6 +33,19 @@ def cmd_sync(conn, args):
 def cmd_inbox(conn, args):
     warnings = inbox.sync(conn)
     print("inbox.md 반영 완료" + "".join(f"\n⚠️ {w}" for w in warnings))
+
+
+def cmd_run(conn, args):
+    pipeline.run(full=args.full)
+
+
+def cmd_watch(conn, args):
+    pipeline.watch()
+
+
+def cmd_today(conn, args):
+    render.write(conn)
+    print(render.TODAY_PATH.read_text())
 
 
 def cmd_plan(conn, args):
@@ -72,6 +88,11 @@ def main():
     sub.add_parser("list").set_defaults(fn=cmd_list)
     sub.add_parser("sync").set_defaults(fn=cmd_sync)
     sub.add_parser("inbox").set_defaults(fn=cmd_inbox)
+    sp = sub.add_parser("run")
+    sp.add_argument("--full", action="store_true", help="Canvas·과제 캘린더까지")
+    sp.set_defaults(fn=cmd_run)
+    sub.add_parser("watch").set_defaults(fn=cmd_watch)
+    sub.add_parser("today").set_defaults(fn=cmd_today)
     sp = sub.add_parser("plan")
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(fn=cmd_plan)

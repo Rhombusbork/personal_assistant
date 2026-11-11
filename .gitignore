@@ -27,7 +27,8 @@ data/
 # OS / IDE
 .DS_Store
 Thumbs.db
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .idea/
 client_secret*.json
 

@@ -67,25 +67,29 @@ def build_event(ev):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true", help="Google 에 쓰지 않고 출력만")
-    args = parser.parse_args()
-
+def fetch_feed():
     load_env()
     url = os.environ.get("CANVAS_ICS_URL")
     if not url:
         raise SystemExit(".env 에 CANVAS_ICS_URL 이 없습니다.")
     with urllib.request.urlopen(url) as resp:
-        events = [build_event(e) for e in parse_ics(resp.read().decode("utf-8"))]
+        return [build_event(e) for e in parse_ics(resp.read().decode("utf-8"))]
 
-    if args.dry_run:
-        for uid, ev in sorted(events, key=lambda x: str(x[1]["start"])):
-            print(ev["start"].get("date") or ev["start"]["dateTime"], ev["summary"])
-        print(f"총 {len(events)}건")
-        return
 
-    service = get_service()
+def same(item, ev):
+    return all(item.get(k) == ev[k] for k in ("summary", "description")) and all(
+        (item[k].get("date") or parse_time(item[k].get("dateTime"))) == (ev[k].get("date") or parse_time(ev[k].get("dateTime")))
+        for k in ("start", "end"))
+
+
+def parse_time(s):
+    return datetime.fromisoformat(s).astimezone(timezone.utc) if s else None
+
+
+def run(conn, service=None):
+    """과제 마감을 '과제' 캘린더에 반영 (바뀐 것만). (생성, 갱신, 삭제) 수 반환."""
+    events = fetch_feed()
+    service = service or get_service()
     cal_id = get_or_create_calendar(service, CALENDAR_NAME, TZ)
     existing, token = {}, None
     while True:
@@ -93,28 +97,42 @@ def main():
             calendarId=cal_id, privateExtendedProperty="pa_source=canvas", pageToken=token, maxResults=2500
         ).execute()
         for item in page.get("items", []):
-            existing[item["extendedProperties"]["private"]["pa_key"]] = item["id"]
+            existing[item["extendedProperties"]["private"]["pa_key"]] = item
         token = page.get("nextPageToken")
         if not token:
             break
 
-    conn = db.connect()
     ignored = {r["key"] for r in conn.execute("SELECT key FROM tasks WHERE status = 'ignored'")}
     created = updated = removed = 0
     for uid, ev in events:
-        # 'event-assignment-475087' -> 'a475087' (pa.tasks 의 키와 동일)
+        # 'event-assignment-475087' -> 'a475087' (저장소 키와 동일)
         if "a" + uid.rsplit("-", 1)[-1] in ignored and "override" not in uid:
             if uid in existing:
-                service.events().delete(calendarId=cal_id, eventId=existing[uid]).execute()
+                service.events().delete(calendarId=cal_id, eventId=existing[uid]["id"]).execute()
                 removed += 1
             continue
         if uid in existing:
-            service.events().update(calendarId=cal_id, eventId=existing[uid], body=ev).execute()
-            updated += 1
+            if not same(existing[uid], ev):
+                service.events().update(calendarId=cal_id, eventId=existing[uid]["id"], body=ev).execute()
+                updated += 1
         else:
             service.events().insert(calendarId=cal_id, body=ev).execute()
             created += 1
-    print(f"Canvas 동기화 완료: 생성 {created}, 갱신 {updated}, 제외로 삭제 {removed}")
+    return created, updated, removed
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", help="Google 에 쓰지 않고 출력만")
+    args = parser.parse_args()
+    if args.dry_run:
+        events = fetch_feed()
+        for uid, ev in sorted(events, key=lambda x: str(x[1]["start"])):
+            print(ev["start"].get("date") or ev["start"]["dateTime"], ev["summary"])
+        print(f"총 {len(events)}건")
+        return
+    c, u, r = run(db.connect())
+    print(f"Canvas 동기화 완료: 생성 {c}, 갱신 {u}, 제외로 삭제 {r}")
 
 
 if __name__ == "__main__":

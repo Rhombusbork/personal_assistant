@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "비서: 자동 감시",
+      "detail": "작업 공간을 열면 자동 시작 — inbox.md 저장 시 반영, Canvas 3시간마다 확인",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/pa watch",
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": { "reveal": "silent", "panel": "dedicated", "showReuseMessage": false }
+    },
+    {
+      "label": "비서: 지금 전체 동기화",
+      "detail": "Canvas 확인 → 과제 캘린더 → 계획 → TODAY.md",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/pa run --full",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    }
+  ]
+}

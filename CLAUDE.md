@@ -26,12 +26,15 @@
 | 약품생화학Ⅰ | 생화학 | biochemistry |
 | 물리약학Ⅱ | 물리약학 | physical_pharmacy |
 
-## 비서 도구 (`.venv/bin/python -m ...`, 자세한 건 docs/usage.md)
+## 비서 도구 (자세한 건 docs/usage.md)
 
-- `pa.tasks` 남은 강의·퀴즈·과제 / `ignore` `done` `time` 으로 관리
-- `pa.plan` 학습 계획을 짜서 Google Calendar '학습 계획'에 반영
-- `pa.sync_canvas`, `pa.sync_timetable` 캘린더 동기화
-- `pa.lectures [과목] [--open N]` 이번 주 강의 목록·열기
+일정 관리는 코드가 자동으로 한다. Claude 는 직접 판단하기보다 아래 파일·명령을 쓴다.
+
+- **현황은 `TODAY.md` 를 읽는다** (감시기가 자동 갱신). 오래됐으면 `bin/pa run` (Canvas 까지면 `--full`).
+- **할 일 추가·완료·제외는 `inbox.md` 를 고친다** (문법은 docs/usage.md). 저장하면 감시기가 반영한다.
+  감시기가 꺼져 있을 수 있으니 고친 뒤 `bin/pa run` 을 실행한다.
+- `bin/pa list` 남은 항목과 키 / `bin/pa lectures [과목] [--open N]` 강의 열기
+- 데이터: `data/pa.db` (SQLite, events 표가 자동 기록)
 
 ## 원칙
 
