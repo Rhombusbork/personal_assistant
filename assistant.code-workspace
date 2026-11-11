@@ -1,0 +1,11 @@
+{
+  "folders": [
+    { "name": "🗂 비서", "path": "." },
+    { "name": "📚 공부 (study_system)", "path": "../study_system" },
+    { "name": "📝 보고서 (report)", "path": "../report" },
+    { "name": "❓ 퀴즈 (pharmacy)", "path": "../quiz_system_project/pharmacy" }
+  ],
+  "settings": {
+    "files.exclude": { "**/.venv": true, "**/__pycache__": true }
+  }
+}
