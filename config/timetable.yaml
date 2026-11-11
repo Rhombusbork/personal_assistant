@@ -35,3 +35,17 @@ online_classes:
   - 생약학Ⅰ
   - 유기약화학Ⅱ
   - 약학윤리학
+
+# 학습 계획 설정
+planner:
+  main_days: [mon, wed, fri, sat]   # 우선 배치 요일
+  fallback_days: [sun]              # 위 요일로 부족하면 사용
+  day_start: "09:00"
+  day_end: "23:00"
+  break_minutes: 10                 # 항목 사이 휴식
+  horizon_days: 14                  # 이 기간 안에 마감인 항목만 계획
+  max_minutes_per_day: 240         # 하루 최대 학습 배치 시간
+  minutes:                          # 기본 예상 소요 시간 (항목별로 `pa.tasks time` 으로 조정)
+    lecture: 50
+    quiz: 20
+    assignment: 60

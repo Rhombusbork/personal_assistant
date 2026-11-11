@@ -8,6 +8,7 @@ import os
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
+from pa import state
 from pa.config import load_env
 from pa.gcal import get_or_create_calendar, get_service
 
@@ -97,15 +98,22 @@ def main():
         if not token:
             break
 
-    created = updated = 0
+    ignored = state.load()["ignored"]
+    created = updated = removed = 0
     for uid, ev in events:
+        # 'event-assignment-475087' -> 'a475087' (pa.tasks 의 키와 동일)
+        if "a" + uid.rsplit("-", 1)[-1] in ignored and "override" not in uid:
+            if uid in existing:
+                service.events().delete(calendarId=cal_id, eventId=existing[uid]).execute()
+                removed += 1
+            continue
         if uid in existing:
             service.events().update(calendarId=cal_id, eventId=existing[uid], body=ev).execute()
             updated += 1
         else:
             service.events().insert(calendarId=cal_id, body=ev).execute()
             created += 1
-    print(f"Canvas 동기화 완료: 생성 {created}, 갱신 {updated}")
+    print(f"Canvas 동기화 완료: 생성 {created}, 갱신 {updated}, 제외로 삭제 {removed}")
 
 
 if __name__ == "__main__":
