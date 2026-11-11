@@ -8,7 +8,7 @@ import os
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
-from pa import state
+from pa import db
 from pa.config import load_env
 from pa.gcal import get_or_create_calendar, get_service
 
@@ -98,7 +98,8 @@ def main():
         if not token:
             break
 
-    ignored = state.load()["ignored"]
+    conn = db.connect()
+    ignored = {r["key"] for r in conn.execute("SELECT key FROM tasks WHERE status = 'ignored'")}
     created = updated = removed = 0
     for uid, ev in events:
         # 'event-assignment-475087' -> 'a475087' (pa.tasks 의 키와 동일)
