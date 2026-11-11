@@ -109,7 +109,7 @@ def main():
         if s.date() != day:
             day = s.date()
             print(f"\n📅 {T.kday(s)}")
-        print(f"  {s:%H:%M}–{e:%H:%M}  [{T.KIND_LABEL[t.kind]}] {T.short_course(t.course)} · {t.title}"
+        print(f"  {s:%H:%M}–{e:%H:%M}  [{T.KIND_LABEL[t.kind]}] {T.label(t)}"
               f"  (마감 {T.kday(t.due)} {t.due:%H:%M})")
     for t in failed:
         print(f"\n⚠️ 마감 전 빈 시간 부족: {T.fmt(t).strip()}")
@@ -123,7 +123,7 @@ def main():
         service.events().delete(calendarId=cal_id, eventId=ev["id"]).execute()
     for t, s, e in plan:
         service.events().insert(calendarId=cal_id, body={
-            "summary": f"[{T.KIND_LABEL[t.kind]}] {T.short_course(t.course)} · {t.title}",
+            "summary": f"[{T.KIND_LABEL[t.kind]}] {T.label(t)}",
             "start": {"dateTime": s.isoformat(), "timeZone": TZ},
             "end": {"dateTime": e.isoformat(), "timeZone": TZ},
             "description": f"마감: {t.due:%Y-%m-%d %H:%M}\n키: {t.key}\n{t.url}",

@@ -7,9 +7,10 @@ PATH = ROOT / "data" / "state.json"
 
 
 def load():
-    if PATH.exists():
-        return json.loads(PATH.read_text())
-    return {"ignored": {}, "done": {}, "minutes": {}}
+    st = json.loads(PATH.read_text()) if PATH.exists() else {}
+    for k in ("ignored", "done", "minutes", "manual"):
+        st.setdefault(k, {})
+    return st
 
 
 def save(state):

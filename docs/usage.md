@@ -11,6 +11,7 @@
 .venv/bin/python -m pa.tasks ignored           # 제외 목록 / unignore 로 되돌리기
 .venv/bin/python -m pa.tasks done m2890903     # 강의 수강 완료 표시
 .venv/bin/python -m pa.tasks time m2890903 80  # 예상 소요 시간 조정(분)
+.venv/bin/python -m pa.tasks add "제목" --due 2026-11-12 --min 60   # 직접 할 일 추가 (--due 없으면 기한 없는 할 일)
 
 # 학습 계획 → '학습 계획' 캘린더 (실행할 때마다 앞으로의 계획을 다시 짬)
 .venv/bin/python -m pa.plan --dry-run      # 미리보기

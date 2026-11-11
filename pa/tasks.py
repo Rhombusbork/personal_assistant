@@ -7,6 +7,8 @@
   python -m pa.tasks done <키>           # 강의 수강 완료 표시 (과제·퀴즈는 제출하면 자동 제외)
   python -m pa.tasks time <키> <분>      # 예상 소요 시간 조정
   python -m pa.tasks ignored            # 제외 목록 보기
+  python -m pa.tasks add "제목" --due 2026-11-12 [--min 60] [--course 과목]
+                                        # 직접 할 일 추가 (--due 없으면 기한 없는 장기 할 일)
 """
 import argparse
 import re
@@ -85,6 +87,11 @@ def collect(include_hidden=False):
                 tasks.append(Task(f"m{i['id']}", "lecture", cname, i["title"].strip(), due,
                                   cfg["minutes"]["lecture"], i.get("html_url", "")))
 
+    for key, m in st["manual"].items():
+        due = parse_dt(m["due"]) if m.get("due") else None
+        if due and now <= due <= horizon:
+            tasks.append(Task(key, "todo", m.get("course", ""), m["title"], due, m["minutes"], ""))
+
     for t in tasks:
         t.minutes = st["minutes"].get(t.key, t.minutes)
     if not include_hidden:
@@ -92,7 +99,7 @@ def collect(include_hidden=False):
     return sorted(tasks, key=lambda t: t.due)
 
 
-KIND_LABEL = {"lecture": "강의", "quiz": "퀴즈", "assignment": "과제"}
+KIND_LABEL = {"lecture": "강의", "quiz": "퀴즈", "assignment": "과제", "todo": "할 일"}
 
 
 def short_course(name):
@@ -106,23 +113,52 @@ def kday(dt):
     return f"{dt:%m/%d}({WEEKDAY[dt.weekday()]})"
 
 
+def label(t):
+    return f"{short_course(t.course)} · {t.title}" if t.course else t.title
+
+
 def fmt(t):
-    return (f"{t.key:>10}  {kday(t.due)} {t.due:%H:%M}  [{KIND_LABEL[t.kind]}] "
-            f"{short_course(t.course)} · {t.title}  ({t.minutes}분)")
+    return f"{t.key:>10}  {kday(t.due)} {t.due:%H:%M}  [{KIND_LABEL[t.kind]}] {label(t)}  ({t.minutes}분)"
+
+
+def someday(st):
+    """기한 없는 직접 추가 할 일 (완료·제외 제외)."""
+    return [(k, m) for k, m in st["manual"].items()
+            if not m.get("due") and k not in st["done"] and k not in st["ignored"]]
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("cmd", nargs="?", default="list",
-                   choices=["list", "ignore", "unignore", "done", "time", "ignored"])
-    p.add_argument("key", nargs="?")
+                   choices=["list", "ignore", "unignore", "done", "time", "ignored", "add"])
+    p.add_argument("key", nargs="?", help="항목 키 (add 에서는 제목)")
     p.add_argument("minutes", nargs="?", type=int)
+    p.add_argument("--due", help="마감 'YYYY-MM-DD' 또는 'YYYY-MM-DD HH:MM' (시각 생략 시 23:59)")
+    p.add_argument("--min", type=int, default=60, help="예상 소요 시간(분)")
+    p.add_argument("--course", default="", help="과목명")
     args = p.parse_args()
     st = state.load()
 
     if args.cmd == "list":
         for t in collect():
             print(fmt(t))
+        rest = someday(st)
+        if rest:
+            print("\n📌 기한 없는 할 일")
+            for k, m in rest:
+                print(f"{k:>10}  {m['title']}")
+        return
+    if args.cmd == "add":
+        if not args.key:
+            raise SystemExit("제목을 지정하세요.")
+        due = None
+        if args.due:
+            d = args.due if " " in args.due else args.due + " 23:59"
+            due = datetime.strptime(d, "%Y-%m-%d %H:%M").replace(tzinfo=KST).isoformat()
+        key = f"u{max([int(k[1:]) for k in st['manual']] + [0]) + 1}"
+        st["manual"][key] = {"title": args.key, "due": due, "minutes": args.min, "course": args.course}
+        state.save(st)
+        print(f"추가: {key} {args.key}" + (f" (마감 {due[:16].replace('T', ' ')})" if due else " (기한 없음)"))
         return
     if args.cmd == "ignored":
         for k, title in st["ignored"].items():
