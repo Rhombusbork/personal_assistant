@@ -17,6 +17,12 @@
 | 기록해줘야 하는 것 | 수업시간 |
 | 그 외 하고 싶은 일들 | 장기적인 todo로서 기록 |
 
+## 2단계 요구사항 (정리 중)
+
+- 강의 자료(배포용 PDF 등)는 Canvas에서 자동으로 받아 `~/study_system/materials/<영문 과목명>/` 에 모은다 (지금 수동으로 모으는 방식 그대로).
+- 공부·보고서·퀴즈 작업은 각각 `~/study_system`, `~/report`, `~/quiz_system_project/pharmacy` 의 규칙을 따른다.
+- AI 기능은 API 키 대신 Claude Code 구독(`claude -p`)을 사용한다.
+
 ## 진행 상황
 
 - [ ] 1단계: 일정/할 일 관리
