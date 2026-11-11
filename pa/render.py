@@ -1,10 +1,10 @@
-"""출력 블록: TODAY.md (VSCode 미리보기용)."""
+"""출력 블록: TODAY.md (VSCode 미리보기용), dashboard/data.js (HTML 대시보드용)."""
 import json
 from datetime import timedelta
 
 from pa import db
 from pa.config import ROOT, load_timetable
-from pa.model import KIND_LABEL, kday, label, now, parse_dt
+from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
 TODAY_PATH = ROOT / "TODAY.md"
 EVENT_LABEL = {"task_added": "🆕 새 항목", "task_done": "✅ 완료", "task_ignored": "🚫 제외",
@@ -117,3 +117,57 @@ def fmt_time(iso):
 
 def write(conn):
     TODAY_PATH.write_text(today_md(conn))
+    write_dashboard(conn)
+
+
+DASH_DATA = ROOT / "dashboard" / "data.js"
+
+
+def dashboard_data(conn):
+    t_now = now()
+    cfg = load_timetable()["planner"]
+    all_tasks = db.tasks(conn)
+    by_key = {t.key: t for t in all_tasks}
+
+    def task_json(t):
+        return {"key": t.key, "kind": t.kind, "course": short_course(t.course), "title": t.title,
+                "due": t.due.isoformat() if t.due else None, "status": t.status, "minutes": t.minutes}
+
+    upcoming = [task_json(t) for t in all_tasks
+                if t.status == "open" and t.due and t_now - timedelta(days=1) <= t.due <= t_now + timedelta(days=21)]
+    plan = [{"key": k, "start": s.isoformat(), "end": e.isoformat(), "summary": summ,
+             "kind": by_key[k].kind if k in by_key else "todo"} for k, s, e, summ in load_plan(conn)]
+    busy = [{"start": r["start"], "end": r["end"], "label": r["label"]} for r in conn.execute("SELECT * FROM busy")]
+
+    # 과목별 진행: 추적한 항목 중 완료 비율 (제외·삭제 빼고)
+    progress = {}
+    for t in all_tasks:
+        if t.status in ("ignored", "gone") or not t.course:
+            continue
+        p = progress.setdefault(short_course(t.course), {"done": 0, "total": 0})
+        p["total"] += 1
+        p["done"] += t.status == "done"
+
+    since = (t_now - timedelta(days=13)).date()
+    done_by_day = {}
+    for r in conn.execute("SELECT ts FROM events WHERE type = 'task_done' AND ts >= ?", (since.isoformat(),)):
+        d = r["ts"][:10]
+        done_by_day[d] = done_by_day.get(d, 0) + 1
+
+    warns = [w for w in (db.get_meta(conn, "inbox_warnings") or "").split("\n") if w]
+    warns += [f"마감 전 빈 시간 부족: {label(by_key[k])}" for k in (db.get_meta(conn, "plan_failed") or "").split(",")
+              if k in by_key]
+    return {
+        "generated": t_now.isoformat(), "canvasSynced": db.get_meta(conn, "canvas_synced_at"),
+        "cap": cfg["max_minutes_per_day"], "dayStart": cfg["day_start"], "dayEnd": cfg["day_end"],
+        "tasks": upcoming, "plan": plan, "busy": busy, "warnings": warns,
+        "progress": [{"course": c, **v} for c, v in sorted(progress.items())],
+        "doneByDay": done_by_day,
+        "someday": [t.title for t in all_tasks if t.status == "open" and not t.due],
+    }
+
+
+def write_dashboard(conn):
+    DASH_DATA.parent.mkdir(exist_ok=True)
+    data = json.dumps(dashboard_data(conn), ensure_ascii=False, indent=1)
+    DASH_DATA.write_text(f"// 자동 생성 — 직접 고치지 마세요\nwindow.PA_DATA = {data};\n")

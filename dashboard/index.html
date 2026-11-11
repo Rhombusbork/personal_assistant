@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비서 대시보드</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #6b7385; --line: #e3e6ec;
+    --lecture: #3b82f6; --quiz: #8b5cf6; --assignment: #f59e0b; --todo: #10b981; --busy: #9aa3b2;
+    --danger: #ef4444; --warn: #f97316;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171d; --card: #1d2129; --text: #e6e9ef; --muted: #98a0b0; --line: #2c323d; --busy: #4b5363; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .tile b { display: block; font-size: 24px; }
+  .tile span { color: var(--muted); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  .stack { display: grid; gap: 16px; align-content: start; }
+  .warn { background: color-mix(in srgb, var(--warn) 12%, var(--card)); border-color: var(--warn); margin-bottom: 16px; }
+  .warn li { margin: 2px 0; }
+
+  /* 주간 보드 */
+  .board-wrap { overflow-x: auto; }
+  .board { display: grid; grid-template-columns: 34px repeat(7, minmax(78px, 1fr)); min-width: 600px; }
+  .board .head { text-align: center; font-weight: 600; padding: 4px 0 6px; font-size: 13px; }
+  .board .head.today { color: var(--lecture); }
+  .axis, .day { position: relative; border-top: 1px solid var(--line); }
+  .day { border-left: 1px solid var(--line); }
+  .axis div { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); }
+  .hour { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
+  .blk { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 2px 5px; font-size: 11px; line-height: 1.3;
+         overflow: hidden; color: #fff; border-left: 3px solid rgba(0,0,0,.25); }
+  .blk.busy { background: var(--busy); }
+  .blk small { opacity: .85; display: block; }
+  .now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 2; }
+
+  /* 마감 목록 */
+  .due-day { margin: 10px 0 4px; font-weight: 600; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--line); color: var(--text); }
+  .badge.d0 { background: var(--danger); color: #fff; } .badge.d1 { background: var(--warn); color: #fff; }
+  .item { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; transform: translateY(-1px); }
+  .item .course { color: var(--muted); }
+  .item code { margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+  /* 막대 */
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; position: relative; padding-top: 8px; }
+  .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+  .bar i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--lecture); }
+  .bar span { font-size: 10px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+  .bar.over i { background: var(--danger); }
+  .cap { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--warn); }
+  .prog { margin: 8px 0; }
+  .prog .row { display: flex; justify-content: space-between; font-size: 13px; }
+  .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
+  .prog .fill { height: 100%; background: var(--todo); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .empty { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main id="app"><p class="empty">data.js 가 아직 없습니다. <code>bin/pa run</code> 을 실행하세요.</p></main>
+<script src="data.js"></script>
+<script>
+// 대시보드: data.js(자동 생성)의 window.PA_DATA 를 그린다. 라이브러리 없음.
+const D = window.PA_DATA;
+const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일" };
+const WD = "일월화수목금토";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const color = k => `var(--${k})`;
+// 날짜는 모두 KST(+09:00) 문자열 — 비교는 'YYYY-MM-DD' 로
+const ymd = iso => iso.slice(0, 10);
+const hm = iso => iso.slice(11, 16);
+const mins = iso => +iso.slice(11, 13) * 60 + +iso.slice(14, 16);
+const addDays = (ymdStr, n) => { const d = new Date(ymdStr + "T12:00:00+09:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const label = d => { const x = new Date(d + "T12:00:00+09:00"); return `${x.getMonth() + 1}/${x.getDate()}(${WD[x.getDay()]})`; };
+// 막대 축 눈금: 이틀에 한 번, 날짜만
+const tick = (d, all) => all.indexOf(d) % 2 ? "&nbsp;" : `${+d.slice(5, 7)}/${+d.slice(8)}`;
+const dday = (due, today) => Math.round((new Date(ymd(due)) - new Date(today)) / 864e5);
+
+function render() {
+  if (!D) return;
+  const today = ymd(D.generated);
+  const nowMin = mins(D.generated);
+  const [ds, de] = [D.dayStart, D.dayEnd].map(t => +t.slice(0, 2));
+  const days7 = [...Array(7)].map((_, i) => addDays(today, i));
+  const days14 = [...Array(14)].map((_, i) => addDays(today, i));
+  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
+  const soon = D.tasks.filter(t => dday(t.due, today) <= 3 && dday(t.due, today) >= 0);
+  const doneTotal = Object.values(D.doneByDay).reduce((a, b) => a + b, 0);
+  const todayMin = planMin(today);
+
+  // --- 주간 보드
+  const PX = 38; // 1시간 높이
+  const H = (de - ds) * PX;
+  const y = m => (m - ds * 60) / 60 * PX;
+  let board = `<div class="board"><div></div>` +
+    days7.map(d => `<div class="head ${d === today ? "today" : ""}">${label(d)}</div>`).join("") +
+    `<div class="axis" style="height:${H}px">` +
+    [...Array(de - ds + 1)].map((_, i) => `<div style="top:${i * PX}px">${ds + i}</div>`).join("") + `</div>`;
+  for (const d of days7) {
+    let col = [...Array(de - ds)].map((_, i) => `<div class="hour" style="top:${i * PX}px"></div>`).join("");
+    for (const b of D.busy.filter(b => ymd(b.start) === d)) {
+      const top = Math.max(0, y(mins(b.start))), h = Math.min(H, y(mins(b.end))) - top;
+      if (h > 0) col += `<div class="blk busy" style="top:${top}px;height:${h}px">${esc(b.label)}<small>${hm(b.start)}–${hm(b.end)}</small></div>`;
+    }
+    for (const p of D.plan.filter(p => ymd(p.start) === d)) {
+      const top = y(mins(p.start)), h = y(mins(p.end)) - top;
+      const t = esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""));
+      col += `<div class="blk" style="top:${top}px;height:${h}px;background:${color(p.kind)}" title="${esc(p.summary)}">${t}<small>${hm(p.start)}–${hm(p.end)}</small></div>`;
+    }
+    if (d === today && nowMin >= ds * 60 && nowMin <= de * 60) col += `<div class="now" style="top:${y(nowMin)}px"></div>`;
+    board += `<div class="day" style="height:${H}px">${col}</div>`;
+  }
+  board += `</div>`;
+
+  // --- 마감 목록 (14일)
+  let dues = "";
+  for (const d of days14) {
+    const items = D.tasks.filter(t => ymd(t.due) === d);
+    if (!items.length) continue;
+    const n = dday(d + "T00:00", today);
+    dues += `<div class="due-day">${label(d)} <span class="badge d${Math.min(n, 2)}">${n === 0 ? "오늘" : "D-" + n}</span></div>` +
+      items.map(t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
+        <span>${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}</span><code>${esc(t.key)}</code></div>`).join("");
+  }
+
+  // --- 일별 부하
+  const maxLoad = Math.max(D.cap, ...days14.map(planMin));
+  const load = `<div class="bars"><div class="cap" style="bottom:${D.cap / maxLoad * 100}%" title="하루 한도"></div>` +
+    days14.map(d => { const m = planMin(d); return `<div class="bar ${m > D.cap ? "over" : ""}" title="${label(d)} ${Math.round(m / 6) / 10}시간">
+      <i style="height:${m / maxLoad * 100}%"></i><span>${tick(d, days14)}</span></div>`; }).join("") + `</div>`;
+
+  // --- 완료 추이
+  const past14 = [...Array(14)].map((_, i) => addDays(today, i - 13));
+  const maxDone = Math.max(1, ...past14.map(d => D.doneByDay[d] || 0));
+  const trend = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
+    <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
+
+  // --- 과목별 진행
+  const prog = D.progress.map(p => `<div class="prog"><div class="row"><span>${esc(p.course)}</span><span>${p.done}/${p.total}</span></div>
+    <div class="track"><div class="fill" style="width:${p.total ? p.done / p.total * 100 : 0}%"></div></div></div>`).join("") || `<p class="empty">아직 없음</p>`;
+
+  const legend = `<div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}
+    <span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
+
+  document.getElementById("app").innerHTML = `
+    <header><h1>${label(today)} 대시보드</h1>
+      <span class="sub">갱신 ${hm(D.generated)} · Canvas 확인 ${D.canvasSynced ? label(ymd(D.canvasSynced)) + " " + hm(D.canvasSynced) : "-"}</span></header>
+    <div class="tiles">
+      <div class="tile"><b>${D.tasks.filter(t => t.due >= D.generated).length}</b><span>남은 할 일 (3주)</span></div>
+      <div class="tile"><b>${(todayMin / 60).toFixed(1)}h</b><span>오늘 계획 / 한도 ${D.cap / 60}h</span></div>
+      <div class="tile"><b style="color:${soon.length ? "var(--warn)" : "inherit"}">${soon.length}</b><span>3일 안 마감</span></div>
+      <div class="tile"><b>${doneTotal}</b><span>최근 2주 완료</span></div>
+    </div>
+    ${D.warnings.length ? `<div class="card warn"><h2>⚠️ 확인 필요</h2><ul>${D.warnings.map(w => `<li>${esc(w).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul></div>` : ""}
+    <div class="grid">
+      <div class="stack">
+        <div class="card"><h2>🗓 이번 주 계획</h2><div class="board-wrap">${board}</div>${legend}</div>
+        <div class="card"><h2>📊 일별 학습량 (계획, 점선 = 하루 한도)</h2>${load}</div>
+      </div>
+      <div class="stack">
+        <div class="card"><h2>⏰ 다가오는 마감</h2>${dues || `<p class="empty">2주 안 마감 없음</p>`}</div>
+        <div class="card"><h2>📚 과목별 진행 (추적한 항목 중 완료)</h2>${prog}</div>
+        <div class="card"><h2>✅ 완료 추이 (14일)</h2>${trend}</div>
+        ${D.someday.length ? `<div class="card"><h2>📌 기한 없는 할 일</h2>${D.someday.map(s => `<div class="item">· ${esc(s)}</div>`).join("")}</div>` : ""}
+      </div>
+    </div>`;
+}
+render();
+// Live Server 는 data.js 가 바뀌면 자동 새로고침. 그 밖의 경우를 위해 5분마다 새로고침.
+setTimeout(() => location.reload(), 5 * 60 * 1000);
+</script>
+</body>
+</html>
