@@ -21,6 +21,14 @@ def log(msg):
 
 
 def run(full=False):
+    # 실행은 한 번에 하나만 (감시기·수동 실행·작업 스케줄러가 겹쳐도 캘린더에 중복으로 쓰지 않게)
+    db.PATH.parent.mkdir(exist_ok=True)
+    with open(db.PATH.parent / "run.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        _run(full)
+
+
+def _run(full):
     conn = db.connect()
     steps = []
     try:
