@@ -27,7 +27,7 @@
 
 - 내가 해야 할 일들(마감, 학습 계획, 진행 상황)을 한눈에 보이게 시각화한다. → ✅ TODAY.md · HTML 대시보드 ([docs/usage.md](docs/usage.md))
 - 매일의 일정 관리는 Claude 없이 코드로 동작한다 (inbox.md 입력 → 자동 계획·기록·시각화). 설계: [docs/automation-plan.md](docs/automation-plan.md)
-- 다음: Windows 작업 스케줄러로 VSCode 없이도 실행, GitHub Pages 로 휴대폰에서 보기 (계획만)
+- 휴대폰: https://rhombusbork.github.io/personal_assistant/ (비밀번호 잠금, 휴대폰 입력 → PC 반영)
 - 종합 설계(욕구 분석·제안 기능·가능/불가능·로드맵): [docs/assistant-master-design.md](docs/assistant-master-design.md)
 
 ## 진행 상황

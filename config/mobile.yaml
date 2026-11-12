@@ -1,0 +1,6 @@
+# 휴대폰 보기 (GitHub Pages) — pa/mobile.py
+repo: Rhombusbork/personal_assistant        # public 저장소 (코드는 올리지 않음, gh-pages·phone-inbox 브랜치만)
+pages_url: https://rhombusbork.github.io/personal_assistant/
+inbox_branch: phone-inbox
+inbox_file: phone-inbox.json
+min_interval_minutes: 10                    # 이보다 자주 올리지 않음

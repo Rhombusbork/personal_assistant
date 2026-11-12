@@ -72,6 +72,21 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 - **✍ 초안**: 과제 옆 버튼 → 과제 설명·자료·내 노트로 `~/report/` 에 규칙에 맞는 파일 + Claude 초안 (내 생각 자리는 비워 둠)
 - Claude 는 위 버튼을 눌렀을 때만 쓴다. 🤖 작업 칸에 몇 번 썼는지 표시
 
+## 휴대폰에서 보기·입력 (GitHub Pages)
+
+주소: **https://rhombusbork.github.io/personal_assistant/** (홈 화면에 추가하면 앱처럼 열림)
+
+- PC 엔진이 바뀐 내용을 **최대 10분마다** 올린다 (바뀐 게 없으면 1시간에 한 번). 작업 스케줄러로도 하루 3번.
+- 데이터는 **비밀번호로 잠겨** 올라간다. 비밀번호는 `.env` 의 `PA_MOBILE_PASSWORD` (바꾸면 다음 올릴 때부터 새 비밀번호, 휴대폰에서 다시 입력)
+- 휴대폰에서 되는 것: 오늘/주차별 보기, 할 일·하고 싶은 일 추가, ✓ 완료, ✕ 제외, 🗑 삭제, 📅 오늘 하기, 수업·Canvas·퀴즈 링크 열기
+- PC 에서만: 보고서 작성, 내용정리, 자료 열기, ⏱ 기록
+- 휴대폰 입력은 GitHub 의 `phone-inbox` 브랜치에 (잠가서) 적히고, **PC 엔진이 3분마다** 가져가 반영 → 다음 올릴 때 화면에도 반영.
+  PC 가 꺼져 있으면 켜질 때 반영된다
+- 휴대폰에서 입력하려면 **GitHub 토큰을 한 번** 넣는다 (⚙):
+  GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token
+  → Repository access: *Only select repositories* → `personal_assistant` → Permissions: **Contents: Read and write** → Generate
+- 비서 코드는 올리지 않는다 (`gh-pages`·`phone-inbox` 브랜치만)
+
 ## 퀴즈 복습 (R11 — 퀴즈 앱은 고치지 않음)
 
 1. 퀴즈 앱(https://rhombusbork.github.io/Pharmacy/) 첫 화면의 **[기록 내보내기]** → 다운로드 폴더에 `quizapp-backup-날짜.json`

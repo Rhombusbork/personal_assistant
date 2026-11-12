@@ -11,11 +11,12 @@ import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, inbox, jobs, learningx, materials, plan, quiz, render, server, sync_canvas
+from pa import collect_canvas, db, inbox, jobs, learningx, materials, mobile, plan, quiz, render, server, sync_canvas
 from pa.gcal import get_service
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
 PLAN_EVERY = 15 * 60
+PHONE_EVERY = 3 * 60
 POLL = 1.0
 
 
@@ -46,6 +47,9 @@ def _run(full):
     conn = db.connect()
     steps = []
     try:
+        n = _pull_phone()
+        if n:
+            steps.append(f"휴대폰 입력 {n}")
         warns = inbox.sync(conn)
         steps.append(f"inbox{' ⚠️' + str(len(warns)) if warns else ''}")
         try:
@@ -78,7 +82,21 @@ def _run(full):
     finally:
         render.write(conn)
         conn.close()
+    try:
+        if mobile.publish():
+            steps.append("휴대폰 화면 올림")
+    except Exception as e:  # 인터넷·GitHub 문제로 나머지가 멈추지 않게
+        steps.append(f"휴대폰 화면 올리기 실패: {str(e)[:80]}")
     log(" · ".join(steps))
+
+
+def _pull_phone():
+    """휴대폰 입력(GitHub phone-inbox)을 inbox.md 로. 실패해도 계속."""
+    try:
+        return mobile.pull_phone_inbox()
+    except Exception as e:
+        log(f"휴대폰 입력 가져오기 실패: {str(e)[:80]}")
+        return 0
 
 
 def _mtime():
@@ -139,9 +157,14 @@ def watch():
     threading.Thread(target=_job_runner, daemon=True).start()
     log("비서 감시 시작 — inbox.md 저장 시 자동 반영, 15분마다 계획 갱신, Canvas 는 3시간마다 확인")
     run(full=True)
-    last_full = last_plan = time.time()
+    last_full = last_plan = last_phone = time.time()
     while True:
         time.sleep(POLL)
+        if time.time() - last_phone >= PHONE_EVERY:  # 휴대폰 입력이 있으면 바로 반영
+            last_phone = time.time()
+            if _pull_phone():
+                seen["mtime"] = _mtime()
+                seen["dirty"] = True
         if seen.pop("dirty", False):
             log("대시보드 입력")
             run(full=False)
