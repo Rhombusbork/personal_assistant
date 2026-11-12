@@ -33,3 +33,17 @@ def test_doc_kind():
     assert jobs.doc_kind("Ch22_배움노트작성_1장으로 정리") == "배움노트"
     assert jobs.doc_kind("리바이어던 발표자료 제출") == "발표자료"
     assert jobs.doc_kind("10주차 결과보고서") == "결과보고서"
+
+
+def test_notices_job_parses_suggestions(conn, monkeypatch):
+    db.sync_source(conn, "canvas", [{"key": "a9", "kind": "assignment", "course": "생약학Ⅰ 676205", "title": "조별 보고서",
+                                     "due": "2099-01-01T23:59:00+09:00", "earliest": None, "minutes": 60, "url": ""}])
+    conn.execute("INSERT INTO notices (id, course, title, text, posted_at) VALUES ('n1', '생약학Ⅰ 676205', '공지', '조장만 제출', '2026-11-12')")
+    monkeypatch.setattr(jobs.ai, "ask", lambda *a, **k: '{"summaries":[{"id":"n1","summary":"조장만 낸다"}],'
+                                                        '"exclude":[{"key":"a9","reason":"조장만 제출"},{"key":"zzz","reason":"x"}]}')
+    jobs.enqueue(conn, "notices", "notices", "새 공지 정리")
+    jobs.run_next(conn)
+    assert jobs.recent(conn)[0]["status"] == "done"
+    assert conn.execute("SELECT summary FROM notices WHERE id='n1'").fetchone()[0] == "조장만 낸다"
+    sugg = __import__("json").loads(db.get_meta(conn, "notice_suggestions"))
+    assert [x["key"] for x in sugg] == ["a9"]  # 없는 키는 버림

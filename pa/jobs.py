@@ -61,7 +61,7 @@ def run_next(conn):
         return False
     _update(conn, row["id"], status="running", step="시작")
     try:
-        result = {"report": report_job}[row["kind"]](conn, row)
+        result = {"report": report_job, "notices": notices_job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
         db.log(conn, "job_done", row["key"], kind=row["kind"], result=str(result))
     except Exception as e:
@@ -193,3 +193,41 @@ def report_job(conn, job):
     except Exception:
         pass
     return path
+
+
+# ---- 공지 정리 (버튼을 눌렀을 때만) ------------------------------------------
+
+def notices_job(conn, job):
+    """새 공지를 Claude 가 읽고: 공지마다 한 줄 요약 + '이 학생이 안 해도 되는' 과제 제외 후보."""
+    import json as _json
+    notes = conn.execute("SELECT * FROM notices WHERE status = 'new' ORDER BY posted_at").fetchall()
+    if not notes:
+        return "새 공지 없음"
+    tasks = conn.execute("SELECT key, course, title, due FROM tasks WHERE source = 'canvas' AND status = 'open' "
+                         "AND kind IN ('assignment', 'quiz')").fetchall()
+    _update(conn, job["id"], step=f"공지 {len(notes)}개 읽는 중 (Claude)")
+    prompt = "학생의 Canvas 과목 공지를 정리한다. JSON 만 출력한다 (설명·코드 블록 표시 없이).\n\n[공지]\n" + "\n\n".join(
+        f"id={n['id']} | {short_course(n['course'])} | {n['title']} | {n['posted_at'][:10]}\n{n['text'][:2500]}" for n in notes
+    ) + "\n\n[학생의 남은 과제·퀴즈]\n" + "\n".join(
+        f"key={t['key']} | {short_course(t['course'])} | {t['title']} | 마감 {t['due'][:16]}" for t in tasks
+    ) + """
+
+출력 형식:
+{"summaries": [{"id": "공지 id", "summary": "학생이 할 일 중심의 한 줄 (해라체)"}],
+ "exclude": [{"key": "과제 key", "reason": "공지의 어느 문장 때문인지 짧게"}]}
+exclude 에는 공지가 '이 학생은 내지 않아도 된다'고 분명히 말하는 과제만 넣는다
+(예: 조장·대표만 제출, 해당자만 제출, 과제 취소). 애매하면 넣지 않는다. 학생이 조장인지 모르면 넣고 이유에 그 조건을 적는다."""
+    text = ai.ask(prompt, timeout=600)
+    conn.execute("UPDATE jobs SET claude = claude + 1 WHERE id = ?", (job["id"],))
+    m = re.search(r"\{.*\}", text, re.S)
+    if not m:
+        raise ValueError("Claude 응답을 읽지 못함: " + text[:120])
+    data = _json.loads(m.group(0))
+    for x in data.get("summaries", []):
+        conn.execute("UPDATE notices SET summary = ? WHERE id = ?", (x.get("summary", ""), str(x.get("id"))))
+    known = {t["key"]: t for t in tasks}
+    sugg = [{"key": x["key"], "title": known[x["key"]]["title"], "course": short_course(known[x["key"]]["course"]),
+             "reason": x.get("reason", "")} for x in data.get("exclude", []) if x.get("key") in known]
+    db.set_meta(conn, "notice_suggestions", _json.dumps(sugg, ensure_ascii=False))
+    conn.commit()
+    return f"공지 {len(notes)}개 요약 · 제외 후보 {len(sugg)}개"

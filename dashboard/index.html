@@ -208,6 +208,7 @@
       <div id="view"></div>
     </div>
     <div class="stack">
+      <div id="notices"></div>
       <div id="jobs"></div>
       <div id="downloads"></div>
       <div class="card"><h2>⏰ 다가오는 마감</h2><div id="dues"></div></div>
@@ -343,6 +344,17 @@ function render() {
     : `<p class="empty">아직 없음</p>`;
 
   $("ritual").innerHTML = LIVE ? ritual(now, today) : "";
+
+  const ns = (LIVE && D.notices) || [], sg = (LIVE && D.suggestions) || [];
+  $("notices").innerHTML = (ns.length || sg.length) ? `<div class="card"><h2>📢 새 공지 ${ns.length}</h2>
+    ${ns.map(n => `<div class="item"><span class="txt"><span class="course">${esc(String(n.course).replace(/\s*\d{6}$/, ""))}</span> ${esc(n.title)}
+      ${n.summary ? `<span class="meta" style="display:block">🤖 ${esc(n.summary)}</span>` : ""}</span>
+      <span class="acts" style="opacity:1"><button data-act="nopen" data-id="${esc(n.id)}">열기</button><button data-act="nread" data-id="${esc(n.id)}" title="읽음">✓</button></span></div>`).join("")}
+    ${sg.length ? `<h3 style="font-size:13px;margin:10px 0 4px">🤖 제외 후보 — 공지를 보고 안 해도 될 것 같은 과제</h3>${sg.map(x => `<div class="item"><span class="txt">${esc(x.course)} · ${esc(x.title)}
+      <span class="meta" style="display:block">${esc(x.reason)}</span></span><span class="acts" style="opacity:1">
+      <button data-act="ignore" data-key="${esc(x.key)}">제외</button><button data-act="sgno" data-key="${esc(x.key)}">아니요</button></span></div>`).join("")}` : ""}
+    ${ns.length ? `<div class="acts" style="margin-top:8px"><button data-act="njob" title="Claude 가 새 공지를 읽고 한 줄 요약 + 제외 후보 (구독 사용)">🤖 요약·제외 후보 찾기</button>
+      <button data-act="nreadall">모두 읽음</button></div>` : ""}</div>` : "";
 
   const js = (LIVE && D.jobs) || [];
   const ST = { queued: "⏳ 대기", running: "⚙️ 진행 중", done: "✅ 완료", failed: "⚠️ 실패" };
@@ -578,6 +590,9 @@ document.addEventListener("click", async e => {
   }
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
+  const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
+                 nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
+  if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
   if (act === "report" && !confirm("이 과제의 보고서 파일을 만들고 Claude 로 초안을 씁니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
   const call = { report: ["job/report", { key }], done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
                  start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];

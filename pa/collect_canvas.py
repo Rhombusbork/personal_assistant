@@ -126,3 +126,27 @@ def sync(conn):
 def online_courses():
     online = load_timetable().get("online_classes", [])
     return [c for c in canvas.active_courses() if any(n in c["name"] for n in online)]
+
+
+def sync_notices(conn, courses=None):
+    """이번 학기 공지 중 처음 보는 것을 '새 공지'로 저장. 처음 실행 때는 지난 공지를 모두 읽음으로 둔다."""
+    import html as htmlmod
+    courses = courses or canvas.active_courses()
+    names = {f"course_{c['id']}": c["name"] for c in courses}
+    first_time = conn.execute("SELECT COUNT(*) FROM notices").fetchone()[0] == 0
+    rows = canvas.get("/announcements", **{"context_codes[]": list(names), "start_date": load_timetable()["semester_start"]})
+    new = 0
+    for a in rows:
+        if conn.execute("SELECT 1 FROM notices WHERE id = ?", (str(a["id"]),)).fetchone():
+            continue
+        text = re.sub(r"<br\s*/?>|</p>|</li>|</div>", "\n", a.get("message") or "")
+        text = re.sub(r"\n{3,}", "\n\n", htmlmod.unescape(re.sub(r"<[^>]+>", "", text))).strip()
+        conn.execute("INSERT INTO notices (id, course, title, text, posted_at, url, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (str(a["id"]), names.get(a["context_code"], ""), a["title"], text[:4000],
+                      a.get("posted_at") or a.get("delayed_post_at") or a.get("created_at") or now().isoformat(),
+                      a.get("html_url", ""), "read" if first_time else "new"))
+        if not first_time:
+            db.log(conn, "notice_new", None, title=a["title"])
+            new += 1
+    conn.commit()
+    return new

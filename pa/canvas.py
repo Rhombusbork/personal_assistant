@@ -1,6 +1,7 @@
 """Canvas(canvas.jejunu.ac.kr) REST API 클라이언트. .env 의 CANVAS_TOKEN 사용."""
 import json
 import os
+import urllib.parse
 import urllib.request
 
 from pa.config import load_env
@@ -14,7 +15,7 @@ def get(path, **params):
     token = os.environ.get("CANVAS_TOKEN")
     if not token:
         raise SystemExit(".env 에 CANVAS_TOKEN 이 없습니다.")
-    query = "&".join(f"{k}={v}" for k, v in {"per_page": 100, **params}.items())
+    query = urllib.parse.urlencode({"per_page": 100, **params}, doseq=True)  # 목록 값은 같은 이름으로 여러 번
     url, results = f"{BASE}{path}?{query}", []
     while url:
         req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})

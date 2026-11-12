@@ -6,6 +6,7 @@ plan    현재 학습 계획 (Google Calendar 일정 id 포함)
 busy    계획 기간의 대면 수업·약속 (시각화용)
 sessions 실제로 한 시간 기록 (⏱) — 예상 시간 보정에 쓴다
 jobs    에이전트 작업 대기열과 결과 (🤖 작업 칸)
+notices Canvas 과목 공지
 """
 import json
 import sqlite3
@@ -62,6 +63,16 @@ CREATE TABLE IF NOT EXISTS jobs (               -- 에이전트 작업 (보고�
   claude INTEGER NOT NULL DEFAULT 0,            -- Claude(구독) 호출 횟수
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notices (            -- Canvas 과목 공지
+  id TEXT PRIMARY KEY,
+  course TEXT NOT NULL,
+  title TEXT NOT NULL,
+  text TEXT NOT NULL,
+  posted_at TEXT NOT NULL,
+  url TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'new',           -- new | read
+  summary TEXT                                  -- 🤖 한 줄 요약 (버튼을 눌렀을 때만)
 );
 CREATE TABLE IF NOT EXISTS sessions (           -- 실제로 한 시간 (⏱ 시작 ~ 끝)
   id INTEGER PRIMARY KEY AUTOINCREMENT,

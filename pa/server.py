@@ -14,6 +14,8 @@ GET  /api/materials?key=…   그 항목에 맞는 자료 후보
 POST /api/open-file  자료 파일을 VSCode 탭으로 열기 (study_system·report 안만)
 POST /api/move-download, /api/dismiss-download   다운로드 폴더의 새 파일 정리
 POST /api/job/report 보고서 준비 + 초안 (에이전트 작업 대기열에 넣음)
+POST /api/job/notices 새 공지 요약 + 제외 후보 찾기 (Claude, 버튼으로만)
+POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
 
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
 """
@@ -121,7 +123,8 @@ class Handler(SimpleHTTPRequestHandler):
             elif action == "/api/quick":
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
-                            "/api/move-download", "/api/dismiss-download", "/api/job/report"):
+                            "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices",
+                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -168,6 +171,26 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("할 일을 찾지 못함")
                 jobs.enqueue(conn, "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/job/notices":
+                jobs.enqueue(conn, "notices", "notices", "새 공지 정리")
+                return {"ok": True}
+            if action == "/api/notice/read":
+                if body.get("id") == "all":
+                    conn.execute("UPDATE notices SET status = 'read' WHERE status = 'new'")
+                else:
+                    conn.execute("UPDATE notices SET status = 'read' WHERE id = ?", (str(body["id"]),))
+                conn.commit()
+                return {"ok": True}
+            if action == "/api/notice/open":
+                row = conn.execute("SELECT url FROM notices WHERE id = ?", (str(body["id"]),)).fetchone()
+                if row and row["url"]:
+                    subprocess.Popen(["explorer.exe", row["url"]])
+                return {"ok": True}
+            if action == "/api/suggest/dismiss":
+                sugg = [x for x in json.loads(db.get_meta(conn, "notice_suggestions") or "[]") if x["key"] != body["key"]]
+                db.set_meta(conn, "notice_suggestions", json.dumps(sugg, ensure_ascii=False))
+                conn.commit()
+                return {"ok": True}
             if action == "/api/open-file":
                 return {"ok": True, "where": materials.open_file(body["path"])}
             if action == "/api/move-download":

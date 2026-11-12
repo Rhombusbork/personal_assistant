@@ -41,6 +41,9 @@ def _run(full):
         if full:
             steps.append(f"Canvas {collect_canvas.sync(conn)}건")
             conn.commit()
+            n = collect_canvas.sync_notices(conn)
+            if n:
+                steps.append(f"새 공지 {n}")
             got, err = learningx.sync(conn, collect_canvas.online_courses())
             steps.append(f"자료 +{got}" + (f" ⚠️{err}" if err else ""))
             service = get_service()

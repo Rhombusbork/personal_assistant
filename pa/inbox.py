@@ -51,6 +51,23 @@ RE_CHECK = re.compile(r"^\s*[-*]\s+\[( |x|X)\]\s+(.*)$")
 RE_BULLET = re.compile(r"^\s*[-*]\s+(?:\[[ xX]\]\s+)?(.*)$")
 
 
+RE_EXAM = re.compile(r"시험|고사")
+
+
+def exam_reviews(key, base, exam, cfg, t_now):
+    """시험 전 복습 블록: 시험 7·4·2일 전부터 각 이틀 안에 (설정: exam_review)."""
+    ex = cfg.get("exam_review", {"offsets": [7, 4, 2], "minutes": 60})
+    out, n = [], len(ex["offsets"])
+    for i, d in enumerate(ex["offsets"], 1):
+        start = datetime.combine(exam.date() - timedelta(days=d), time(0, 0), KST)
+        end = min(datetime.combine(exam.date() - timedelta(days=max(d - 2, 1)), time(23, 59), KST), exam)
+        if end < t_now:
+            continue
+        out.append({**base, "key": f"{key}@복습{i}", "title": f"{base['title']} 복습 {i}/{n}",
+                    "minutes": ex["minutes"], "due": end.isoformat(), "earliest": start.isoformat()})
+    return out
+
+
 def parse_line(text, today, default_minutes):
     """할 일 한 줄 → dict. 잘못된 부분이 있으면 ValueError."""
     item = {"due": None, "minutes": default_minutes, "course": "", "every": None}
@@ -264,6 +281,8 @@ def sync(conn):
             continue
         key = f"i:{it['title']}"
         items.append({**base, "key": key, "due": it["due"].isoformat() if it["due"] else None, "earliest": None})
+        if it["due"] and RE_EXAM.search(it["title"]) and not is_checked:
+            items += exam_reviews(key, base, it["due"], cfg, now())
         if is_checked:
             checked.add(key)
 

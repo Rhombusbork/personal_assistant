@@ -175,6 +175,9 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "notices": [dict(r) for r in conn.execute(
+            "SELECT id, course, title, posted_at, summary FROM notices WHERE status = 'new' ORDER BY posted_at DESC")],
+        "suggestions": json.loads(db.get_meta(conn, "notice_suggestions") or "[]"),
         "slack": json.loads(db.get_meta(conn, "slack") or "null"),
         "calibration": calibrate.describe(conn),
         "eveningReview": cfg.get("evening_review", "21:00"),

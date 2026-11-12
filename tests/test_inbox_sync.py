@@ -96,3 +96,11 @@ def test_add_done_remove_roundtrip(conn):
 
 def test_every_line_format():
     assert inbox.format_line("생화학 공부", minutes=60, every=[3, 1]) == "- [ ] 생화학 공부 ~60m 매주:화,목"
+
+
+def test_exam_creates_review_blocks(conn):
+    write("## 할 일\n- [ ] 생화학 기말고사 @12-28 10:00 #생화학\n")  # 미래 날짜
+    inbox.sync(conn)
+    rows = conn.execute("SELECT key, earliest, due FROM tasks WHERE key LIKE 'i:생화학 기말고사@복습%' ORDER BY key").fetchall()
+    assert [r["key"][-3:] for r in rows] == ["복습1", "복습2", "복습3"]
+    assert all(r["earliest"] < r["due"] for r in rows)
