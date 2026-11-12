@@ -10,9 +10,12 @@
 - 이미 시작한 계획 블록은 움직이지 않음
 - 캘린더에는 바뀐 것만 반영
 """
+import json
+import re
+from dataclasses import replace
 from datetime import datetime, time, timedelta
 
-from pa import db
+from pa import calibrate, db
 from pa.config import load_timetable
 from pa.gcal import get_or_create_calendar, get_service
 from pa.model import KIND_LABEL, KST, label, now, parse_dt
@@ -81,7 +84,11 @@ def place(task, slots, cfg, days, used, not_before):
 
 
 def make_plan(items, busy, cfg, t_now, pinned):
-    """pinned: 이미 진행 중이라 고정하는 {key: (start, end)}."""
+    """(계획 [(할 일, 시작, 끝)], 자리 없는 할 일, 이유 {키: 문장}).
+
+    pinned: 이미 진행 중이라 고정하는 {계획 키: (시작, 끝)}.
+    큰 일(split_over 분 초과)은 chunk 분 이하로 나눠 되도록 다른 날에 배치한다 → 키 '원래키#번호'.
+    """
     until = max([t.due for t in items], default=t_now)
     blocks = busy + [(s, e, "진행 중") for s, e in pinned.values()]
     slots = free_slots(t_now, until, cfg, sorted(blocks))
@@ -90,26 +97,74 @@ def make_plan(items, busy, cfg, t_now, pinned):
         used[s.date()] = used.get(s.date(), 0) + int((e - s).total_seconds() // 60)
     main = cfg["main_days"]
     every = main + cfg["fallback_days"]
-    plan, failed, lecture_end = [], [], {}
-    for t in items:
-        if t.key in pinned:
-            continue
-        not_before = t_now if t.kind == "lecture" else lecture_end.get(t.course, t_now)
-        if t.earliest:
-            not_before = max(not_before, t.earliest)
+    split_over, chunk = cfg.get("split_over", 120), cfg.get("chunk_minutes", 90)
+    plan, failed, why, lecture_end = [], [], {}, {}
+    # 마감 순. 같은 날 마감이면 강의 먼저 (17강 퀴즈 23:59:00 < 17강 강의 23:59:59 같은 경우에도 강의 → 퀴즈)
+    items = sorted(items, key=lambda t: (t.due.date(), t.kind != "lecture", t.due))
+
+    def put(t, not_before):
+        """요일 단계별로 배치. (시작, 끝, 이유) 또는 None."""
         if t.earliest and t.earliest.date() == t.due.date():  # 날짜가 정해진 할 일
             got = place(t, slots, cfg, DAYS, used, not_before)
-        else:
-            # 월수금토 → 일요일 → 그래도 마감 전에 자리가 없으면 다른 요일이라도 (예: 목요일 마감)
-            got = (place(t, slots, cfg, main, used, not_before) or place(t, slots, cfg, every, used, not_before)
-                   or place(t, slots, cfg, DAYS, used, not_before))
-        if not got:
-            failed.append(t)
+            return got and (*got, "정해진 날")
+        for days, reason in ((main, "월·수·금·토 중 마감 전 가장 이른 빈 시간"),
+                             (every, "월수금토에 자리가 없어 일요일"),
+                             (DAYS, "마감 전 월수금토·일에 자리가 없어 다른 요일")):
+            got = place(t, slots, cfg, days, used, not_before)
+            if got:
+                return (*got, reason)
+        return None
+
+    for t in items:
+        pinned_parts = [k for k in pinned if k == t.key or k.startswith(t.key + "#")]
+        done_min = sum(int((pinned[k][1] - pinned[k][0]).total_seconds() // 60) for k in pinned_parts)
+        remaining = t.minutes - done_min
+        if remaining <= 0 or (pinned_parts and remaining < 15):
             continue
-        plan.append((t, *got))
-        if t.kind == "lecture":
-            lecture_end[t.course] = max(lecture_end.get(t.course, t_now), got[1])
-    return sorted(plan, key=lambda x: x[1]), failed
+        not_before = t_now if t.kind == "lecture" else lecture_end.get(t.course, t_now)
+        after_lecture = not_before > t_now
+        if t.earliest:
+            not_before = max(not_before, t.earliest)
+
+        big = remaining > split_over and t.kind in ("todo", "assignment")
+        n = -(-remaining // chunk) if big else 1
+        size = -(-remaining // n)
+        parts = [replace(t, minutes=size) for _ in range(n)] if big else [replace(t, minutes=remaining)]
+        first = len(pinned_parts) + 1
+        total = len(pinned_parts) + n
+        chunked = big or bool(pinned_parts)  # 진행 중 블록과 키가 겹치지 않게
+        placed = []
+        for i, part in enumerate(parts):
+            if chunked:
+                part.key = f"{t.key}#{first + i}"
+                part.title = f"{t.title} ({first + i}/{total})"
+            got = None
+            if placed:  # 나눈 조각은 되도록 다음 날부터, 안 되면 같은 날 이어서
+                prev_end = placed[-1][2]
+                next_day = datetime.combine(prev_end.date() + timedelta(days=1), time(0, 0), KST)
+                got = put(part, max(not_before, next_day)) or put(part, max(not_before, prev_end))
+            else:
+                got = put(part, not_before)
+            if not got:
+                failed.append(t)
+                break
+            placed.append((part, got[0], got[1]))
+            reason = got[2] + (" · 같은 과목 강의 뒤" if after_lecture else "") + (f" · 큰 일이라 {total}번으로 나눔" if big else "")
+            if getattr(t, "factor", 1.0) != 1.0:
+                reason += f" · 예상 시간 보정 ×{t.factor:.1f}"
+            why[part.key] = reason
+        plan += placed
+        if t.kind == "lecture" and placed:
+            lecture_end[t.course] = max(lecture_end.get(t.course, t_now), placed[-1][2])
+    return sorted(plan, key=lambda x: x[1]), failed, why
+
+
+def capacity(t_now, cfg, busy, days=7):
+    """앞으로 days 일 동안 계획에 쓸 수 있는 분 (하루 한도 적용)."""
+    per_day = {}
+    for s, e in free_slots(t_now, t_now + timedelta(days=days - 1), cfg, busy):
+        per_day[s.date()] = per_day.get(s.date(), 0) + int((e - s).total_seconds() // 60)
+    return sum(min(cfg["max_minutes_per_day"], m) for m in per_day.values())
 
 
 def summary(t):
@@ -127,23 +182,41 @@ def run(conn, service=None, write=True):
     horizon = t_now + timedelta(days=cfg["horizon_days"])
     items = [t for t in db.tasks(conn, "status = 'open' AND due IS NOT NULL")
              if t_now < t.due <= horizon and (t.earliest is None or t.earliest <= horizon)]
+    # 예상 시간: 직접 정한 값(time 명령)은 그대로, 아니면 ⏱ 기록으로 보정. 이미 한 시간은 뺀다.
+    fs = calibrate.factors(conn)
+    spent = calibrate.tracked(conn)
+    fixed = {r["key"] for r in conn.execute("SELECT key FROM tasks WHERE minutes_override IS NOT NULL")}
+    for t in items:
+        t.factor = 1.0 if t.key in fixed else calibrate.factor_for(fs, t.kind, t.course)
+        t.minutes = round(t.minutes * t.factor)
+        if spent.get(t.key):
+            t.minutes = max(15, t.minutes - spent[t.key])
     by_key = {t.key: t for t in items}
 
     old = {r["key"]: r for r in conn.execute("SELECT * FROM plan").fetchall()}
-    pinned, missed = {}, []
+    pinned, pinned_task, missed = {}, {}, []
     for k, r in old.items():
+        base = k.split("#")[0]
         s, e = parse_dt(r["start"]), parse_dt(r["end"])
-        if k in by_key and s <= t_now < e:
+        if base in by_key and s <= t_now < e:
             pinned[k] = (s, e)
-        elif k in by_key and e <= t_now:
+            m = re.search(r"\((\d+/\d+)\)$", r["summary"])
+            pinned_task[k] = replace(by_key[base], key=k, minutes=int((e - s).total_seconds() // 60),
+                                     title=by_key[base].title + (f" ({m.group(1)})" if m else ""))
+        elif base in by_key and e <= t_now:
             missed.append((k, r["start"]))
 
     # --- 통신 (DB 쓰기 없음)
     service = service or get_service()
     busy = fetch_busy(service, t_now.replace(hour=0, minute=0), horizon + timedelta(days=1))
-    plan, failed = make_plan(items, busy, cfg, t_now, pinned)
-    plan += [(by_key[k], s, e) for k, (s, e) in pinned.items()]
+    plan, failed, why = make_plan(items, busy, cfg, t_now, pinned)
+    plan += [(pinned_task[k], s, e) for k, (s, e) in pinned.items()]
+    for k in pinned:
+        why[k] = "이미 시작한 블록이라 그대로 둠"
     plan.sort(key=lambda x: x[1])
+    week_end = t_now + timedelta(days=7)
+    slack = {"capacity": capacity(t_now, cfg, busy),
+             "need": sum(t.minutes for t in items if t.due <= week_end)}
     rows = sync_calendar(service, plan, old, t_now) if write else None
 
     # --- DB 쓰기 (짧게)
@@ -156,6 +229,8 @@ def run(conn, service=None, write=True):
         conn.executemany("INSERT INTO plan VALUES (?, ?, ?, ?, ?)", rows)
     db.set_meta(conn, "planned_at", t_now.isoformat())
     db.set_meta(conn, "plan_failed", ",".join(t.key for t in failed))
+    db.set_meta(conn, "plan_why", json.dumps(why, ensure_ascii=False))
+    db.set_meta(conn, "slack", json.dumps(slack))
     conn.commit()
     return plan, failed
 

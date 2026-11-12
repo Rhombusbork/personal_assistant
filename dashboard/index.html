@@ -223,6 +223,7 @@
       <div class="card"><h2>과목별 진행 <span class="hint">추적한 항목 중 완료</span></h2><div id="prog"></div></div>
       <div class="card"><h2>완료 추이 <span class="hint">14일</span></h2><div id="trend"></div></div>
       <div class="card"><h2>오늘 실제로 한 시간 <span class="hint">⏱ 기록</span></h2><div id="sessions"></div></div>
+      <div class="card"><h2>예상 시간 보정 <span class="hint">⏱ 기록 3번 이상부터</span></h2><div id="calib"></div></div>
     </div>
   </details>
 </main>
@@ -252,7 +253,7 @@ const tick = (d, all) => all.indexOf(d) % 2 ? "&nbsp;" : `${+d.slice(5, 7)}/${+d
 const stamp = iso => iso ? `${label(ymd(iso))} ${hm(iso)}` : "-";
 const dur = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? " " + (m % 60) + "분" : ""}` : `${m}분`;
 const ddayText = (due, today) => { const n = between(today, ymd(due)); return n < 0 ? "지남" : n === 0 ? "오늘" : "D-" + n; };
-const taskOf = k => (D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || null);
+const taskOf = k => { k = String(k).split("#")[0]; return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || null; };
 
 async function load() {
   try { const r = await fetch("/api/data", { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
@@ -306,7 +307,9 @@ function render() {
   const todayPlan = D.plan.filter(p => ymd(p.start) === today);
   const leftMin = todayPlan.filter(p => dt(p.end) > now).reduce((s, p) => s + (dt(p.end) - Math.max(dt(p.start), now)) / 6e4, 0);
   $("sum").innerHTML = `<span class="pill">남은 할 일 ${open.length}</span><span class="pill">오늘 남은 계획 ${dur(Math.round(leftMin))}</span>`
-    + `<span class="pill ${soon.length ? "hot" : ""}">3일 안 마감 ${soon.length}</span>`;
+    + `<span class="pill ${soon.length ? "hot" : ""}">3일 안 마감 ${soon.length}</span>`
+    + (D.slack ? (() => { const d = D.slack.capacity - D.slack.need;
+        return `<span class="pill ${d < 0 ? "hot" : "on"}" title="앞으로 7일: 쓸 수 있는 시간 ${dur(D.slack.capacity)} / 마감 7일 안 할 일 ${dur(D.slack.need)}">이번 주 ${d < 0 ? "부족 " + dur(-d) : "여유 " + dur(d)}</span>`; })() : "");
   $("courses").innerHTML = (D.courses || []).map(c => `<option value="${esc(c)}">`).join("");
 
   // 타이머
@@ -408,7 +411,8 @@ async function showMaterials(key) {
 function todayView(now, today) {
   const rows = [
     ...D.busy.filter(b => ymd(b.start) === today).map(b => ({ busy: true, start: b.start, end: b.end, title: b.label })),
-    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: taskOf(p.key), summary: p.summary, kind: p.kind })),
+    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: taskOf(p.key), summary: p.summary, kind: p.kind, why: p.why,
+                                                          part: (p.summary.match(/\((\d+\/\d+)\)$/) || [])[1] })),
   ].sort((a, b) => dt(a.start) - dt(b.start));
 
   // 지금 할 일: 진행 중인 블록 → 오늘 다음 블록 → 가장 급한 마감
@@ -419,8 +423,9 @@ function todayView(now, today) {
   if (pick && pick.t) {
     const t = pick.t;
     html += `<div class="now-card"><div class="lbl">${cur ? "▶ 지금 할 일" : `다음 · ${hm(pick.start)} 시작`}</div>
-      <div class="ttl">${esc(t.title)}</div>
+      <div class="ttl">${esc(t.title)}${pick.part ? ` <span class="hint">(${pick.part})</span>` : ""}</div>
       <div class="meta">${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · ${hm(pick.start)}–${hm(pick.end)} · 마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})</div>
+      ${pick.why ? `<div class="meta">왜 지금? ${esc(pick.why)}</div>` : ""}
       ${acts(t, true)}</div>`;
   } else {
     const urgent = D.tasks.filter(t => dt(t.due) >= now)[0];
@@ -445,7 +450,7 @@ function todayView(now, today) {
     } else {
       const t = r.t;
       html += `<div class="tl-row${past}${curC}" style="border-left-color:${color(r.kind)}"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
-        <span class="what">${t ? esc(t.title) : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
+        <span class="what" title="${esc(r.why || "")}">${t ? esc(t.title) + (r.part ? ` (${r.part})` : "") : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
         ${t && !past ? acts(t) : "<span></span>"}</div>`;
     }
   }
@@ -485,7 +490,8 @@ function weekView(now, today, nowMin) {
   h += `</div></div><div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
   const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
   if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b><div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
-    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div><div style="margin-top:6px">${acts(sel)}</div></div>`;
+    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div>
+    ${sp && sp.why ? `<div class="meta">왜 여기? ${esc(sp.why)}</div>` : ""}<div style="margin-top:6px">${acts(sel)}</div></div>`;
   return h;
 }
 
@@ -501,10 +507,17 @@ function renderStats(today) {
   const maxDone = Math.max(1, ...past14.map(d => D.doneByDay[d] || 0));
   $("trend").innerHTML = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
     <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
+  renderCalib();
   $("sessions").innerHTML = D.sessionsToday.length ? D.sessionsToday.map(s => { const t = taskOf(s.key);
     return `<div class="item"><span class="txt">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span>
       <span class="meta">${s.minutes ? dur(s.minutes) : ""}${t && s.minutes ? ` / 예상 ${dur(t.minutes)}` : ""}</span></div>`; }).join("")
     : `<p class="empty">⏱ 시작 버튼으로 기록하면 여기에 쌓이고, 쌓인 기록으로 예상 시간을 고칩니다.</p>`;
+}
+
+function renderCalib() {
+  $("calib").innerHTML = (D.calibration || []).length ? D.calibration.map(c => `<div class="item"><span class="txt">${esc(c.what)}</span>
+    <span class="meta">예상의 ×${c.factor} (${c.n}번)</span></div>`).join("")
+    : `<p class="empty">아직 기록이 부족합니다. 할 일을 ⏱ 시작 → ✓ 끝내고 완료 로 마치면, 같은 종류가 3번 쌓였을 때부터 계획에 반영됩니다.</p>`;
 }
 
 function tickTimer() {

@@ -2,7 +2,7 @@
 import json
 from datetime import timedelta
 
-from pa import db, jobs, materials
+from pa import calibrate, db, jobs, materials
 from pa.config import ROOT, load_timetable
 from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
@@ -55,7 +55,7 @@ def today_md(conn):
     # 오늘 일정 (수업·약속 + 학습 계획)
     rows = [(s, e, f"🏫 {n}", "") for s, e, n in busy if s.date() == today]
     for k, s, e, summ in today_plan:
-        t = tasks.get(k)
+        t = tasks.get(k.split("#")[0])
         rows.append((s, e, summ, f"{dday(t.due, t_now)} {t.due:%H:%M}" if t else ""))
     L += ["## 📅 오늘 일정", ""]
     if rows:
@@ -136,8 +136,10 @@ def dashboard_data(conn):
 
     upcoming = [task_json(t) for t in all_tasks
                 if t.status == "open" and t.due and t_now - timedelta(days=1) <= t.due <= t_now + timedelta(days=21)]
-    plan = [{"key": k, "start": s.isoformat(), "end": e.isoformat(), "summary": summ,
-             "kind": by_key[k].kind if k in by_key else "todo"} for k, s, e, summ in load_plan(conn)]
+    why = json.loads(db.get_meta(conn, "plan_why") or "{}")
+    plan = [{"key": k, "task": k.split("#")[0], "start": s.isoformat(), "end": e.isoformat(), "summary": summ,
+             "why": why.get(k, ""), "kind": by_key[k.split("#")[0]].kind if k.split("#")[0] in by_key else "todo"}
+            for k, s, e, summ in load_plan(conn)]
     busy = [{"start": r["start"], "end": r["end"], "label": r["label"]} for r in conn.execute("SELECT * FROM busy")]
 
     # 과목별 진행: 추적한 항목 중 완료 비율 (제외·삭제 빼고)
@@ -173,6 +175,8 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "slack": json.loads(db.get_meta(conn, "slack") or "null"),
+        "calibration": calibrate.describe(conn),
         "eveningReview": cfg.get("evening_review", "21:00"),
         "recent": recent_changes(conn, by_key, t_now),
         "courseFolders": [c["match"][0] for c in materials._cfg()["courses"]],
