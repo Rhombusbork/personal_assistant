@@ -142,10 +142,21 @@ def guess_course(filename):
 
 
 def scan_downloads(conn):
-    """엔진 시작 이후(처음엔 지금부터) 새로 받은 자료 파일을 '새 다운로드' 목록에 올린다."""
+    """다운로드 폴더 맨 위를 한 번 읽어서: ① 자료 연결 창용 '최근 받은 파일' 목록을 기억하고
+    ② 엔진 시작 이후(처음엔 지금부터) 새로 받은 자료를 '새 다운로드' 목록에 올린다."""
     d = downloads_dir()
     if not d:
         return
+    entries = []
+    with os.scandir(d) as it:  # Windows 쪽 폴더라 한 번만 읽는다
+        for e in it:
+            try:
+                if e.is_file():
+                    entries.append((Path(e.path), e.stat()))
+            except OSError:
+                continue
+    from pa import links
+    links.update_recent_downloads(entries)
     since = float(db.get_meta(conn, "downloads_since") or 0)
     if not since:
         db.set_meta(conn, "downloads_since", str(time.time()))
@@ -154,14 +165,11 @@ def scan_downloads(conn):
     pending = json.loads(db.get_meta(conn, "downloads_pending") or "[]")
     known = {p["path"] for p in pending}
     changed = False
-    for f in d.iterdir():
-        try:
-            if (f.is_file() and f.suffix.lower() in DOC_EXT and f.stat().st_mtime > since
-                    and str(f) not in known and not f.name.endswith((".crdownload", ".part", ".tmp"))):
-                pending.append({"path": str(f), "name": f.name, "course": guess_course(f.name)})
-                changed = True
-        except OSError:
-            continue
+    for f, st in entries:
+        if (f.suffix.lower() in DOC_EXT and st.st_mtime > since
+                and str(f) not in known and not f.name.endswith((".crdownload", ".part", ".tmp"))):
+            pending.append({"path": str(f), "name": f.name, "course": guess_course(f.name)})
+            changed = True
     if changed:
         db.set_meta(conn, "downloads_pending", json.dumps(pending, ensure_ascii=False))
         conn.commit()

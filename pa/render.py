@@ -199,6 +199,7 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "links": _link_names(conn, {t.key for t in all_tasks if t.status == "open"}),
         "exams": _exam_suggestions(conn),
         "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),
@@ -262,6 +263,14 @@ def semester_weeks(all_tasks, t_now):
                       "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
         d = nxt
     return weeks
+
+
+def _link_names(conn, keys):
+    from pa import links
+    try:
+        return links.summary_map(conn, keys)
+    except Exception:
+        return {}
 
 
 def _exam_suggestions(conn):

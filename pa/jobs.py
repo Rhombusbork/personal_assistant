@@ -15,7 +15,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from pa import ai, canvas, db, materials
+from pa import ai, canvas, db, links, materials
 from pa.model import KST, now, parse_dt, short_course
 
 REPORT_DIR = Path.home() / "report"
@@ -142,12 +142,16 @@ def report_job(conn, job, force=False):
 
     _update(conn, job["id"], step="2/5 자료 모으기")
     dirs = materials.course_dirs(task["course"])
-    # 정확히 맞는 자료(17강·Ch22 등) 우선. 아니면 작은 파일만 — 수백 쪽 교과서를 통째로 읽히지 않게
-    mats = []
-    if dirs:
-        cand = materials.scan(dirs[0], task["title"])
-        mats = [f for sc, f in cand if sc >= 10][:3] or [f for sc, f in cand if sc >= 2 and f.stat().st_size < MAX_REF_BYTES][:2]
-    notes = [f for sc, f in materials.scan(dirs[1], task["title"])[:3] if sc >= 2] if dirs else []
+    linked = links.paths(conn, task["key"])
+    if linked:  # 📄 에서 직접 연결한 자료가 있으면 그것만 (넣은 만큼 참고)
+        notes = [f for f in linked if links.root_of(f) and links.root_of(f)[0] == "노트"]
+        mats = [f for f in linked if f not in notes]
+    else:  # 없으면 자동 추측: 정확히 맞는 자료(17강·Ch22 등) 우선, 아니면 작은 파일만 — 수백 쪽 교과서를 통째로 읽히지 않게
+        mats = []
+        if dirs:
+            cand = materials.scan(dirs[0], task["title"])
+            mats = [f for sc, f in cand if sc >= 10][:3] or [f for sc, f in cand if sc >= 2 and f.stat().st_size < MAX_REF_BYTES][:2]
+        notes = [f for sc, f in materials.scan(dirs[1], task["title"])[:3] if sc >= 2] if dirs else []
 
     _update(conn, job["id"], step="3/5 파일 만들기")
     path = report_path(task)

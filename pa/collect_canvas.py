@@ -6,7 +6,7 @@
 import re
 from datetime import date, datetime, time, timedelta
 
-from pa import canvas, db
+from pa import canvas, db, links, materials
 from pa.config import load_timetable
 from pa.model import KST, now, parse_dt
 
@@ -24,7 +24,11 @@ def lecture_deadline(module_name, week, sem_start):
     return datetime.combine(end, time(23, 59), KST)
 
 
+pairs_found = []
+
+
 def collect():
+    pairs_found.clear()
     tt = load_timetable()
     minutes = tt["planner"]["minutes"]
     sem_start = date.fromisoformat(tt["semester_start"])
@@ -51,7 +55,11 @@ def collect():
         if not any(n in cname for n in online):
             continue
         lec_start = len(items)
+        dirs = materials.course_dirs(cname)
+        local = [x["p"] for x in links.index() if dirs and x["p"].startswith(str(dirs[0]) + "/")]
         for m in canvas.get(f"/courses/{c['id']}/modules", **{"include[]": "items"}):
+            if local:  # 같은 주차의 강의 ↔ 자료 짝 (모든 주차, 이미 받은 파일 기준)
+                pairs_found.extend(links.find_pairs(m.get("items", []), local))
             wk = re.match(r"(\d+)주차", m["name"])
             if not wk or not this_week <= int(wk.group(1)) <= this_week + 1:
                 continue
@@ -116,6 +124,9 @@ not_lectures = set()  # LearningX 가 '자료'라고 알려 준 Canvas 항목
 def sync(conn):
     items = collect()
     db.sync_source(conn, "canvas", items)
+    n = links.save_pairs(conn, pairs_found)
+    if n:
+        db.log(conn, "pairs_added", None, count=n)
     for key in not_lectures:
         db.set_status(conn, key, "gone", "auto")
     db.set_meta(conn, "learningx_lecture_error", "; ".join(f"{k}: {v}" for k, v in learningx_errors.items()))

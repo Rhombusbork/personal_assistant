@@ -35,7 +35,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from pa import db, inbox, jobs, materials, render
+from pa import db, inbox, jobs, links, materials, render
 from pa.config import ROOT
 from pa.model import KST
 
@@ -123,6 +123,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/materials"):
             key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
             return self._json(200, materials_for(key))
+        if self.path.startswith(("/api/files", "/api/downloads", "/api/ls", "/api/links")):
+            return self._links_get()
         if self.path.startswith("/api/report-path"):  # 보고서 초안 파일이 이미 있나
             key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
             conn = db.connect()
@@ -185,7 +187,8 @@ class Handler(SimpleHTTPRequestHandler):
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
-                            "/api/google-login", "/api/ack", "/api/exam-dismiss"):
+                            "/api/google-login", "/api/ack", "/api/exam-dismiss",
+                            "/api/link", "/api/unlink", "/api/link-download"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -204,6 +207,34 @@ class Handler(SimpleHTTPRequestHandler):
         if Handler.on_change:
             threading.Thread(target=Handler.on_change, daemon=True).start()
 
+
+    def _links_get(self):
+        """자료 연결 창용 (읽기만): 파일 목록 · 최근 다운로드 · 폴더 하나 · 연결된 자료와 추천."""
+        q = parse_qs(urlparse(self.path).query)
+        arg = lambda k, d="": q.get(k, [d])[0]
+        try:
+            if self.path.startswith("/api/files"):
+                return self._json(200, {"files": links.index(), "roots": [r["name"] for r in links.cfg()["roots"]]})
+            if self.path.startswith("/api/downloads"):
+                return self._json(200, {"files": links.recent_downloads(),
+                                        "days": links.cfg()["downloads"]["recent_days"]})
+            if self.path.startswith("/api/ls"):
+                return self._json(200, links.ls(arg("root", "자료"), arg("path")))
+            conn = db.connect()
+            try:
+                key = arg("key")
+                row = conn.execute("SELECT course, title, kind FROM tasks WHERE key = ?", (key,)).fetchone()
+                dirs = materials.course_dirs(row["course"]) if row else None
+                start = links.root_of(dirs[0]) if dirs else None
+                deleted = json.loads(db.get_meta(conn, "deleted_materials") or "{}").get(row["course"], []) if row else []
+                return self._json(200, {"links": links.get(conn, key), "suggest": links.suggest(conn, key),
+                                        "max": links.cfg()["max_links"], "title": row["title"] if row else key,
+                                        "kind": row["kind"] if row else "", "deleted": deleted,
+                                        "start": {"root": start[0], "path": start[1]} if start else {"root": "자료", "path": ""}})
+            finally:
+                conn.close()
+        except (ValueError, OSError) as e:
+            return self._json(400, {"error": str(e)})
 
     def side_action(self, action, body):
         """inbox 를 바꾸지 않는 요청 — 계획을 다시 짤 필요가 없다 (완료 처리 제외)."""
@@ -232,6 +263,15 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("할 일을 찾지 못함")
                 jobs.enqueue(conn, "report-force" if body.get("force") else "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/link":  # 자료 연결 (여러 개 한 번에도)
+                for p in body.get("paths") or [body["path"]]:
+                    links.add(conn, body["key"], p)
+                return {"ok": True}
+            if action == "/api/unlink":
+                links.remove(conn, body["key"], body["path"])
+                return {"ok": True}
+            if action == "/api/link-download":  # 다운로드 파일 → 과목 폴더로 옮겨서 연결
+                return links.add_download(conn, body["key"], body["path"], body.get("course"))
             if action == "/api/exam-dismiss":
                 from pa import exams
                 exams.dismiss(conn, body["id"])
@@ -256,10 +296,16 @@ class Handler(SimpleHTTPRequestHandler):
                 row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
                 if not row:
                     raise ValueError("할 일을 찾지 못함")
-                _, scored = materials.find(row["course"], row["title"])
-                pdfs = [f for sc, f in scored if sc >= 10 and f.suffix.lower() == ".pdf" and "요약" not in f.parts]
+                linked = [f for f in links.paths(conn, body["key"]) if f.suffix.lower() == ".pdf"]
+                if len(linked) > 1:  # 연결된 PDF 가 여러 개 → 자료 창에서 고르게
+                    return {"ok": True, "choose": True}
+                if linked:
+                    pdfs = linked
+                else:
+                    _, scored = materials.find(row["course"], row["title"])
+                    pdfs = [f for sc, f in scored if sc >= 10 and f.suffix.lower() == ".pdf" and "요약" not in f.parts]
                 if not pdfs:
-                    raise ValueError("이 강의의 자료(PDF)가 아직 없습니다 — 받으면 그때 정리할 수 있어요 (📄 자료 에서 확인)")
+                    raise ValueError("이 강의의 자료(PDF)가 아직 없습니다 — 📄 자료 에서 연결하거나, 받으면 그때 정리할 수 있어요")
                 existing = jobs.summary_path(pdfs[0])
                 if existing.exists():
                     materials.open_file(existing)
