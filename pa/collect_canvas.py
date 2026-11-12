@@ -50,6 +50,7 @@ def collect():
 
         if not any(n in cname for n in online):
             continue
+        lec_start = len(items)
         for m in canvas.get(f"/courses/{c['id']}/modules", **{"include[]": "items"}):
             wk = re.match(r"(\d+)주차", m["name"])
             if not wk or not this_week <= int(wk.group(1)) <= this_week + 1:
@@ -63,11 +64,65 @@ def collect():
                     "due": due.isoformat(), "earliest": None, "minutes": minutes["lecture"],
                     "url": i.get("html_url", ""),
                 })
+        enrich_lectures(items, lec_start, c, t_now)
     return items
+
+
+def enrich_lectures(items, start, course, t_now):
+    """LearningX 데이터로 강의 항목을 정확하게: 실제 출석 마감·영상 길이·수강 완료.
+    지난 주차라도 아직 안 들었고 지각 수강 기간이 남은 강의는 추가한다. 실패하면 그대로 둔다."""
+    from pa import learningx
+    try:
+        info = learningx.lecture_info(course["id"])
+        learningx_errors.pop(course["name"], None)
+    except Exception as e:
+        learningx_errors[course["name"]] = str(e)
+        return
+    seen = set()
+    for it in list(items[start:]):
+        x = info.get(it["key"])
+        if not x:
+            continue
+        if x.get("file"):  # 강의가 아니라 자료(슬라이드 PDF) → 할 일에서 뺀다
+            items.remove(it)
+            not_lectures.add(it["key"])
+            continue
+        seen.add(it["key"])
+        if x["due"]:
+            it["due"] = parse_dt(x["due"]).isoformat()
+        if x["minutes"]:
+            it["minutes"] = x["minutes"]
+        it["done"] = x["done"]
+    for key, x in info.items():
+        if key in seen or x.get("file") or x["done"]:
+            continue
+        due, late = parse_dt(x["due"]), parse_dt(x["late"])
+        if due and due >= t_now:
+            pass
+        elif late and late >= t_now:
+            due = late  # 출석 마감은 지났지만 지각 수강 가능
+        else:
+            continue
+        items.append({"key": key, "kind": "lecture", "course": course["name"],
+                      "title": x["title"] + (" (지각 수강)" if due == late else ""), "due": due.isoformat(),
+                      "earliest": None, "minutes": x["minutes"] or 50,
+                      "url": f"https://canvas.jejunu.ac.kr/courses/{course['id']}/modules/items/{key[1:]}"})
+
+
+learningx_errors = {}
+not_lectures = set()  # LearningX 가 '자료'라고 알려 준 Canvas 항목
 
 
 def sync(conn):
     items = collect()
     db.sync_source(conn, "canvas", items)
+    for key in not_lectures:
+        db.set_status(conn, key, "gone", "auto")
+    db.set_meta(conn, "learningx_lecture_error", "; ".join(f"{k}: {v}" for k, v in learningx_errors.items()))
     db.set_meta(conn, "canvas_synced_at", now().isoformat())
     return len(items)
+
+
+def online_courses():
+    online = load_timetable().get("online_classes", [])
+    return [c for c in canvas.active_courses() if any(n in c["name"] for n in online)]

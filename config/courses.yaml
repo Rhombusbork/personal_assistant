@@ -1,0 +1,22 @@
+# 과목 대응표 — Canvas 과목명(또는 inbox #분류)에 match 가 들어 있으면 그 폴더를 쓴다.
+# 위에서부터 먼저 맞는 것을 쓴다.
+root: ~/study_system
+courses:
+  - match: [생약학]
+    materials: pharmacognosy
+    notes: 생약학
+  - match: [의약품분석학]
+    materials: analytical_chemistry
+    notes: 의약품분석학
+  - match: [유기약화학]
+    materials: organic_chemistry
+    notes: 유기약화학
+  - match: [약학윤리, 윤리]
+    materials: ethics
+    notes: 약학윤리
+  - match: [생화학]
+    materials: biochemistry
+    notes: 생화학
+  - match: [물리약학]
+    materials: physical_pharmacy
+    notes: 물리약학

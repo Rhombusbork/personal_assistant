@@ -11,6 +11,7 @@
   bin/pa ignore <키>          계속 제외 / unignore 로 되돌리기
   bin/pa time <키> <분>       예상 소요 시간 조정
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
+  bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
 """
 import argparse
 import sys
@@ -78,6 +79,9 @@ def cmd_time(conn, args):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "browser":
+        from pa import browser
+        return browser.main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "lectures":
         from pa import lectures
         sys.argv = [sys.argv[0]] + sys.argv[2:]

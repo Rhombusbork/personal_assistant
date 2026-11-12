@@ -151,6 +151,9 @@
   .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
   .prog .fill { height: 100%; background: var(--todo); }
   .empty { color: var(--muted); font-size: 13px; }
+  .mat { margin-top: 12px; border: 1px solid var(--accent); }
+  .mat .item button { font-size: 12px; }
+  .dl select { font-size: 12px; padding: 1px 4px; }
 </style>
 </head>
 <body>
@@ -190,6 +193,7 @@
     </details>
   </div>
 
+  <div id="matPanel"></div>
   <div id="timer"></div>
   <div id="warn"></div>
 
@@ -200,6 +204,7 @@
       <div id="view"></div>
     </div>
     <div class="stack">
+      <div id="downloads"></div>
       <div class="card"><h2>⏰ 다가오는 마감</h2><div id="dues"></div></div>
       <div class="card"><h2>💭 하고 싶은 일 <span class="hint">기한 없음</span></h2><div id="someday"></div>
         <form class="inline" id="somedayForm" autocomplete="off"><input type="text" name="title" placeholder="하고 싶은 일 추가" required><button type="submit">추가</button></form>
@@ -264,6 +269,7 @@ function acts(t, big) {
   const k = esc(t.key), b = [];
   const isActive = D.active && D.active.key === t.key;
   if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : "▶ 열기"}</button>`);
+  if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
   b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
                   : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
   b.push(`<button data-act="done" data-key="${k}">${t.kind === "lecture" ? "✓ 들었음" : "✓ 완료"}</button>`);
@@ -327,7 +333,30 @@ function render() {
       <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>${smallActs(t)}</div>`).join("")
     : `<p class="empty">아직 없음</p>`;
 
+  const dls = (LIVE && D.downloads) || [];
+  $("downloads").innerHTML = dls.length ? `<div class="card dl"><h2>📥 새로 받은 파일 <span class="hint">과목 폴더로 정리</span></h2>${dls.map(f => `
+    <div class="item"><span class="txt">${esc(f.name)}</span><span class="acts" style="opacity:1">
+      <select data-dl="${esc(f.path)}">${["", ...D.courseFolders].map(c => `<option value="${esc(c)}" ${c === f.course ? "selected" : ""}>${c || "과목?"}</option>`).join("")}</select>
+      <button data-act="dlmove" data-path="${esc(f.path)}">옮기기</button><button data-act="dlskip" data-path="${esc(f.path)}" title="무시">✕</button></span></div>`).join("")}</div>` : "";
+
   if ($("statsBox").open) renderStats(today);
+}
+
+// 📄 자료: 강한 단서(17강·Ch24·11주)로 하나가 맞으면 바로 열고, 아니면 후보 목록
+async function showMaterials(key) {
+  const t = taskOf(key);
+  const r = await (await fetch("/api/materials?key=" + encodeURIComponent(key))).json();
+  const strong = r.files.filter(f => f.score >= 10);
+  if (r.strong && strong.length === 1) { await post("open-file", { path: strong[0].path }); return; }
+  let body = "";
+  if (!r.dir) body = `<p class="empty">이 과목의 자료 폴더가 정해져 있지 않습니다 (config/courses.yaml).</p>`;
+  else {
+    if (r.clues.length && !r.strong) body += `<p class="msg">${esc(r.clues.join(", "))} 자료가 아직 없습니다 — Canvas 에서 받으면 '📥 새로 받은 파일'에 뜹니다.</p>`;
+    body += r.files.length ? r.files.map(f => `<div class="item"><span class="txt">${f.score >= 10 ? "⭐ " : ""}${esc(f.name)}</span>
+      <button data-act="openfile" data-path="${esc(f.path)}">열기</button></div>`).join("") : `<p class="empty">맞는 파일 없음</p>`;
+  }
+  $("matPanel").innerHTML = `<div class="card mat"><h2>📄 ${esc(t ? t.title : key)} <span class="hint">${esc(r.dir || "")}</span>
+    <button class="chip" data-act="matclose" style="margin-left:auto">닫기</button></h2>${body}</div>`;
 }
 
 function todayView(now, today) {
@@ -479,6 +508,15 @@ document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act, key = b.dataset.key;
+  if (act === "matclose") { $("matPanel").innerHTML = ""; return; }
+  if (act === "mat") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }
+  if (act === "openfile") { try { await post("open-file", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
+  if (act === "dlmove") {
+    const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
+    if (!course) { alert("과목을 골라 주세요"); return; }
+    try { await post("move-download", { path: b.dataset.path, course }); } catch (err) { alert(err.message); } return;
+  }
+  if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
   const call = { done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
                  start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];

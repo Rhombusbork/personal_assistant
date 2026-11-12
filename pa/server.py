@@ -10,16 +10,20 @@ POST /api/quick      빠른 입력 한 줄 ('@내일 18시 ~2h #과목')
 POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop 에 done=true 면 완료까지)
 POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
+GET  /api/materials?key=…   그 항목에 맞는 자료 후보
+POST /api/open-file  자료 파일을 VSCode 탭으로 열기 (study_system·report 안만)
+POST /api/move-download, /api/dismiss-download   다운로드 폴더의 새 파일 정리
 
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
 """
 import json
 import subprocess
 import threading
+from urllib.parse import parse_qs, urlparse
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-from pa import db, inbox, render
+from pa import db, inbox, materials, render
 from pa.config import ROOT
 from pa.model import KST
 
@@ -41,6 +45,20 @@ def parse_add(body):
         "course": str(body.get("course", "")).strip(),
         "every": [int(d) for d in body.get("every", [])] or None,
     }
+
+
+def materials_for(key):
+    conn = db.connect()
+    try:
+        row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (key,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {"files": [], "dir": None, "strong": False}
+    mat, scored = materials.find(row["course"], row["title"])
+    return {"dir": str(mat) if mat else None, "clues": sorted("".join(c) for c in materials.clues(row["title"])),
+            "strong": bool(scored) and scored[0][0] >= 10,
+            "files": [{"name": str(f.relative_to(mat)), "path": str(f), "score": sc} for sc, f in scored[:8]]}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -72,6 +90,9 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self._host_ok():
             return self._json(403, {"error": "host"})
+        if self.path.startswith("/api/materials"):
+            key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
+            return self._json(200, materials_for(key))
         if self.path.split("?")[0] == "/api/data":
             conn = db.connect()
             try:
@@ -98,7 +119,8 @@ class Handler(SimpleHTTPRequestHandler):
                 inbox.remove(body["key"]); msg = "삭제"
             elif action == "/api/quick":
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
-            elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync"):
+            elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
+                            "/api/move-download", "/api/dismiss-download"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -138,6 +160,14 @@ class Handler(SimpleHTTPRequestHandler):
                 if not row or not row["url"]:
                     raise ValueError("열 수 있는 링크가 없음")
                 subprocess.Popen(["explorer.exe", row["url"]])  # Windows 기본 브라우저 (학교 로그인 유지)
+                return {"ok": True}
+            if action == "/api/open-file":
+                return {"ok": True, "where": materials.open_file(body["path"])}
+            if action == "/api/move-download":
+                dst = materials.move_download(conn, body["path"], body["course"])
+                return {"ok": True, "message": f"옮김: {dst}"}
+            if action == "/api/dismiss-download":
+                materials.dismiss_download(conn, body["path"])
                 return {"ok": True}
             if action == "/api/sync" and Handler.on_sync:
                 threading.Thread(target=Handler.on_sync, daemon=True).start()

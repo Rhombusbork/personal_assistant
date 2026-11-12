@@ -6,11 +6,12 @@ watch()    시작할 때 full 실행 후, inbox.md 가 저장될 때마다 빠�
            VSCode 작업 공간을 열면 자동으로 켜진다.
 """
 import fcntl
+import threading
 import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, inbox, plan, render, server, sync_canvas
+from pa import collect_canvas, db, inbox, learningx, materials, plan, render, server, sync_canvas
 from pa.gcal import get_service
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
@@ -40,6 +41,8 @@ def _run(full):
         if full:
             steps.append(f"Canvas {collect_canvas.sync(conn)}건")
             conn.commit()
+            got, err = learningx.sync(conn, collect_canvas.online_courses())
+            steps.append(f"자료 +{got}" + (f" ⚠️{err}" if err else ""))
             service = get_service()
             c, u, r = sync_canvas.run(conn, service)
             steps.append(f"과제 캘린더 +{c} ~{u} -{r}")
@@ -59,6 +62,19 @@ def _mtime():
         return inbox.PATH.stat().st_mtime
     except FileNotFoundError:
         return 0
+
+
+def _download_watcher():
+    """다운로드 폴더를 5초마다 본다 — 따로 도는 스레드라 동기화 중에도 멈추지 않는다."""
+    while True:
+        conn = db.connect()
+        try:
+            materials.scan_downloads(conn)
+        except Exception as e:
+            log(f"다운로드 폴더 확인 실패: {e}")
+        finally:
+            conn.close()
+        time.sleep(5)
 
 
 def watch():
@@ -81,6 +97,7 @@ def watch():
         log(f"대시보드: http://localhost:{server.PORT}")
     else:
         log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
+    threading.Thread(target=_download_watcher, daemon=True).start()
     log("비서 감시 시작 — inbox.md 저장 시 자동 반영, 15분마다 계획 갱신, Canvas 는 3시간마다 확인")
     run(full=True)
     last_full = last_plan = time.time()

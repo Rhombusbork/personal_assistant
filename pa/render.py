@@ -2,7 +2,7 @@
 import json
 from datetime import timedelta
 
-from pa import db
+from pa import db, materials
 from pa.config import ROOT, load_timetable
 from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
@@ -156,6 +156,9 @@ def dashboard_data(conn):
         done_by_day[d] = done_by_day.get(d, 0) + 1
 
     warns = [w for w in (db.get_meta(conn, "inbox_warnings") or "").split("\n") if w]
+    lx = db.get_meta(conn, "learningx_error") or db.get_meta(conn, "learningx_lecture_error")
+    if lx:
+        warns.append(f"강의 플랫폼(LearningX) 연결 문제: {lx} — 터미널에서 bin/pa browser login 으로 다시 로그인")
     warns += [f"마감 전 빈 시간 부족: {label(by_key[k])}" for k in (db.get_meta(conn, "plan_failed") or "").split(",")
               if k in by_key]
     return {
@@ -168,6 +171,8 @@ def dashboard_data(conn):
         "plannedAt": db.get_meta(conn, "planned_at"),
         "courses": sorted({short_course(t.course) for t in all_tasks if t.course}),
         "active": active_json(conn, by_key),
+        "downloads": materials.pending_downloads(conn),
+        "courseFolders": [c["match"][0] for c in materials._cfg()["courses"]],
         "todayDone": [task_json(by_key[r["key"]]) for r in conn.execute(
             "SELECT key FROM tasks WHERE status = 'done' AND done_at >= ? ORDER BY done_at",
             (t_now.replace(hour=0, minute=0).isoformat(),)) if r["key"] in by_key],
