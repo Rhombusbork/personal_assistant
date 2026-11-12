@@ -19,8 +19,19 @@ PLAN_EVERY = 15 * 60
 POLL = 1.0
 
 
+LOG_FILE = db.PATH.parent / "pa.log"
+
+
 def log(msg):
-    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+    line = f"[{datetime.now():%m-%d %H:%M:%S}] {msg}"
+    print(line, flush=True)
+    try:  # 창 없이(작업 스케줄러) 돌 때도 남도록 파일에도. 1MB 넘으면 뒤쪽 절반만 남김
+        if LOG_FILE.exists() and LOG_FILE.stat().st_size > 1_000_000:
+            LOG_FILE.write_text(LOG_FILE.read_text()[-500_000:])
+        with LOG_FILE.open("a") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
 
 
 def run(full=False):
@@ -51,9 +62,13 @@ def _run(full):
             steps.append(f"과제 캘린더 +{c} ~{u} -{r}")
         result, failed = plan.run(conn, service)
         steps.append(f"계획 {len(result)}건" + (f" (자리 부족 {len(failed)})" if failed else ""))
+        db.set_meta(conn, "last_error", "")
+        conn.commit()
     except Exception as e:  # 네트워크 오류 등 — 화면은 가진 데이터로라도 갱신
         steps.append(f"오류: {e}")
         traceback.print_exc()
+        db.set_meta(conn, "last_error", f"{datetime.now():%m/%d %H:%M} {e}")
+        conn.commit()
     finally:
         render.write(conn)
         conn.close()

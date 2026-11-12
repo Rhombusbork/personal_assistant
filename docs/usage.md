@@ -35,6 +35,35 @@
 강의·자료 **페이지를 열지 않고** 데이터만 읽는다 (열람·출석 기록이 남지 않게).
 로그인이 만료되면 대시보드에 "LearningX 연결 문제"가 뜬다 → `bin/pa browser login` 다시.
 
+## VSCode 를 안 열어도 자동 실행 (Windows 작업 스케줄러)
+
+Windows 로그인할 때 + 매일 07:00·13:00·19:00 에 창 없이 `bin/pa run --full` 을 돌린다.
+Windows PowerShell 에서 한 번만:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007\personal_assistant\scripts\windows\register-task.ps1"
+```
+
+- 결과는 `data/pa.log`, 실패하면 대시보드·TODAY.md 에 "마지막 동기화 실패"
+- 지우기: 같은 폴더의 `unregister-task.ps1`
+
+## 공지 · 시험 · 요약 (R6·R8)
+
+- **📢 새 공지**: Canvas 확인 때 새 공지를 모아 보여 준다 (코드만). [🤖 요약·제외 후보 찾기] 를 누르면 그때만 Claude 가
+  공지마다 한 줄 요약 + "안 내도 될 것 같은 과제"를 제안 → [제외] / [아니요]
+- **시험 모드**: 제목에 `시험`·`고사` 가 들어간 할 일 (예: `생화학 기말고사 @12-15 10시 #생화학`) →
+  시험 7·4·2일 전부터 복습 1시간씩 3번 자동 배치 (`config/timetable.yaml` 의 `exam_review`)
+- **🤖 요약**: 📄 자료 목록의 PDF 옆 버튼 → `materials/<과목>/요약/<이름>_요약.md` (내 노트 notes/ 와 섞지 않음)
+- **✍ 초안**: 과제 옆 버튼 → 과제 설명·자료·내 노트로 `~/report/` 에 규칙에 맞는 파일 + Claude 초안 (내 생각 자리는 비워 둠)
+- Claude 는 위 버튼을 눌렀을 때만 쓴다. 🤖 작업 칸에 몇 번 썼는지 표시
+
+## 계획이 똑똑해지는 부분 (R5)
+
+- ⏱ 기록이 같은 종류·과목에서 3번 쌓이면 예상 시간을 자동 보정 (통계 → 예상 시간 보정)
+- 이미 ⏱ 로 한 시간은 남은 시간에서 뺀다
+- 2시간 넘는 과제·할 일은 90분 이하로 나눠 여러 날에 (`split_over`, `chunk_minutes`)
+- 블록마다 "왜 여기?" 이유, 머리글에 "이번 주 여유/부족"
+
 ## inbox.md 문법
 
 ```markdown

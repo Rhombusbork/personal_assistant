@@ -158,6 +158,8 @@ def dashboard_data(conn):
         done_by_day[d] = done_by_day.get(d, 0) + 1
 
     warns = [w for w in (db.get_meta(conn, "inbox_warnings") or "").split("\n") if w]
+    if db.get_meta(conn, "last_error"):
+        warns.append(f"마지막 동기화 실패: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
     lx = db.get_meta(conn, "learningx_error") or db.get_meta(conn, "learningx_lecture_error")
     if lx:
         warns.append(f"강의 플랫폼(LearningX) 연결 문제: {lx} — 터미널에서 bin/pa browser login 으로 다시 로그인")
