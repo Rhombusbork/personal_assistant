@@ -45,6 +45,7 @@ planner:
   break_minutes: 10                 # 항목 사이 휴식
   horizon_days: 14                  # 이 기간 안에 마감인 항목만 계획
   max_minutes_per_day: 240         # 하루 최대 학습 배치 시간
+  evening_review: "21:00"           # 이 시각 이후 대시보드에 '하루 마무리'
   minutes:                          # 기본 예상 소요 시간 (항목별로 `pa.tasks time` 으로 조정)
     lecture: 50
     quiz: 20

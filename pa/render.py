@@ -173,6 +173,8 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "eveningReview": cfg.get("evening_review", "21:00"),
+        "recent": recent_changes(conn, by_key, t_now),
         "courseFolders": [c["match"][0] for c in materials._cfg()["courses"]],
         "todayDone": [task_json(by_key[r["key"]]) for r in conn.execute(
             "SELECT key FROM tasks WHERE status = 'done' AND done_at >= ? ORDER BY done_at",
@@ -181,6 +183,26 @@ def dashboard_data(conn):
             "SELECT key, start, end, minutes FROM sessions WHERE start >= ? ORDER BY start",
             (t_now.replace(hour=0, minute=0).isoformat(),))],
     }
+
+
+CHANGE_LABEL = {"task_added": "🆕 새로 생김", "due_changed": "🔁 마감 바뀜", "material_downloaded": "📥 자료 받음",
+                "job_done": "🤖 작업 완료"}
+
+
+def recent_changes(conn, by_key, t_now):
+    """지난 24시간 동안 바뀐 것 (아침 브리핑용). 자동 완료(제출·수강 감지)도 포함."""
+    rows = conn.execute("SELECT ts, type, key, detail FROM events WHERE ts >= ? ORDER BY id DESC LIMIT 60",
+                        ((t_now - timedelta(hours=24)).isoformat(),)).fetchall()
+    out = []
+    for r in rows:
+        d = json.loads(r["detail"]) if r["detail"] else {}
+        t = by_key.get(r["key"])
+        name = label(t) if t else d.get("file") or r["key"] or ""
+        if r["type"] == "task_done" and d.get("by") == "auto":
+            out.append({"ts": r["ts"], "label": "✅ 자동 완료 (제출·수강 확인)", "name": name})
+        elif r["type"] in CHANGE_LABEL and not (r["type"] == "task_added" and t and t.source == "inbox"):
+            out.append({"ts": r["ts"], "label": CHANGE_LABEL[r["type"]], "name": name})
+    return out[:20]
 
 
 def active_json(conn, by_key):

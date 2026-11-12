@@ -152,6 +152,9 @@
   .prog .fill { height: 100%; background: var(--todo); }
   .empty { color: var(--muted); font-size: 13px; }
   .mat { margin-top: 12px; border: 1px solid var(--accent); }
+  .ritual { margin-top: 12px; border: 1px solid var(--todo); background: color-mix(in srgb, var(--todo) 6%, var(--card)); }
+  .ritual h3 { font-size: 13px; margin: 10px 0 4px; color: var(--muted); }
+  .ritual ul { margin: 0; padding-left: 18px; font-size: 13px; }
   .mat .item button { font-size: 12px; }
   .dl select { font-size: 12px; padding: 1px 4px; }
 </style>
@@ -193,6 +196,7 @@
     </details>
   </div>
 
+  <div id="ritual"></div>
   <div id="matPanel"></div>
   <div id="timer"></div>
   <div id="warn"></div>
@@ -335,6 +339,8 @@ function render() {
       <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>${smallActs(t)}</div>`).join("")
     : `<p class="empty">아직 없음</p>`;
 
+  $("ritual").innerHTML = LIVE ? ritual(now, today) : "";
+
   const js = (LIVE && D.jobs) || [];
   const ST = { queued: "⏳ 대기", running: "⚙️ 진행 중", done: "✅ 완료", failed: "⚠️ 실패" };
   $("jobs").innerHTML = js.length ? `<div class="card"><h2>🤖 작업</h2>${js.map(j => `<div class="item"><span class="txt">
@@ -349,6 +355,37 @@ function render() {
       <button data-act="dlmove" data-path="${esc(f.path)}">옮기기</button><button data-act="dlskip" data-path="${esc(f.path)}" title="무시">✕</button></span></div>`).join("")}</div>` : "";
 
   if ($("statsBox").open) renderStats(today);
+}
+
+// ---- 아침 브리핑 · 저녁 마무리 (하루에 한 번씩, 닫으면 그날은 다시 안 뜸)
+const seenToday = k => { try { return localStorage.getItem(k) === ymdOf(new Date()); } catch { return false; } };
+function ritual(now, today) {
+  const evening = `${pad(now.getHours())}:${pad(now.getMinutes())}` >= D.eveningReview;
+  const todayPlan = D.plan.filter(p => ymd(p.start) === today);
+  const tomorrow = addDays(today, 1);
+  const firstTomorrow = [...D.busy.filter(b => ymd(b.start) === tomorrow), ...D.plan.filter(p => ymd(p.start) === tomorrow)]
+    .sort((a, b) => dt(a.start) - dt(b.start))[0];
+  if (evening && !seenToday("pa.evening")) {
+    const missed = todayPlan.filter(p => dt(p.end) <= now).map(p => taskOf(p.key)).filter(t => t && t.status === "open");
+    const worked = D.sessionsToday.reduce((s, x) => s + (x.minutes || 0), 0);
+    return `<div class="card ritual"><h2>🌙 하루 마무리 <button class="chip" data-act="ritualclose" data-k="pa.evening" style="margin-left:auto">마무리</button></h2>
+      <h3>오늘 끝낸 일 ${D.todayDone.length}</h3><ul>${D.todayDone.map(t => `<li>${esc(t.title)}</li>`).join("") || "<li>없음</li>"}</ul>
+      ${missed.length ? `<h3>계획했지만 아직 안 끝난 일 — 실제로 했으면 ✓, 아니면 다음 빈 시간으로 자동으로 옮겨집니다</h3>${missed.map(t => `<div class="item"><span class="txt">${esc(t.title)}</span>
+        <button data-act="done" data-key="${esc(t.key)}">✓ 했음</button></div>`).join("")}` : ""}
+      ${worked ? `<h3>⏱ 오늘 기록한 시간 ${dur(worked)}</h3>` : ""}
+      <h3>내일 ${label(tomorrow)}</h3><ul><li>${firstTomorrow ? `첫 일정 ${hm(firstTomorrow.start)} ${esc(firstTomorrow.label || firstTomorrow.summary)}` : "일정 없음"}</li></ul></div>`;
+  }
+  if (!evening && !seenToday("pa.morning")) {
+    const cls = D.busy.filter(b => ymd(b.start) === today);
+    const mins = todayPlan.reduce((s, p) => s + (dt(p.end) - dt(p.start)) / 6e4, 0);
+    const soon = D.tasks.filter(t => dt(t.due) >= now && between(today, ymd(t.due)) <= 2);
+    return `<div class="card ritual"><h2>☀️ 오늘 브리핑 <button class="chip primary" data-act="ritualclose" data-k="pa.morning" style="margin-left:auto">오늘 시작</button></h2>
+      <ul><li>수업·약속 ${cls.length}개${cls.length ? " (" + cls.map(b => `${hm(b.start)} ${esc(b.label)}`).join(", ") + ")" : ""}</li>
+        <li>계획된 할 일 ${todayPlan.length}개 · ${dur(Math.round(mins))}${todayPlan[0] ? ` · 첫 블록 ${hm(todayPlan[0].start)}` : ""}</li></ul>
+      ${soon.length ? `<h3>이틀 안 마감</h3><ul>${soon.map(t => `<li>${ddayText(t.due, today)} ${hm(t.due)} ${esc(t.title)}</li>`).join("")}</ul>` : ""}
+      ${D.recent.length ? `<h3>지난 하루 동안 바뀐 것</h3><ul>${D.recent.map(r => `<li>${r.label} · ${esc(r.name)}</li>`).join("")}</ul>` : ""}</div>`;
+  }
+  return "";
 }
 
 // 📄 자료: 강한 단서(17강·Ch24·11주)로 하나가 맞으면 바로 열고, 아니면 후보 목록
@@ -518,6 +555,7 @@ document.addEventListener("click", async e => {
   if (!b) return;
   const act = b.dataset.act, key = b.dataset.key;
   if (act === "matclose") { $("matPanel").innerHTML = ""; return; }
+  if (act === "ritualclose") { try { localStorage.setItem(b.dataset.k, ymdOf(new Date())); } catch {} render(); return; }
   if (act === "mat") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }
   if (act === "openfile") { try { await post("open-file", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "dlmove") {
