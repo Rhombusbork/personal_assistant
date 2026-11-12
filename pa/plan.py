@@ -167,6 +167,12 @@ def capacity(t_now, cfg, busy, days=7):
     return sum(min(cfg["max_minutes_per_day"], m) for m in per_day.values())
 
 
+def is_exam(t):
+    """inbox 의 시험 항목 자체 (예: '생화학 기말고사') — 공부 블록이 아니라 시험 시각. 복습 블록은 따로 생긴다."""
+    from pa.inbox import RE_EXAM
+    return t.kind == "todo" and bool(RE_EXAM.search(t.title)) and "@복습" not in t.key and "복습" not in t.title
+
+
 def signature(conn):
     """계획에 영향을 주는 것들의 지문 — 할 일·예상 시간·설정·날짜·⏱ 기록. 같으면 다시 계획할 필요가 없다."""
     import hashlib
@@ -205,7 +211,7 @@ def run(conn, service=None, write=True):
     t_now = now()
     horizon = t_now + timedelta(days=cfg["horizon_days"])
     items = [t for t in db.tasks(conn, "status = 'open' AND due IS NOT NULL")
-             if t_now < t.due <= horizon and (t.earliest is None or t.earliest <= horizon)]
+             if t_now < t.due <= horizon and (t.earliest is None or t.earliest <= horizon) and not is_exam(t)]
     # 예상 시간: 직접 정한 값(time 명령)은 그대로, 아니면 ⏱ 기록으로 보정. 이미 한 시간은 뺀다.
     fs = calibrate.factors(conn)
     spent = calibrate.tracked(conn)

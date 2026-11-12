@@ -51,6 +51,7 @@ RE_CHECK = re.compile(r"^\s*[-*]\s+\[( |x|X)\]\s+(.*)$")
 RE_BULLET = re.compile(r"^\s*[-*]\s+(?:\[[ xX]\]\s+)?(.*)$")
 
 
+KEYLIKE = re.compile(r"[a-z]\d+|[a-z]:\S+")  # 'a475087', 'm2890877', 'i:제목' 같은 키
 RE_EXAM = re.compile(r"(?<!임상)시험|고사")  # '임상시험' 같은 말은 시험이 아님
 
 
@@ -242,6 +243,11 @@ def ignore_like(conn, key):
     return text
 
 
+def keep(key):
+    """단어 제외 규칙에 걸린 과제 하나를 계속 보이게 ('!키' 예외)."""
+    _insert("ignore", f"- !{key}")
+
+
 def unignore(text):
     """## 제외 칸에서 그 줄을 지운다 (키든 단어든). 다음 반영 때 다시 나타난다."""
     lines = PATH.read_text().splitlines()
@@ -269,7 +275,11 @@ def excluded(conn):
     for _, _, text in read_sections()["ignore"]:
         keys = match(conn, text, ("open", "ignored", "done"))
         titles = [r["title"] for k in keys[:5] if (r := conn.execute("SELECT title FROM tasks WHERE key = ?", (k,)).fetchone())]
-        out.append({"text": text, "pattern": not re.fullmatch(r"[a-z]\d+|[a-z]:\S+", text), "count": len(keys), "titles": titles})
+        if text.startswith("!"):  # 예외 줄
+            row = conn.execute("SELECT title FROM tasks WHERE key = ?", (text[1:],)).fetchone()
+            out.append({"text": text, "keep": True, "pattern": False, "count": 1, "titles": [row["title"]] if row else []})
+            continue
+        out.append({"text": text, "pattern": not KEYLIKE.fullmatch(text), "count": len(keys), "titles": titles})
     return out
 
 
@@ -362,15 +372,25 @@ def sync(conn):
             warnings.append(f"inbox.md {no}번째 줄 '{text}' 가 {len(keys)}개 항목에 맞음 — 더 구체적으로 쓰거나 키를 쓰세요: "
                             + ", ".join(f"`{k}`" for k in keys[:5]))
 
-    # ## 제외 — 여기 있는 동안만 제외
-    ignore_keys = set()
+    # ## 제외 — 여기 있는 동안만 제외. '!키' 줄은 예외 (단어 규칙에 걸려도 계속 보이게)
+    ignore_keys, keep, by_rule = set(), set(), {}
     for no, _, text in sections["ignore"]:
+        if text.startswith("!"):
+            keep.add(text[1:].strip())
+            continue
         keys = match(conn, text, ("open", "ignored"))
-        if not keys:
+        is_key = bool(KEYLIKE.fullmatch(text))
+        if not keys and is_key:  # 단어 규칙은 앞으로 생길 과제를 위한 것이라 지금 없어도 괜찮다
             warnings.append(f"inbox.md {no}번째 줄 '{text}' 에 맞는 항목 없음")
-        ignore_keys.update(keys)
+        for k in keys:
+            ignore_keys.add(k)
+            if not is_key:
+                by_rule.setdefault(k, text)
+    ignore_keys -= keep
     for k in ignore_keys:
-        db.set_status(conn, k, "ignored", "inbox")
+        # 단어 규칙이 '새로' 숨긴 과제는 기록해서 알려 준다 (모르고 놓치지 않게)
+        if db.set_status(conn, k, "ignored", "inbox") and k in by_rule:
+            db.log(conn, "rule_hidden", k, rule=by_rule[k])
     for r in conn.execute("SELECT key FROM tasks WHERE status = 'ignored' AND status_by = 'inbox'").fetchall():
         if r["key"] not in ignore_keys:
             db.set_status(conn, r["key"], "open", "inbox")

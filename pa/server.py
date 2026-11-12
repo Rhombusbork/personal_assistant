@@ -65,6 +65,14 @@ def parse_add(body):
     }
 
 
+def _meta(k):
+    conn = db.connect()
+    try:
+        return db.get_meta(conn, k)
+    finally:
+        conn.close()
+
+
 def materials_for(key):
     conn = db.connect()
     try:
@@ -74,7 +82,9 @@ def materials_for(key):
     if not row:
         return {"files": [], "dir": None, "strong": False}
     mat, scored = materials.find(row["course"], row["title"])
-    return {"dir": str(mat) if mat else None, "clues": sorted("".join(c) for c in materials.clues(row["title"])),
+    deleted = json.loads(_meta("deleted_materials") or "{}").get(row["course"], [])
+    return {"dir": str(mat) if mat else None, "deleted": deleted,
+            "clues": sorted("".join(c) for c in materials.clues(row["title"])),
             "strong": bool(scored) and scored[0][0] >= 10,
             "files": [{"name": str(f.relative_to(mat)), "path": str(f), "score": sc,
                        "pdf": f.suffix.lower() == ".pdf", "summary": str(jobs.summary_path(f)) if jobs.summary_path(f).exists() else None}
@@ -113,6 +123,18 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/materials"):
             key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
             return self._json(200, materials_for(key))
+        if self.path.startswith("/api/report-path"):  # 보고서 초안 파일이 이미 있나
+            key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
+            conn = db.connect()
+            try:
+                row = conn.execute("SELECT * FROM tasks WHERE key = ?", (key,)).fetchone()
+                p = jobs.report_path(dict(row)) if row else None
+            except Exception as e:
+                return self._json(400, {"error": str(e)})
+            finally:
+                conn.close()
+            return self._json(200, {"exists": bool(p and p.exists()), "path": str(p) if p else None,
+                                    "name": p.name if p else None})
         if self.path.startswith("/api/viewers"):
             return self._json(200, {"count": viewer_count()})
         if self.path.split("?")[0] == "/api/data":
@@ -146,6 +168,11 @@ class Handler(SimpleHTTPRequestHandler):
                     conn.close()
             elif action == "/api/ignore":
                 inbox.ignore(body["key"]); msg = "제외"
+            elif action == "/api/exam-add":  # 시험 일정 후보 → inbox (시험 모드가 복습을 배치)
+                when = datetime.fromisoformat(f"{body['date']}T{body.get('time') or '09:00'}").replace(tzinfo=KST)
+                msg = inbox.add_task(title=body["title"], due=when, minutes=None, course=body.get("course", ""), every=None)
+            elif action == "/api/keep":
+                inbox.keep(body["key"]); msg = "이 과제는 계속 보이기"
             elif action == "/api/unignore":
                 inbox.unignore(body["text"]); msg = "제외 취소"
             elif action == "/api/remove":
@@ -158,7 +185,7 @@ class Handler(SimpleHTTPRequestHandler):
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
-                            "/api/google-login", "/api/ack"):
+                            "/api/google-login", "/api/ack", "/api/exam-dismiss"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -203,8 +230,12 @@ class Handler(SimpleHTTPRequestHandler):
                 row = conn.execute("SELECT title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
                 if not row:
                     raise ValueError("할 일을 찾지 못함")
-                jobs.enqueue(conn, "report", body["key"], row["title"])
+                jobs.enqueue(conn, "report-force" if body.get("force") else "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/exam-dismiss":
+                from pa import exams
+                exams.dismiss(conn, body["id"])
+                return {"ok": True}
             if action == "/api/google-login":
                 subprocess.Popen([str(ROOT / "bin" / "pa"), "google-login"],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

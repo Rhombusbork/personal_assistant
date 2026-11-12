@@ -167,6 +167,12 @@ def dashboard_data(conn):
     if fails:
         warns.append(f"휴대폰 입력 {len(fails)}건을 반영하지 못했습니다 ({', '.join(fmt_time(r['ts']) for r in fails[:3])}) "
                      "— 휴대폰에서 다시 입력해 주세요 [ack:phone]")
+    ack = db.get_meta(conn, "ack_hidden") or "0"
+    for r in conn.execute("SELECT e.key, e.detail, t.title, t.due FROM events e JOIN tasks t ON t.key = e.key "
+                          "WHERE e.type = 'rule_hidden' AND e.ts > ? AND t.status = 'ignored' ORDER BY e.ts", (ack,)):
+        rule = json.loads(r["detail"] or "{}").get("rule", "")
+        warns.append(f"제외 규칙 '{rule}' 이(가) 새 과제를 숨겼어요: {r['title']} (마감 {fmt_time(r['due'])}) "
+                     f"[keep={r['key']}] [ack:hidden]")
     tt = load_timetable()
     end = datetime.fromisoformat(tt["semester_end"]).date()
     left = (end - t_now.date()).days
@@ -193,6 +199,7 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "exams": _exam_suggestions(conn),
         "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),
         "semester": semester_weeks(all_tasks, t_now),
@@ -255,6 +262,14 @@ def semester_weeks(all_tasks, t_now):
                       "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
         d = nxt
     return weeks
+
+
+def _exam_suggestions(conn):
+    from pa import exams
+    try:
+        return exams.suggestions(conn)
+    except Exception:
+        return []
 
 
 def inbox_excluded(conn):

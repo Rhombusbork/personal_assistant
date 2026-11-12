@@ -61,7 +61,8 @@ def run_next(conn):
         return False
     _update(conn, row["id"], status="running", step="시작")
     try:
-        result = {"report": report_job, "notices": notices_job, "summary": summary_job}[row["kind"]](conn, row)
+        result = {"report": report_job, "report-force": lambda c, j: report_job(c, j, force=True),
+                  "notices": notices_job, "summary": summary_job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
         db.log(conn, "job_done", row["key"], kind=row["kind"], result=str(result))
     except Exception as e:
@@ -130,7 +131,7 @@ def assignment_text(task):
     return (re.sub(r"\n{3,}", "\n\n", text).strip() + "\n" + " · ".join(extra)).strip()
 
 
-def report_job(conn, job):
+def report_job(conn, job, force=False):
     task = conn.execute("SELECT * FROM tasks WHERE key = ?", (job["key"],)).fetchone()
     if not task:
         raise ValueError("할 일을 찾지 못함")
@@ -150,10 +151,15 @@ def report_job(conn, job):
 
     _update(conn, job["id"], step="3/5 파일 만들기")
     path = report_path(task)
-    if path.exists():
+    if path.exists() and not force:
         _update(conn, job["id"], step="이미 있는 파일 열기")
         materials.open_file(path)
         return path
+    if path.exists():  # 새로 쓰기: 지금 파일은 _old 로 보관 (지우지 않음)
+        n = 1
+        while (old := path.with_name(f"{path.stem}_old{n}{path.suffix}")).exists():
+            n += 1
+        path.rename(old)
 
     _update(conn, job["id"], step="4/5 초안 쓰기 (Claude, 몇 분 걸림)")
     sid, name = student()

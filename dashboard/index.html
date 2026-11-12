@@ -243,6 +243,7 @@
       <div id="view"></div>
     </div>
     <div class="stack">
+      <div id="exams"></div>
       <div id="notices"></div>
       <div id="jobs"></div>
       <div id="downloads"></div>
@@ -341,7 +342,7 @@ function askPassword(msg) {
 async function phonePost(action, body) {
   if (action === "open-quiz") { window.open(D.quiz.url, "_blank"); return {}; }
   const toOp = { quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
-                 ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }) }[action];
+                 ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), keep: b => ({ op: "keep", key: b.key }), "exam-dismiss": b => ({ op: "exam-dismiss", id: b.id }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }) }[action];
   if (!toOp) throw new Error("이 기능은 PC 대시보드에서만 됩니다");
   const pw = ls.get("pa.pw");
   if (!pw) { location.reload(); throw new Error("비밀번호를 먼저 입력해 주세요"); }  // 비밀번호 없이 잠그면 PC 가 못 푼다
@@ -459,9 +460,10 @@ function render() {
   const warns = D.warnings.filter(w => { const m = w.match(/\[ack:(\w+)\]/); return !(MOB && m && ls.get("pa.ack." + m[1]) === w); });
   if (MOB) { const pend = JSON.parse(ls.get("pa.pending") || "[]"); if (pend.length) warns.unshift(`📱 PC 반영 대기 ${pend.length}건 (PC 가 켜져 있으면 몇 분 안에)`); }
   else if (!LIVE) warns.unshift("엔진이 꺼져 있어 마지막 데이터를 보여 주는 중입니다. VSCode 에서 'Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시'.");
-  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w.replace(/\s*\[ack:\w+\]/, "")).replace(/`([^`]+)`/g, "<code>$1</code>")}${
+  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w.replace(/\s*\[ack:\w+\]/, "").replace(/\s*\[keep=[^\]]+\]/, "")).replace(/`([^`]+)`/g, "<code>$1</code>")}${
     LIVE && w.includes("로그인 필요") ? ` <button class="chip" data-act="relogin">다시 로그인</button>` : ""}${
     LIVE && w.includes("Google Calendar 로그인") ? ` <button class="chip" data-act="glogin">Google 다시 로그인</button>` : ""}${
+    (LIVE || MOB) && w.includes("[keep=") ? ` <button class="chip" data-act="keep" data-key="${esc(w.match(/\[keep=([^\]]+)\]/)[1])}" title="이 과제만 규칙의 예외로 — 계속 보이게">보이기</button>` : ""}${
     (LIVE || MOB) && w.includes("[ack:") ? ` <button class="chip" data-act="ack" data-what="${w.match(/\[ack:(\w+)\]/)[1]}">확인</button>` : ""}</li>`).join("")}</ul></div>` : "";
 
   $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : todayView(now, today);
@@ -485,6 +487,11 @@ function render() {
 
   $("ritual").innerHTML = LIVE || MOB ? ritual(now, today) : "";
 
+  const exs = (LIVE || MOB) ? (D.exams || []) : [];
+  $("exams").innerHTML = exs.length ? `<div class="card"><h2>📝 시험 일정 후보 <span class="hint">공지에서 찾음 · 맞으면 추가</span></h2>${exs.map(x => `
+    <div class="item"><span class="txt"><b>${esc(x.title)}</b> ${label(x.date)}${x.time ? " " + x.time : ""}<span class="meta" style="display:block">「${esc(x.line)}」</span></span>
+      <span class="acts" style="opacity:1"><button data-act="examadd" data-x='${esc(JSON.stringify(x))}'>할 일로 추가</button><button data-act="examno" data-id="${esc(x.id)}">아니요</button></span></div>`).join("")}
+    <p class="hint">추가하면 시험 7·4·2일 전에 복습이 잡히고, 마감 캘린더에 알림이 갑니다.</p></div>` : "";
   const ns = (LIVE && D.notices) || [], sg = (LIVE && D.suggestions) || [];
   $("notices").innerHTML = (ns.length || sg.length) ? `<div class="card"><h2>📢 새 공지 ${ns.length}</h2>
     ${ns.map(n => `<div class="item"><span class="txt"><span class="course">${esc(String(n.course).replace(/\s*\d{6}$/, ""))}</span> ${esc(n.title)}
@@ -498,7 +505,8 @@ function render() {
 
   const ex = D.excluded || [];
   $("excluded").innerHTML = ex.length ? `<details class="card"><summary><b>🚫 제외한 것 ${ex.length}</b> <span class="hint">눌러서 보기 · 취소하면 다시 나타남</span></summary>
-    ${ex.map(x => `<div class="item"><span class="txt">${esc(x.text)}<span class="meta" style="display:block">${x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만"} · 걸린 과제 ${x.count}개${
+    ${ex.map(x => `<div class="item"><span class="txt">${esc(x.keep ? "예외(계속 보이기): " + (x.titles[0] || x.text) : x.text)}<span class="meta" style="display:block">${
+      x.keep ? "단어 규칙에 걸려도 보이게 · 취소하면 다시 숨김" : (x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만") + ` · 걸린 과제 ${x.count}개`}${
       x.titles.length ? " · " + esc(x.titles[0]) : ""}</span></span>${LIVE || MOB ? `<button data-act="unign" data-text="${esc(x.text)}">취소</button>` : ""}</div>`).join("")}</details>` : "";
 
   const js = (LIVE && D.jobs) || [];
@@ -542,6 +550,9 @@ function ritual(now, today) {
     return `<div class="card ritual"><h2>☀️ 오늘 브리핑 <button class="chip primary" data-act="ritualclose" data-k="pa.morning" style="margin-left:auto">오늘 시작</button></h2>
       <ul><li>수업·약속 ${cls.length}개${cls.length ? " (" + cls.map(b => `${hm(b.start)} ${esc(b.label)}`).join(", ") + ")" : ""}</li>
         <li>계획된 할 일 ${todayPlan.length}개 · ${dur(Math.round(mins))}${todayPlan[0] ? ` · 첫 블록 ${hm(todayPlan[0].start)}` : ""}</li></ul>
+      ${(() => { const rest = D.plan.filter(p => p.why && p.why.includes("다른 요일") && dt(p.end) > now);
+        return rest.length ? `<h3>쉬려던 요일(월수금토·일 밖)에 잡힌 것 ${rest.length}개 — 마감 때문에</h3><ul>${rest.map(p =>
+          `<li>${label(ymd(p.start))} ${hm(p.start)} ${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}</li>`).join("")}</ul>` : ""; })()}
       ${soon.length ? `<h3>이틀 안 마감</h3><ul>${soon.map(t => `<li>${ddayText(t.due, today)} ${hm(t.due)} ${esc(t.title)}</li>`).join("")}</ul>` : ""}
       ${D.quiz && D.quiz.stale ? `<h3>📝 퀴즈 복습</h3><ul><li>퀴즈 기록을 ${D.quiz.backupAt ? label(ymd(D.quiz.backupAt)) + " 이후로" : "아직"} 가져오지 않았어요.
         퀴즈 앱에서 <b>[기록 내보내기]</b>를 누르면 틀린 문제 복습 일정이 생깁니다. <button class="chip" data-act="openquiz">퀴즈 앱 열기</button></li></ul>` : ""}
@@ -560,6 +571,7 @@ async function showMaterials(key) {
   if (!r.dir) body = `<p class="empty">이 과목의 자료 폴더가 정해져 있지 않습니다 (config/courses.yaml).</p>`;
   else {
     if (r.clues.length && !r.strong) body += `<p class="msg">${esc(r.clues.join(", "))} 자료가 아직 없습니다 — Canvas 에서 받으면 '📥 새로 받은 파일'에 뜹니다.</p>`;
+    if (r.deleted && r.deleted.length) body += `<p class="msg" title="${esc(r.deleted.join("\n"))}">이 과목에서 교수님이 지운 자료 ${r.deleted.length}개는 받지 않았습니다 (마우스를 올리면 목록).</p>`;
     body += r.files.length ? r.files.map(f => `<div class="item"><span class="txt">${f.score >= 10 ? "⭐ " : ""}${esc(f.name)}</span>
       <span class="acts" style="opacity:1"><button data-act="openfile" data-path="${esc(f.path)}">열기</button>
       ${f.summary ? `<button data-act="openfile" data-path="${esc(f.summary)}">요약 열기</button>`
@@ -813,6 +825,13 @@ document.addEventListener("click", async e => {
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
   if (act === "glogin") { try { const r = await post("google-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
+  if (act === "examadd") {
+    const x = JSON.parse(b.dataset.x); b.disabled = true;
+    try { await post(MOB ? "add" : "exam-add", MOB ? { title: x.title, date: x.date, time: x.time || "09:00", minutes: "", course: x.course, every: [] } : x); }
+    catch (err) { alert(err.message); b.disabled = false; } return;
+  }
+  if (act === "examno") { try { await post("exam-dismiss", { id: b.dataset.id }); } catch (err) { alert(err.message); } return; }
+  if (act === "keep") { try { await post("keep", { key }); } catch (err) { alert(err.message); } return; }
   if (act === "ack") {
     if (MOB) { ls.set("pa.ack." + b.dataset.what, D.warnings.find(w => w.includes("[ack:" + b.dataset.what)) || ""); render(); return; }
     try { await post("ack", { what: b.dataset.what }); } catch (err) { alert(err.message); } return;
@@ -830,7 +849,22 @@ document.addEventListener("click", async e => {
   const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
                  nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
   if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
-  if (act === "report" && !confirm("이 과제의 보고서 파일을 만들고 Claude 로 초안을 씁니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
+  if (act === "report") {  // 이미 초안이 있으면: 새로 쓰기(지금 것은 _old 로) 또는 열기
+    b.disabled = true;
+    try {
+      const st = await (await fetch("/api/report-path?key=" + encodeURIComponent(key))).json();
+      if (st.error) throw new Error(st.error);
+      if (st.exists) {
+        if (confirm(`이미 초안 파일이 있습니다: ${st.name}\n\n[확인] 새로 쓰기 — 지금 파일은 _old 로 보관 (Claude 사용, 몇 분)\n[취소] 지금 파일 열기`))
+          await post("job/report", { key, force: true });
+        else await post("open-file", { path: st.path });
+      } else if (confirm("이 과제의 보고서 파일을 만들고 Claude 로 초안을 씁니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) {
+        await post("job/report", { key });
+      }
+    } catch (err) { alert(err.message); }
+    b.disabled = false;
+    return;
+  }
   const call = { report: ["job/report", { key }], done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
                  start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];
   b.disabled = true;

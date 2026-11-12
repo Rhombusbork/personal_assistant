@@ -43,5 +43,12 @@ def get(path, **params):
     return results
 
 
-def active_courses():
-    return get("/courses", enrollment_state="active")
+_courses = {"at": 0.0, "data": None}
+
+
+def active_courses(max_age=600):
+    """수강 과목 목록 — 한 동기화 안에서 여러 번 쓰이므로 10분 보관."""
+    import time
+    if _courses["data"] is None or time.time() - _courses["at"] > max_age:
+        _courses["data"], _courses["at"] = get("/courses", enrollment_state="active"), time.time()
+    return _courses["data"]

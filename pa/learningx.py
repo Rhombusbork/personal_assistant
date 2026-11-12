@@ -57,7 +57,21 @@ def fetch_token_in(ctx, course_id):
     return any(c["name"] == "xn_api_token" for c in ctx.cookies(BASE))
 
 
-def modules(course_id, token=None):
+_mod_cache = {}  # course_id → (시각, 모듈)
+
+
+def modules(course_id, token=None, max_age=300):
+    """캐시: 같은 동기화에서 강의 정보·자료 다운로드가 함께 쓴다."""
+    import time
+    hit = _mod_cache.get(course_id)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1], token
+    mods, token = _modules(course_id, token)
+    _mod_cache[course_id] = (time.time(), mods)
+    return mods, token
+
+
+def _modules(course_id, token=None):
     """(모듈 목록, 쓴 토큰). 토큰이 없거나 만료되면 NeedLogin — 비서가 스스로 다시 로그인하지 않는다.
 
     (비서가 따로 로그인하면 학교가 평소 브라우저의 통합 로그인을 끊어, 평소 브라우저에서
@@ -183,5 +197,7 @@ def sync(conn, online_courses):
         except Exception as e:  # 한 과목이 실패해도 나머지는 계속
             err = f"{c['name']}: {e}"
     db.set_meta(conn, "learningx_error", err or "")
+    if deleted_files:
+        db.set_meta(conn, "deleted_materials", json.dumps(deleted_files, ensure_ascii=False))
     conn.commit()
     return total, err

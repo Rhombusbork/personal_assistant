@@ -31,7 +31,9 @@ def calendar_id(service):
 
 
 def event_body(t):
-    summary = f"{ICON[t.kind]} {t.title}" + (f" [{short_course(t.course)}]" if t.course else "")
+    from pa.plan import is_exam
+    icon = "📝" if is_exam(t) else ICON[t.kind]
+    summary = f"{icon} {t.title}" + (f" [{short_course(t.course)}]" if t.course else "")
     return {
         "summary": summary,
         "start": {"dateTime": (t.due - timedelta(minutes=30)).isoformat(), "timeZone": TZ},

@@ -40,9 +40,20 @@ def latest_backup():
     return files[-1] if files else None
 
 
+_decks = {"sig": None, "data": {}}
+
+
 def decks():
-    """deckId → {subject, title} (퀴즈 앱의 덱 목록에서 읽기만)."""
+    """deckId → {subject, title} (퀴즈 앱의 덱 목록에서 읽기만). 목록 파일이 바뀔 때만 다시 읽는다."""
     base = cfg()["dir"] / "decks"
+    sig = tuple((base / f).stat().st_mtime if (base / f).exists() else 0 for f in ("index.json", "index-hidden.json"))
+    if sig == _decks["sig"]:
+        return _decks["data"]
+    _decks["sig"], _decks["data"] = sig, _read_decks(base)
+    return _decks["data"]
+
+
+def _read_decks(base):
     out = {}
     for idx in ("index.json", "index-hidden.json"):
         try:

@@ -165,6 +165,15 @@ def apply_entry(op):
             conn.close()
     elif kind == "ignore":
         inbox.ignore(op["key"])
+    elif kind == "exam-dismiss":
+        from pa import exams
+        conn = db.connect()
+        try:
+            exams.dismiss(conn, op["id"])
+        finally:
+            conn.close()
+    elif kind == "keep":
+        inbox.keep(op["key"])
     elif kind == "unignore":
         inbox.unignore(op["text"])
     elif kind == "remove":
