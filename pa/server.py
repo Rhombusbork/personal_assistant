@@ -17,6 +17,7 @@ POST /api/move-download, /api/dismiss-download   다운로드 폴더의 새 파�
 POST /api/job/report 보고서 준비 + 초안 (에이전트 작업 대기열에 넣음)
 POST /api/job/notices 새 공지 요약 + 제외 후보 찾기 (Claude, 버튼으로만)
 POST /api/job/summary 자료 PDF 요약 (Claude, 버튼으로만)
+POST /api/job/summary-for  강의·과제에 맞는 자료를 찾아 바로 요약 (이미 있으면 그 정리를 연다)
 POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
 POST /api/today      💭 하고 싶은 일을 오늘 하기 (오늘 23:59 마감을 붙임)
 POST /api/browser-login  LearningX 다시 로그인 창 열기
@@ -145,7 +146,7 @@ class Handler(SimpleHTTPRequestHandler):
             elif action == "/api/quick":
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
-                            "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary",
+                            "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login"):
                 return self._json(200, self.side_action(action, body))
             else:
@@ -197,6 +198,20 @@ class Handler(SimpleHTTPRequestHandler):
                 subprocess.Popen([str(ROOT / "bin" / "pa"), "browser", "login"],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return {"ok": True, "message": "로그인 창을 엽니다 — 로그인하면 저절로 닫힙니다"}
+            if action == "/api/job/summary-for":
+                row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+                if not row:
+                    raise ValueError("할 일을 찾지 못함")
+                _, scored = materials.find(row["course"], row["title"])
+                pdfs = [f for sc, f in scored if sc >= 10 and f.suffix.lower() == ".pdf" and "요약" not in f.parts]
+                if not pdfs:
+                    raise ValueError("이 강의의 자료(PDF)가 아직 없습니다 — 받으면 그때 정리할 수 있어요 (📄 자료 에서 확인)")
+                existing = jobs.summary_path(pdfs[0])
+                if existing.exists():
+                    materials.open_file(existing)
+                    return {"ok": True, "message": "이미 만든 정리를 열었습니다"}
+                jobs.enqueue(conn, "summary", str(pdfs[0]), "내용정리: " + pdfs[0].stem)
+                return {"ok": True, "message": f"내용정리 시작: {pdfs[0].name} (🤖 작업 칸)"}
             if action == "/api/job/summary":
                 jobs.enqueue(conn, "summary", body["path"], "요약: " + Path(body["path"]).stem)
                 return {"ok": True}

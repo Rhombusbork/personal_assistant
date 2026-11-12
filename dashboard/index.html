@@ -151,6 +151,25 @@
   .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
   .prog .fill { height: 100%; background: var(--todo); }
   .empty { color: var(--muted); font-size: 13px; }
+  .wk-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .wk-nav b { font-size: 16px; }
+  .strip { display: flex; gap: 3px; margin-bottom: 10px; flex-wrap: wrap; }
+  .sw { position: relative; min-width: 30px; padding: 3px 0 2px; font-size: 12px; border-radius: 6px;
+        background: color-mix(in srgb, var(--warn) calc(var(--lvl) * 70%), var(--field)); }
+  .sw.past { opacity: .45; }
+  .sw.cur { outline: 2px solid var(--accent); }
+  .sw.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .sw i { display: block; font-style: normal; font-size: 9px; color: var(--danger); line-height: 1; }
+  .sw.sel i { color: #fff; }
+  .head.pastday, .day.pastday { opacity: .55; }
+  .wl-h { font-size: 14px; margin: 14px 0 4px; }
+  .wl-g { font-weight: 600; font-size: 13px; margin: 10px 0 2px; }
+  .wl { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px dashed var(--line); }
+  .wl .txt { min-width: 0; }
+  .wl .meta { display: block; }
+  .wl.done { opacity: .5; }
+  .wl.done .txt { text-decoration: line-through; }
+  @media (max-width: 700px) { .wl { grid-template-columns: 10px 1fr; } .wl .acts { grid-column: 2; } }
   .term { display: grid; gap: 2px; }
   .trow { display: grid; grid-template-columns: 74px 70px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 8px; font-size: 12px; }
   .trow.cur { background: color-mix(in srgb, var(--accent) 10%, var(--card)); outline: 1px solid var(--accent); }
@@ -213,7 +232,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">이번 주</button><button data-view="term">학기</button></span>
+      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">주차별</button></span>
           <span class="hint" id="viewHint"></span></h2>
       <div id="view"></div>
     </div>
@@ -247,6 +266,8 @@ const WD = "일월화수목금토";
 let D = window.PA_DATA || null, LIVE = false, selKey = null;
 let view = "today";
 try { view = localStorage.getItem("pa.view") || "today"; } catch {}
+if (view !== "today") view = "week";  // 예전 '학기' 탭은 주차별로 합쳐짐
+let wkIdx = null;  // 주차별에서 보고 있는 주 번호 (null = 이번 주)
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -287,9 +308,10 @@ function acts(t, big) {
   if (!LIVE || !t) return "";
   const k = esc(t.key), b = [];
   const isActive = D.active && D.active.key === t.key;
-  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : "▶ 열기"}</button>`);
-  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명·자료·내 노트를 모아 보고서 파일을 만들고 초안까지 (Claude 사용)">✍ 초안</button>`);
+  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : "▶ 열기"}</button>`);
+  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명·자료·내 노트를 모아 보고서 파일을 만들고 초안까지 (Claude 사용)">✍ 보고서 작성</button>`);
   if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
+  if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`);
   b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
                   : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
   b.push(`<button data-act="done" data-key="${k}">${t.kind === "lecture" ? "✓ 들었음" : "✓ 완료"}</button>`);
@@ -338,8 +360,8 @@ function render() {
   $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w).replace(/`([^`]+)`/g, "<code>$1</code>")}${
     LIVE && w.includes("로그인 필요") ? ` <button class="chip" data-act="relogin">다시 로그인</button>` : ""}</li>`).join("")}</ul></div>` : "";
 
-  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : view === "term" ? termView(today) : todayView(now, today);
-  $("viewHint").textContent = view === "week" ? "블록을 누르면 버튼이 나옵니다" : view === "term" ? "주마다 마감 · 막대 = 남은 일의 예상 시간" : "";
+  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : todayView(now, today);
+  $("viewHint").textContent = view === "week" ? "◀ ▶ 또는 ← → 키로 주 이동 · 숫자 띠를 누르면 그 주로" : "";
 
   // 오른쪽: 마감
   const item = t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
@@ -494,13 +516,64 @@ function todayView(now, today) {
   return html;
 }
 
+function curWeekIdx(today) {
+  const ws = D.semester || [];
+  const i = ws.findIndex(w => w.start <= today && today <= addDays(w.start, 6));
+  return i >= 0 ? i : (ws.length && today < ws[0].start ? 0 : ws.length - 1);
+}
+
+// 주차별: 주 이동 + 학기 띠 + 그 주의 캘린더 + 그 주에 할 것 (버튼 항상 보임)
 function weekView(now, today, nowMin) {
+  const ws = D.semester || [];
+  if (!ws.length) return `<p class="empty">학기 정보가 없습니다.</p>`;
+  const cur = curWeekIdx(today);
+  const i = wkIdx === null ? cur : Math.max(0, Math.min(ws.length - 1, wkIdx));
+  const w = ws[i], days = [...Array(7)].map((_, k) => addDays(w.start, k)), end = days[6];
+  const maxMin = Math.max(60, ...ws.map(x => x.minutes));
+
+  let h = `<div class="wk-nav"><button data-wk="${i - 1}" ${i === 0 ? "disabled" : ""}>◀</button>
+    <b>${i + 1}주차</b><span class="meta">${label(w.start)} ~ ${label(end)}</span>
+    <button data-wk="${i + 1}" ${i === ws.length - 1 ? "disabled" : ""}>▶</button>
+    ${i !== cur ? `<button class="chip" data-wk="${cur}">이번 주로</button>` : `<span class="pill on">이번 주</span>`}</div>`;
+  h += `<div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""}"
+      data-wk="${j}" style="--lvl:${(x.minutes / maxMin).toFixed(2)}" title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}">
+      ${j + 1}${x.items.some(y => y.exam) ? "<i>시험</i>" : ""}</button>`).join("")}</div>`;
+
+  // 캘린더: 계획·수업 데이터가 있는 주만 (계획은 2주 앞까지)
+  const hasData = days.some(d => D.plan.some(p => ymd(p.start) === d) || D.busy.some(b => ymd(b.start) === d));
+  if (hasData) h += calendar(days, now, today, nowMin);
+  else h += `<p class="empty">${end < today ? "지난 주입니다" : "계획은 2주 앞까지만 짭니다"} — 아래 목록으로 보세요.</p>`;
+
+  // 그 주에 할 것 (마감 기준), 종류별
+  const groups = [["lecture", "📘 강의"], ["assignment", "📝 과제"], ["quiz", "❓ 퀴즈"], ["todo", "✅ 할 일"]];
+  const its = w.items;
+  h += `<h3 class="wl-h">이 주에 마감인 것 ${its.filter(x => x.status === "open").length}개 남음 / 전체 ${its.length}개</h3>`;
+  for (const [kind, name] of groups) {
+    const g = its.filter(x => x.kind === kind).sort((a, b) => (a.status === "done") - (b.status === "done") || dt(a.due) - dt(b.due));
+    if (!g.length) continue;
+    h += `<div class="wl-g">${name} <span class="meta">${g.filter(x => x.status === "open").length}/${g.length}</span></div>` + g.map(x => {
+      const done = x.status === "done", late = !done && dt(x.due) < now;
+      return `<div class="wl ${done ? "done" : ""}"><span class="dot" style="background:${color(x.kind)}"></span>
+        <span class="txt">${x.exam ? "📝 " : ""}${esc(x.title)}<span class="meta">${x.course ? esc(x.course) + " · " : ""}마감 ${label(ymd(x.due))} ${hm(x.due)}
+          ${done ? "· 완료" : late ? "· <b style='color:var(--danger)'>지남</b>" : "· " + ddayText(x.due, today)}${x.minutes ? " · 예상 " + dur(x.minutes) : ""}</span></span>
+        ${done ? "" : acts(x)}</div>`;
+    }).join("");
+  }
+  if (!its.length) h += `<p class="empty">이 주에 마감인 것이 없습니다.</p>`;
+
+  const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
+  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b><div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
+    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div>
+    ${sp && sp.why ? `<div class="meta">왜 여기? ${esc(sp.why)}</div>` : ""}<div style="margin-top:6px">${acts(sel)}</div></div>`;
+  return h;
+}
+
+function calendar(days, now, today, nowMin) {
   const [ds, de] = [D.dayStart, D.dayEnd].map(t => +t.slice(0, 2));
-  const days = [...Array(7)].map((_, i) => addDays(today, i));
   const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
-  const PX = 38, H = (de - ds) * PX, y = m => (m - ds * 60) / 60 * PX;
+  const PX = 34, H = (de - ds) * PX, y = m => (m - ds * 60) / 60 * PX;
   let h = `<div class="board-wrap"><div class="board"><div></div>` +
-    days.map(d => `<div class="head ${d === today ? "today" : ""} ${planMin(d) > D.cap ? "over" : ""}">${label(d)}</div>`).join("") +
+    days.map(d => `<div class="head ${d === today ? "today" : ""} ${d < today ? "pastday" : ""} ${planMin(d) > D.cap ? "over" : ""}">${label(d)}</div>`).join("") +
     `<div class="axis" style="height:${H}px">` + [...Array(de - ds)].map((_, i) => `<div style="top:${i * PX}px">${ds + i}</div>`).join("") + `</div>`;
   for (const d of days) {
     let col = [...Array(de - ds)].map((_, i) => `<div class="hour" style="top:${i * PX}px"></div>`).join("");
@@ -511,31 +584,12 @@ function weekView(now, today, nowMin) {
     for (const p of D.plan.filter(p => ymd(p.start) === d)) {
       const top = y(mins(p.start)), hh = y(mins(p.end)) - top;
       col += `<div class="blk${dt(p.end) <= now ? " past" : ""}${selKey === p.key ? " sel" : ""}" data-sel="${esc(p.key)}" style="top:${top}px;height:${hh}px;background:${color(p.kind)}"
-        title="${esc(p.summary)}">${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}<small>${hm(p.start)}–${hm(p.end)}</small></div>`;
+        title="${esc(p.summary)} — 누르면 버튼">${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}<small>${hm(p.start)}–${hm(p.end)}</small></div>`;
     }
     if (d === today && nowMin >= ds * 60 && nowMin <= de * 60) col += `<div class="nowline" style="top:${y(nowMin)}px"></div>`;
-    h += `<div class="day" style="height:${H}px">${col}</div>`;
+    h += `<div class="day ${d < today ? "pastday" : ""}" style="height:${H}px">${col}</div>`;
   }
-  h += `</div></div><div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
-  const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
-  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b><div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
-    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div>
-    ${sp && sp.why ? `<div class="meta">왜 여기? ${esc(sp.why)}</div>` : ""}<div style="margin-top:6px">${acts(sel)}</div></div>`;
-  return h;
-}
-
-function termView(today) {
-  const weeks = D.semester || [];
-  const maxMin = Math.max(60, ...weeks.map(w => w.minutes));
-  return `<div class="term">${weeks.map((w, i) => {
-    const end = addDays(w.start, 6), cur = w.start <= today && today <= end, past = end < today;
-    const exam = w.items.some(x => x.exam);
-    const items = w.items.map(x => `<span class="titem ${x.status === "done" ? "done" : ""}" title="${esc(x.course)} · ${esc(x.title)} · ${label(ymd(x.due))} ${hm(x.due)}">
-      <i class="dot" style="background:${color(x.kind)}"></i>${x.exam ? "📝 " : ""}${esc(x.title.length > 18 ? x.title.slice(0, 17) + "…" : x.title)}</span>`).join("");
-    return `<div class="trow ${cur ? "cur" : ""} ${past ? "past" : ""}"><span class="tw">${i + 1}주 <small>${label(w.start).replace(/\(.\)/, "")}</small></span>
-      <span class="tbar"><i style="width:${w.minutes / maxMin * 100}%"></i></span>
-      <span class="titems">${exam ? "<b class='badge d0'>시험</b> " : ""}${items || "<span class='meta'>-</span>"}</span></div>`;
-  }).join("")}</div>`;
+  return h + `</div></div><div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
 }
 
 function renderStats(today) {
@@ -605,6 +659,8 @@ $("statsBox").addEventListener("toggle", () => D && $("statsBox").open && render
 document.addEventListener("click", async e => {
   const tab = e.target.closest("[data-view]");
   if (tab) { view = tab.dataset.view; try { localStorage.setItem("pa.view", view); } catch {} render(); return; }
+  const wkb = e.target.closest("[data-wk]");
+  if (wkb) { wkIdx = +wkb.dataset.wk; selKey = null; render(); return; }
   const blk = e.target.closest("[data-sel]");
   if (blk) { selKey = selKey === blk.dataset.sel ? null : blk.dataset.sel; render(); return; }
   const b = e.target.closest("[data-act]");
@@ -628,6 +684,11 @@ document.addEventListener("click", async e => {
   if (act === "relogin") {
     if (!confirm("비서용 로그인 창을 엽니다.\n\n주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다.\n그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.\n\n계속할까요?")) return;
     try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
+  if (act === "sumfor") {
+    b.disabled = true;
+    try { const r = await post("job/summary-for", { key }); if (r.message) alert(r.message); }
+    catch (err) { alert(err.message); } b.disabled = false; return;
+  }
   if (act === "dotoday") { try { await post("today", { key }); } catch (err) { alert(err.message); } return; }
   const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
                  nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
@@ -643,7 +704,11 @@ document.addEventListener("keydown", e => {
   const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
   if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)) { e.preventDefault(); $("quickInput").focus(); return; }
   if (typing) return;
-  if (e.key === "t" || e.key === "w" || e.key === "m") { view = { t: "today", w: "week", m: "term" }[e.key]; try { localStorage.setItem("pa.view", view); } catch {} render(); }
+  if (e.key === "t" || e.key === "w") { view = e.key === "t" ? "today" : "week"; try { localStorage.setItem("pa.view", view); } catch {} render(); }
+  if (view === "week" && (e.key === "ArrowLeft" || e.key === "ArrowRight") && D) {
+    const base = wkIdx === null ? curWeekIdx(ymdOf(new Date())) : wkIdx;
+    wkIdx = Math.max(0, Math.min((D.semester || []).length - 1, base + (e.key === "ArrowLeft" ? -1 : 1))); render();
+  }
 });
 
 load();

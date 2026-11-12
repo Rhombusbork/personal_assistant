@@ -231,8 +231,9 @@ def semester_weeks(all_tasks, t_now):
     d = start
     while d <= end:
         nxt = d + timedelta(days=7)
-        its = [{"title": t.title, "course": short_course(t.course), "kind": t.kind, "status": t.status,
-                "due": t.due.isoformat(), "exam": bool(EXAM.search(t.title)) and "@복습" not in t.key}
+        its = [{"key": t.key, "title": t.title, "course": short_course(t.course), "kind": t.kind, "status": t.status,
+                "due": t.due.isoformat(), "url": t.url, "source": t.source, "minutes": t.minutes,
+                "exam": bool(EXAM.search(t.title)) and "@복습" not in t.key}
                for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status in ("open", "done")
                and "@복습" not in t.key]
         weeks.append({"start": d.isoformat(), "items": sorted(its, key=lambda x: x["due"]),

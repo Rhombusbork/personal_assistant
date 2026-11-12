@@ -208,7 +208,9 @@ def run(conn, service=None, write=True):
 
     # --- 통신 (DB 쓰기 없음)
     service = service or get_service()
-    busy = fetch_busy(service, t_now.replace(hour=0, minute=0), horizon + timedelta(days=1))
+    # 수업·약속은 이번 주 월요일부터 (주차별 화면에서 지난 요일도 보이게). 계획은 지금부터만.
+    week_start = (t_now - timedelta(days=t_now.weekday())).replace(hour=0, minute=0)
+    busy = fetch_busy(service, week_start, horizon + timedelta(days=1))
     plan, failed, why = make_plan(items, busy, cfg, t_now, pinned)
     plan += [(pinned_task[k], s, e) for k, (s, e) in pinned.items()]
     for k in pinned:
