@@ -625,7 +625,9 @@ document.addEventListener("click", async e => {
   }
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
-  if (act === "relogin") { try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
+  if (act === "relogin") {
+    if (!confirm("비서용 로그인 창을 엽니다.\n\n주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다.\n그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.\n\n계속할까요?")) return;
+    try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
   if (act === "dotoday") { try { await post("today", { key }); } catch (err) { alert(err.message); } return; }
   const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
                  nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];

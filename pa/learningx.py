@@ -46,40 +46,33 @@ def _get(url, token):
                 raise
 
 
-def refresh_token(course_id):
-    """과목의 LearningX 탭(과목 단위)을 한 번 열어 새 토큰을 받는다. Canvas 로그인이 만료됐으면 NeedLogin."""
-    from playwright.sync_api import sync_playwright
-    from pa import browser
+def fetch_token_in(ctx, course_id):
+    """로그인 창(사용자가 연 것) 안에서 과목의 LearningX 탭을 열어 토큰을 받는다. 개별 강의 페이지는 열지 않는다."""
     tab = next((t for t in canvas.get(f"/courses/{course_id}/tabs") if "강의콘텐츠" in t.get("label", "")), None)
     if not tab:
-        raise NeedLogin("LearningX 탭을 찾지 못함")
-    with sync_playwright() as p:
-        ctx = browser._context(p, headless=True)
-        try:
-            if not browser.logged_in(ctx):
-                raise NeedLogin("Canvas 로그인 만료 — bin/pa browser login")
-            page = ctx.new_page()
-            page.goto(tab["full_url"], wait_until="networkidle", timeout=60000)
-            browser.save_state(ctx)
-        finally:
-            ctx.close()
-    tok = _token()
-    if not tok:
-        raise NeedLogin("토큰을 받지 못함")
-    return tok
+        return False
+    page = ctx.new_page()
+    page.goto(tab["full_url"], wait_until="networkidle", timeout=60000)
+    page.close()
+    return any(c["name"] == "xn_api_token" for c in ctx.cookies(BASE))
 
 
 def modules(course_id, token=None):
-    """(모듈 목록, 쓴 토큰). 토큰이 만료됐으면 한 번 새로 받아 다시 시도."""
+    """(모듈 목록, 쓴 토큰). 토큰이 없거나 만료되면 NeedLogin — 비서가 스스로 다시 로그인하지 않는다.
+
+    (비서가 따로 로그인하면 학교가 평소 브라우저의 통합 로그인을 끊어, 평소 브라우저에서
+     영상·자료가 안 열린 일이 있었다. 그래서 다시 로그인은 사용자가 버튼을 눌렀을 때만.)
+    """
     url = f"{BASE}/learningx/api/v1/courses/{course_id}/modules?include_detail=true"
-    token = token or _token() or refresh_token(course_id)
+    token = token or _token()
+    if not token:
+        raise NeedLogin("LearningX 로그인 필요 (저장된 토큰 없음)")
     try:
         return _get(url, token), token
     except urllib.error.HTTPError as e:
-        if e.code not in (401, 403):
-            raise
-    token = refresh_token(course_id)
-    return _get(url, token), token
+        if e.code in (401, 403):
+            raise NeedLogin("LearningX 로그인 만료")
+        raise
 
 
 def items(mods):

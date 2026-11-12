@@ -47,7 +47,7 @@ def login(timeout_min=10):
     with sync_playwright() as p:
         ctx = _context(p, headless=False)
         if logged_in(ctx):
-            save_state(ctx)
+            _finish(ctx)
             print("이미 로그인되어 있습니다.")
             ctx.close()
             return True
@@ -59,7 +59,7 @@ def login(timeout_min=10):
             time.sleep(3)
             try:
                 if logged_in(ctx):
-                    save_state(ctx)
+                    _finish(ctx)
                     print("✅ 로그인 확인 — 저장됨", flush=True)
                     ctx.close()
                     return True
@@ -68,6 +68,17 @@ def login(timeout_min=10):
         print("시간 초과 — 로그인이 확인되지 않았습니다.")
         ctx.close()
         return False
+
+
+def _finish(ctx):
+    """로그인 직후 (사용자가 연 창 안에서) LearningX 토큰까지 받아 저장한다."""
+    from pa import collect_canvas, learningx
+    for c in collect_canvas.online_courses()[:1]:
+        try:
+            learningx.fetch_token_in(ctx, c["id"])
+        except Exception as e:
+            print("LearningX 토큰 받기 실패:", e)
+    save_state(ctx)
 
 
 def find_item(course_word, title_word):
