@@ -1,6 +1,6 @@
 """자동 실행 블록.
 
-run(full)  inbox → (full 이면 Canvas·과제 캘린더) → 계획 → TODAY.md·대시보드
+run(full)  inbox → (full 이면 Canvas·공지·자료) → 계획 → 마감 캘린더 → TODAY.md·대시보드 → 휴대폰
 watch()    시작할 때 full 실행 후, inbox.md 가 저장될 때마다 빠른 실행,
            PLAN_EVERY 마다 계획 갱신, CANVAS_EVERY 마다 full 실행, 대시보드 서버(pa/server.py)도 함께.
            VSCode 작업 공간을 열면 자동으로 켜진다.
@@ -11,7 +11,7 @@ import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, inbox, jobs, learningx, materials, mobile, plan, quiz, render, server, sync_canvas
+from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, plan, quiz, render, server
 from pa.gcal import get_service
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
@@ -58,7 +58,6 @@ def _run(full):
                 steps.append(f"퀴즈 기록 +{n}")
         except Exception as e:  # 퀴즈 연결 문제로 전체가 멈추지 않게
             steps.append(f"퀴즈 기록 오류: {e}")
-        service = None
         if full:
             steps.append(f"Canvas {collect_canvas.sync(conn)}건")
             conn.commit()
@@ -67,11 +66,12 @@ def _run(full):
                 steps.append(f"새 공지 {n}")
             got, err = learningx.sync(conn, collect_canvas.online_courses())
             steps.append(f"자료 +{got}" + (f" ⚠️{err}" if err else ""))
-            service = get_service()
-            c, u, r = sync_canvas.run(conn, service)
-            steps.append(f"과제 캘린더 +{c} ~{u} -{r}")
+        service = get_service()
         result, failed = plan.run(conn, service)
         steps.append(f"계획 {len(result)}건" + (f" (자리 부족 {len(failed)})" if failed else ""))
+        c, u, r = deadlines.sync(conn, service)  # 모든 마감 + 알림 (inbox·휴대폰으로 넣은 할 일도 바로)
+        if c or u or r:
+            steps.append(f"마감 캘린더 +{c} ~{u} -{r}")
         db.set_meta(conn, "last_error", "")
         conn.commit()
     except Exception as e:  # 네트워크 오류 등 — 화면은 가진 데이터로라도 갱신

@@ -15,7 +15,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python -m pa.sync_timetable --dry-run   # 미리보기
 python -m pa.sync_timetable             # 수업 시간표 동기화
-python -m pa.sync_canvas                # Canvas 과제 마감 동기화 (.env 의 CANVAS_ICS_URL)
+bin/pa run --full                       # 전체 동기화: Canvas → 계획 → 마감 캘린더(알림 포함)
 ```
 
 처음 실행 시 터미널에 출력되는 URL 을 브라우저에서 열어 로그인/허용하면

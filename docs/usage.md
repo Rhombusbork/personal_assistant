@@ -92,9 +92,9 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 
 비서가 Google Calendar 에 넣는 일정에 알림을 붙인다 → **휴대폰 Google Calendar 앱이 알려 준다 (PC 가 꺼져 있어도)**.
 - '학습 계획' 블록: 시작 **10분 전**
-- '과제' 마감: 마감 **하루 전 · 3시간 전 · 1시간 전** (하루 종일 마감은 그날 23:59 마감으로 넣어서 같은 알림)
+- **'마감' 캘린더**: 과제·퀴즈·온라인 강의 출석·직접 넣은 할 일 **모든 마감**에 **하루 전 · 3시간 전 · 1시간 전** 알림. 끝내거나 제외하면 자동으로 지워짐
 - 바꾸려면 `config/timetable.yaml` 의 `reminders` (다음 동기화 때 모든 일정에 다시 적용). 0 이면 알림 없음
-- 휴대폰 Google Calendar 앱 → 메뉴(☰)에서 **'학습 계획', '과제' 캘린더가 체크**되어 있어야 하고, 앱 알림이 켜져 있어야 한다
+- 휴대폰 Google Calendar 앱 → 메뉴(☰)에서 **'학습 계획', '마감' 캘린더가 체크**되어 있어야 하고, 앱 알림이 켜져 있어야 한다
 
 ### 휴대폰 홈 화면에 앱처럼 두기 (처음 한 번)
 
@@ -174,7 +174,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 | 명령 | 하는 일 |
 |---|---|
 | `bin/pa watch` | 자동 감시 + 대시보드 서버 http://localhost:8765 (VSCode 를 열면 자동 실행됨) |
-| `bin/pa run [--full]` | 한 번 실행: inbox → (`--full` 이면 Canvas·과제 캘린더) → 계획 → TODAY.md·대시보드 |
+| `bin/pa run [--full]` | 한 번 실행: inbox → (`--full` 이면 Canvas·공지·자료) → 계획 → 마감 캘린더 → TODAY.md·대시보드 |
 | `bin/pa list` | 남은 할 일 (맨 앞이 키) |
 | `bin/pa done/ignore/unignore <키>` | 완료 / 계속 제외 / 제외 취소 |
 | `bin/pa time <키> <분>` | 예상 소요 시간 조정 |
