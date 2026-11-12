@@ -131,7 +131,8 @@ def dashboard_data(conn):
 
     def task_json(t):
         return {"key": t.key, "kind": t.kind, "course": short_course(t.course), "title": t.title,
-                "due": t.due.isoformat() if t.due else None, "status": t.status, "minutes": t.minutes}
+                "due": t.due.isoformat() if t.due else None, "status": t.status, "minutes": t.minutes,
+                "source": t.source}
 
     upcoming = [task_json(t) for t in all_tasks
                 if t.status == "open" and t.due and t_now - timedelta(days=1) <= t.due <= t_now + timedelta(days=21)]
@@ -163,7 +164,9 @@ def dashboard_data(conn):
         "tasks": upcoming, "plan": plan, "busy": busy, "warnings": warns,
         "progress": [{"course": c, **v} for c, v in sorted(progress.items())],
         "doneByDay": done_by_day,
-        "someday": [t.title for t in all_tasks if t.status == "open" and not t.due],
+        "someday": [task_json(t) for t in all_tasks if t.status == "open" and not t.due],
+        "plannedAt": db.get_meta(conn, "planned_at"),
+        "courses": sorted({short_course(t.course) for t in all_tasks if t.course}),
     }
 
 

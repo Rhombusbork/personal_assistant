@@ -2,11 +2,18 @@
 
 ## 매일 쓰는 법 (Claude 없이)
 
-1. VSCode 에서 `assistant.code-workspace` 를 연다 → **비서 감시기가 자동으로 켜진다**
-   (처음 한 번 "자동 작업을 허용할까요?" 가 뜨면 허용)
-2. **[TODAY.md](../TODAY.md)** 를 열고 `Ctrl+Shift+V` 로 미리보기 → 오늘 일정·마감·계획
-3. 할 일 추가·완료·제외는 **[inbox.md](../inbox.md)** 에 적고 저장 → 몇 초 안에 계획·캘린더·TODAY.md 갱신
-4. 대시보드: `dashboard/index.html` 을 오른쪽 클릭 → **Open with Live Server**
+1. VSCode 에서 `assistant.code-workspace` 를 연다 → **감시기가 켜지고, 대시보드가 VSCode 탭으로 자동으로 열린다**
+   - 처음 한 번: `Ctrl+Shift+P → Tasks: Manage Automatic Tasks → Allow Automatic Tasks` (허용해야 자동 실행됨)
+   - 자동으로 안 열리면 `Ctrl+Shift+P → 작업 실행 → 비서: 대시보드 열기`, 또는 브라우저에서 http://localhost:8765
+2. **대시보드에서 바로 입력**
+   - ➕ 할 일 추가: 제목, 마감 날짜·몇 시까지(비우면 23:59), 예상 시간, 분류, 매주 반복 요일
+   - 💭 하고 싶은 일: 기한 없는 일을 오른쪽 위 칸에 한 줄로 추가
+   - 각 항목 옆 ✓ 완료 / ✕ 계속 제외(Canvas 과제) / 🗑 삭제(직접 넣은 할 일)
+   - 30초마다 자동 갱신, '지금'은 컴퓨터 시계 기준. 계획은 15분마다 다시 짠다
+3. 대시보드 입력은 모두 **[inbox.md](../inbox.md)** 에 적힌다 — inbox.md 를 직접 고쳐도 같다
+4. [TODAY.md](../TODAY.md) (`Ctrl+Shift+V`) 는 같은 내용을 글로 요약한 것
+
+대시보드 오른쪽 위 표시가 **실시간**이면 입력 가능, **보기 전용**이면 감시기가 꺼진 상태다.
 
 ## inbox.md 문법
 
@@ -32,7 +39,7 @@
 
 | 명령 | 하는 일 |
 |---|---|
-| `bin/pa watch` | 자동 감시 (VSCode 를 열면 자동 실행됨) |
+| `bin/pa watch` | 자동 감시 + 대시보드 서버 http://localhost:8765 (VSCode 를 열면 자동 실행됨) |
 | `bin/pa run [--full]` | 한 번 실행: inbox → (`--full` 이면 Canvas·과제 캘린더) → 계획 → TODAY.md·대시보드 |
 | `bin/pa list` | 남은 할 일 (맨 앞이 키) |
 | `bin/pa done/ignore/unignore <키>` | 완료 / 계속 제외 / 제외 취소 |
@@ -44,7 +51,7 @@ VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기�
 
 ## 계획 규칙 (`config/timetable.yaml` 의 `planner`)
 
-- 마감이 가까운 순으로, 월·수·금·토 빈 시간에 먼저 배치하고 부족하면 일요일
+- 마감이 가까운 순으로, 월·수·금·토 빈 시간에 먼저 배치하고 부족하면 일요일, 그래도 없으면 나머지 요일
 - 대면 수업·약속(Google Calendar) 시간은 피함, 하루 최대 `max_minutes_per_day`
 - 같은 과목의 퀴즈·과제는 그 과목 강의 뒤, 이미 시작한 블록은 고정
 

@@ -111,6 +111,92 @@ def read_sections():
     return out
 
 
+# ---- 쓰기 (대시보드 입력 → inbox.md) ----------------------------------------
+
+SECTION_HEAD = {"todo": "## 할 일", "done": "## 완료", "ignore": "## 제외"}
+KO_DAYS = "월화수목금토일"
+
+
+def format_line(title, due=None, minutes=None, course="", every=None):
+    """입력값 → inbox 한 줄. due: datetime, every: 요일 번호 목록(0=월)."""
+    # 제목 안의 기호가 문법으로 읽히지 않게 비슷한 전각 문자로 바꾼다
+    title = " ".join(title.replace("@", "＠").replace("~", "∼").replace("#", "＃").split())
+    if not title:
+        raise ValueError("제목이 없음")
+    parts = [f"- [ ] {title}"]
+    if due:
+        parts.append(f"@{due:%m-%d}" + ("" if (due.hour, due.minute) == (23, 59) else f" {due:%H:%M}"))
+    if minutes:
+        parts.append(f"~{minutes}m")
+    if course:
+        parts.append("#" + "_".join(course.split()))
+    if every:
+        parts.append("매주:" + ",".join(KO_DAYS[d] for d in sorted(set(every))))
+    return " ".join(parts)
+
+
+def _insert(section, line):
+    """section 맨 위(제목과 바로 아래 주석 다음)에 한 줄 넣는다. 섹션이 없으면 끝에 만든다."""
+    lines = PATH.read_text().splitlines() if PATH.exists() else TEMPLATE.splitlines()
+    head = SECTION_HEAD[section]
+    idx = next((i for i, l in enumerate(lines) if l.strip() == head), None)
+    if idx is None:
+        lines += ["", head, line]
+    else:
+        pos, in_comment = idx + 1, False
+        while pos < len(lines) and (in_comment or lines[pos].lstrip().startswith("<!--")):
+            in_comment = "-->" not in lines[pos]
+            pos += 1
+        lines.insert(pos, line)
+    PATH.write_text("\n".join(lines) + "\n")
+
+
+def add_task(**fields):
+    line = format_line(**fields)
+    _insert("todo", line)
+    return line
+
+
+def _todo_line_index(lines, title):
+    """제목이 같은 (반복 아닌) 할 일 줄 번호."""
+    for i, l in enumerate(lines):
+        m = RE_CHECK.match(l)
+        if m:
+            try:
+                it = parse_line(m.group(2), now().date(), 60)
+            except ValueError:
+                continue
+            if it["title"] == title and it["every"] is None:
+                return i
+    return None
+
+
+def mark_done(key):
+    """inbox 할 일이면 체크, 그 밖(Canvas·반복 할 일)은 ## 완료 에 키를 적는다."""
+    if key.startswith("i:") and "@" not in key:
+        lines = PATH.read_text().splitlines()
+        i = _todo_line_index(lines, key[2:])
+        if i is not None:
+            lines[i] = re.sub(r"\[ \]", "[x]", lines[i], count=1)
+            PATH.write_text("\n".join(lines) + "\n")
+            return
+    _insert("done", f"- {key}")
+
+
+def ignore(key):
+    _insert("ignore", f"- {key}")
+
+
+def remove(key):
+    """inbox 에 직접 쓴 할 일 줄을 지운다."""
+    lines = PATH.read_text().splitlines()
+    i = _todo_line_index(lines, key[2:]) if key.startswith("i:") else None
+    if i is None:
+        raise ValueError("inbox 에 없는 항목")
+    del lines[i]
+    PATH.write_text("\n".join(lines) + "\n")
+
+
 def match(conn, text, statuses):
     """키가 정확히 같거나, 적은 단어가 모두 '과목 · 제목'에 들어 있는 항목들."""
     marks = ",".join("?" * len(statuses))

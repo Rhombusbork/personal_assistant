@@ -2,7 +2,8 @@
 
 규칙
 - 마감이 가장 가까운 항목부터 배치 (EDF)
-- 월·수·금·토(main_days)의 빈 시간에 먼저 넣고, 마감 전까지 자리가 없으면 일요일(fallback_days) 사용
+- 월·수·금·토(main_days)의 빈 시간에 먼저 넣고, 마감 전까지 자리가 없으면 일요일(fallback_days),
+  그래도 없으면 나머지 요일 사용
 - 날짜가 정해진 반복 할 일은 그 날짜에만 배치
 - 대면 수업·약속 시간은 피하고, 하루 최대 max_minutes_per_day
 - 같은 과목의 퀴즈·과제는 그 과목 강의 뒤에
@@ -99,7 +100,9 @@ def make_plan(items, busy, cfg, t_now, pinned):
         if t.earliest and t.earliest.date() == t.due.date():  # 날짜가 정해진 할 일
             got = place(t, slots, cfg, DAYS, used, not_before)
         else:
-            got = place(t, slots, cfg, main, used, not_before) or place(t, slots, cfg, every, used, not_before)
+            # 월수금토 → 일요일 → 그래도 마감 전에 자리가 없으면 다른 요일이라도 (예: 목요일 마감)
+            got = (place(t, slots, cfg, main, used, not_before) or place(t, slots, cfg, every, used, not_before)
+                   or place(t, slots, cfg, DAYS, used, not_before))
         if not got:
             failed.append(t)
             continue

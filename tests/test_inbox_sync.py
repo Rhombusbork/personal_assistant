@@ -70,3 +70,29 @@ def test_every_creates_dated_instances(conn):
     inbox.sync(conn)
     n = conn.execute("SELECT COUNT(*) FROM tasks WHERE key LIKE 'i:생화학 공부@%'").fetchone()[0]
     assert n >= 14
+
+
+def test_add_done_remove_roundtrip(conn):
+    from datetime import datetime
+    from pa.model import KST
+    write(inbox.TEMPLATE)
+    line = inbox.add_task(title="발표 #준비 @자료", due=datetime(2026, 11, 20, 18, 0, tzinfo=KST),
+                          minutes=90, course="린 스타트업", every=None)
+    assert line == "- [ ] 발표 ＃준비 ＠자료 @11-20 18:00 ~90m #린_스타트업"
+    inbox.add_task(title="논문 읽기")
+    inbox.sync(conn)
+    assert status(conn, "i:발표 ＃준비 ＠자료") == "open"
+    inbox.mark_done("i:발표 ＃준비 ＠자료")
+    inbox.sync(conn)
+    assert status(conn, "i:발표 ＃준비 ＠자료") == "done"
+    inbox.mark_done("a1")
+    inbox.ignore("a1")  # 완료가 먼저 적용됐으므로 제외 칸은 '맞는 항목 없음' 경고
+    inbox.sync(conn)
+    assert status(conn, "a1") == "done"
+    inbox.remove("i:논문 읽기")
+    inbox.sync(conn)
+    assert status(conn, "i:논문 읽기") == "gone"
+
+
+def test_every_line_format():
+    assert inbox.format_line("생화학 공부", minutes=60, every=[3, 1]) == "- [ ] 생화학 공부 ~60m 매주:화,목"

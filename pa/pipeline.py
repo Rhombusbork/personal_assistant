@@ -2,17 +2,19 @@
 
 run(full)  inbox → (full 이면 Canvas·과제 캘린더) → 계획 → TODAY.md·대시보드
 watch()    시작할 때 full 실행 후, inbox.md 가 저장될 때마다 빠른 실행,
-           CANVAS_EVERY 마다 full 실행. VSCode 작업 공간을 열면 자동으로 켜진다.
+           PLAN_EVERY 마다 계획 갱신, CANVAS_EVERY 마다 full 실행, 대시보드 서버(pa/server.py)도 함께.
+           VSCode 작업 공간을 열면 자동으로 켜진다.
 """
 import fcntl
 import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, inbox, plan, render, sync_canvas
+from pa import collect_canvas, db, inbox, plan, render, server, sync_canvas
 from pa.gcal import get_service
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
+PLAN_EVERY = 15 * 60
 POLL = 1.0
 
 
@@ -52,6 +54,13 @@ def _run(full):
     log(" · ".join(steps))
 
 
+def _mtime():
+    try:
+        return inbox.PATH.stat().st_mtime
+    except FileNotFoundError:
+        return 0
+
+
 def watch():
     # 감시기는 하나만 (VSCode 창을 여러 개 열어도 캘린더에 중복으로 쓰지 않게)
     lock = open(db.PATH.parent / "watch.lock", "w")
@@ -60,21 +69,35 @@ def watch():
     except BlockingIOError:
         log("이미 다른 창에서 감시 중 — 이 창에서는 실행하지 않습니다.")
         return
-    log("비서 감시 시작 — inbox.md 저장 시 자동 반영, Canvas 는 3시간마다 확인")
+
+    seen = {"mtime": _mtime()}
+
+    def after_input():
+        # 대시보드에서 입력하면 바로 다시 계획 (inbox 저장 감지로 한 번 더 돌지 않게 mtime 기억)
+        seen["mtime"] = _mtime()
+        log("대시보드 입력")
+        run(full=False)
+
+    if server.start(after_input):
+        log(f"대시보드: http://localhost:{server.PORT}")
+    else:
+        log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
+    log("비서 감시 시작 — inbox.md 저장 시 자동 반영, 15분마다 계획 갱신, Canvas 는 3시간마다 확인")
     run(full=True)
-    last_full = time.time()
-    last_mtime = inbox.PATH.stat().st_mtime if inbox.PATH.exists() else 0
+    last_full = last_plan = time.time()
     while True:
         time.sleep(POLL)
-        try:
-            mtime = inbox.PATH.stat().st_mtime
-        except FileNotFoundError:
-            continue
-        if mtime != last_mtime:
+        mtime = _mtime()
+        if mtime and mtime != seen["mtime"]:
             time.sleep(0.5)  # 저장이 끝나길 잠깐 기다림
-            last_mtime = inbox.PATH.stat().st_mtime
+            seen["mtime"] = _mtime()
             log("inbox.md 저장 감지")
             run(full=False)
+            last_plan = time.time()
         if time.time() - last_full >= CANVAS_EVERY:
             run(full=True)
-            last_full = time.time()
+            last_full = last_plan = time.time()
+        elif time.time() - last_plan >= PLAN_EVERY:
+            # 시간이 흐르면 지난 블록·날짜가 바뀌므로 주기적으로 다시 계획
+            run(full=False)
+            last_plan = time.time()

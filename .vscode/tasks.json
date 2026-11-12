@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "비서: 자동 감시",
-      "detail": "작업 공간을 열면 자동 시작 — inbox.md 저장 시 반영, Canvas 3시간마다 확인",
+      "detail": "작업 공간을 열면 자동 시작 — 대시보드 서버, inbox.md 저장 시 반영, 15분마다 계획, Canvas 3시간마다",
       "type": "shell",
       "command": "${workspaceFolder}/bin/pa watch",
       "isBackground": true,
@@ -12,12 +12,37 @@
       "presentation": { "reveal": "silent", "panel": "dedicated", "showReuseMessage": false }
     },
     {
+      "label": "비서: 대시보드 열기",
+      "detail": "VSCode 안의 브라우저 탭으로 http://localhost:8765 를 연다 (서버가 뜰 때까지 기다림)",
+      "type": "shell",
+      "command": "echo '대시보드: http://localhost:8765' ${input:openDashboard}",
+      "dependsOn": "비서: 서버 대기",
+      "problemMatcher": [],
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": { "reveal": "never", "panel": "shared", "showReuseMessage": false }
+    },
+    {
+      "label": "비서: 서버 대기",
+      "type": "shell",
+      "command": "for i in $(seq 1 90); do curl -s -o /dev/null http://localhost:8765/ && exit 0; sleep 1; done; echo '대시보드 서버가 뜨지 않았습니다 (감시기 확인)'; exit 1",
+      "problemMatcher": [],
+      "presentation": { "reveal": "never", "panel": "shared", "showReuseMessage": false }
+    },
+    {
       "label": "비서: 지금 전체 동기화",
-      "detail": "Canvas 확인 → 과제 캘린더 → 계획 → TODAY.md",
+      "detail": "Canvas 확인 → 과제 캘린더 → 계획 → TODAY.md·대시보드",
       "type": "shell",
       "command": "${workspaceFolder}/bin/pa run --full",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared" }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "openDashboard",
+      "type": "command",
+      "command": "simpleBrowser.show",
+      "args": "http://localhost:8765"
     }
   ]
 }
