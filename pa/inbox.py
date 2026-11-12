@@ -151,8 +151,34 @@ def _insert(section, line):
     PATH.write_text("\n".join(lines) + "\n")
 
 
+RE_DUE_WORD = re.compile(r"@(오늘|내일|모레|[월화수목금토일])(?:요일)?(?:\s+(\d{1,2})(?::(\d{2})|시))?")
+RE_HOUR_SI = re.compile(r"(@\d{1,2}-\d{1,2}\s+)(\d{1,2})시")
+
+
+def quick_line(text, today=None):
+    """빠른 입력 한 줄 → inbox 줄. '@내일 18시', '@금' 같은 말은 날짜로 바꿔 적는다
+    (inbox 에 '내일'을 그대로 두면 날이 바뀔 때 뜻이 달라지므로)."""
+    today = today or now().date()
+
+    def word_to_date(m):
+        w, hh, mm = m.groups()
+        if w in ("오늘", "내일", "모레"):
+            d = today + timedelta(days=("오늘", "내일", "모레").index(w))
+        else:
+            d = today + timedelta(days=(DAY_MAP[w] - today.weekday()) % 7)
+        out = f"@{d:%m-%d}"
+        return out + (f" {int(hh):02d}:{mm or '00'}" if hh else "")
+
+    text = RE_HOUR_SI.sub(lambda m: f"{m.group(1)}{int(m.group(2)):02d}:00", RE_DUE_WORD.sub(word_to_date, text))
+    it = parse_line(text, today, None)
+    return format_line(it["title"], it["due"], it["minutes"], it["course"], it["every"])
+
+
 def add_task(**fields):
-    line = format_line(**fields)
+    return add_task_line(format_line(**fields))
+
+
+def add_task_line(line):
     _insert("todo", line)
     return line
 

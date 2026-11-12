@@ -37,3 +37,13 @@ def test_year_rollover():
 def test_errors(line):
     with pytest.raises(ValueError):
         parse_line(line, TODAY, 60)
+
+
+def test_quick_line_words():
+    from pa.inbox import quick_line
+    # 2026-11-11 은 수요일
+    assert quick_line("발표 @내일 18시 ~2h #창업", TODAY) == "- [ ] 발표 @11-12 18:00 ~120m #창업"
+    assert quick_line("보고서 @금", TODAY) == "- [ ] 보고서 @11-13"
+    assert quick_line("회의 @수 9:30", TODAY) == "- [ ] 회의 @11-11 09:30"
+    assert quick_line("정리 @11-20 9시", TODAY) == "- [ ] 정리 @11-20 09:00"
+    assert quick_line("논문 읽기", TODAY) == "- [ ] 논문 읽기"

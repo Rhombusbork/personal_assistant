@@ -73,12 +73,11 @@ def watch():
     seen = {"mtime": _mtime()}
 
     def after_input():
-        # 대시보드에서 입력하면 바로 다시 계획 (inbox 저장 감지로 한 번 더 돌지 않게 mtime 기억)
-        seen["mtime"] = _mtime()
-        log("대시보드 입력")
-        run(full=False)
+        # 대시보드 입력 → 다음 순환에서 한 번만 다시 계획 (연달아 눌러도 한 번으로 합침)
+        seen["mtime"] = _mtime()  # inbox 저장 감지로 또 돌지 않게
+        seen["dirty"] = True
 
-    if server.start(after_input):
+    if server.start(after_input, on_sync=lambda: run(full=True)):
         log(f"대시보드: http://localhost:{server.PORT}")
     else:
         log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
@@ -87,6 +86,10 @@ def watch():
     last_full = last_plan = time.time()
     while True:
         time.sleep(POLL)
+        if seen.pop("dirty", False):
+            log("대시보드 입력")
+            run(full=False)
+            last_plan = time.time()
         mtime = _mtime()
         if mtime and mtime != seen["mtime"]:
             time.sleep(0.5)  # 저장이 끝나길 잠깐 기다림

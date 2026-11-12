@@ -132,7 +132,7 @@ def dashboard_data(conn):
     def task_json(t):
         return {"key": t.key, "kind": t.kind, "course": short_course(t.course), "title": t.title,
                 "due": t.due.isoformat() if t.due else None, "status": t.status, "minutes": t.minutes,
-                "source": t.source}
+                "source": t.source, "url": t.url}
 
     upcoming = [task_json(t) for t in all_tasks
                 if t.status == "open" and t.due and t_now - timedelta(days=1) <= t.due <= t_now + timedelta(days=21)]
@@ -167,7 +167,23 @@ def dashboard_data(conn):
         "someday": [task_json(t) for t in all_tasks if t.status == "open" and not t.due],
         "plannedAt": db.get_meta(conn, "planned_at"),
         "courses": sorted({short_course(t.course) for t in all_tasks if t.course}),
+        "active": active_json(conn, by_key),
+        "todayDone": [task_json(by_key[r["key"]]) for r in conn.execute(
+            "SELECT key FROM tasks WHERE status = 'done' AND done_at >= ? ORDER BY done_at",
+            (t_now.replace(hour=0, minute=0).isoformat(),)) if r["key"] in by_key],
+        "sessionsToday": [dict(r) for r in conn.execute(
+            "SELECT key, start, end, minutes FROM sessions WHERE start >= ? ORDER BY start",
+            (t_now.replace(hour=0, minute=0).isoformat(),))],
     }
+
+
+def active_json(conn, by_key):
+    row = db.active_session(conn)
+    if not row:
+        return None
+    t = by_key.get(row["key"])
+    return {"key": row["key"], "start": row["start"], "title": label(t) if t else row["key"],
+            "kind": t.kind if t else "todo", "estimate": t.minutes if t else None}
 
 
 def write_dashboard(conn):

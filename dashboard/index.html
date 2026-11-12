@@ -17,78 +17,129 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
-  main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 40px; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 14px; }
+  main { max-width: 1240px; margin: 0 auto; padding: 16px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 12px; }
   h1 { font-size: 22px; margin: 0; }
   .sub { color: var(--muted); font-size: 12px; }
-  .live { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--line); }
-  .live.on { background: color-mix(in srgb, var(--todo) 20%, var(--card)); color: var(--todo); }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
-  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
-  .tile b { display: block; font-size: 24px; }
-  .tile span { color: var(--muted); font-size: 12px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
+  .pill.on { background: color-mix(in srgb, var(--todo) 20%, var(--card)); color: var(--todo); }
+  .sum { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .sum .pill { font-size: 12px; padding: 2px 10px; }
+  .sum .hot { background: color-mix(in srgb, var(--warn) 20%, var(--card)); color: var(--warn); }
+
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
-  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; margin-top: 14px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   .stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
-  .warn { background: color-mix(in srgb, var(--warn) 12%, var(--card)); border-color: var(--warn); margin-bottom: 16px; }
+  .warn { background: color-mix(in srgb, var(--warn) 12%, var(--card)); border-color: var(--warn); margin-top: 12px; }
   .warn ul { margin: 0; padding-left: 18px; }
 
-  /* 입력 폼 */
-  form { display: grid; gap: 10px; }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .row > label { font-size: 12px; color: var(--muted); min-width: 48px; }
   input, select, button { font: inherit; color: inherit; }
   input[type=text], input[type=date], input[type=time], select {
     background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; min-width: 0; }
-  input.title { flex: 1 1 260px; font-size: 15px; }
-  input.course { flex: 1 1 140px; }
-  button { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  button { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
   button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 7px 16px; font-weight: 600; }
-  button.chip { font-size: 12px; padding: 3px 9px; border-radius: 99px; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.chip { font-size: 12px; padding: 2px 9px; border-radius: 99px; }
+
+  /* 빠른 입력 */
+  .quick { display: flex; gap: 8px; align-items: center; }
+  .quick input { flex: 1; font-size: 15px; padding: 9px 12px; }
+  .quick kbd { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  details.more { margin-top: 8px; }
+  details.more summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  form.full { display: grid; gap: 8px; margin-top: 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row > label { font-size: 12px; color: var(--muted); min-width: 40px; }
   .days { display: flex; gap: 4px; }
   .days input { display: none; }
-  .days span { display: inline-block; width: 30px; text-align: center; padding: 3px 0; border-radius: 6px;
+  .days span { display: inline-block; width: 28px; text-align: center; padding: 2px 0; border-radius: 6px;
                border: 1px solid var(--line); background: var(--field); cursor: pointer; font-size: 12px; }
   .days input:checked + span { background: var(--todo); border-color: var(--todo); color: #fff; }
   .msg { font-size: 12px; color: var(--muted); }
   .msg.err { color: var(--danger); }
-  .hint { font-size: 12px; color: var(--muted); }
+  .hint { font-size: 12px; color: var(--muted); font-weight: normal; }
+
+  /* 타이머 */
+  .timer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px;
+           border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--card)); border: 1px solid var(--accent); }
+  .timer b { font-variant-numeric: tabular-nums; font-size: 18px; }
+
+  /* 보기 전환 */
+  .tabs { display: inline-flex; background: var(--field); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+  .tabs button { border: 0; background: none; padding: 3px 12px; font-size: 13px; }
+  .tabs button.on { background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+
+  /* 지금 할 일 */
+  .now-card { border: 2px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .now-card .lbl { font-size: 12px; color: var(--accent); font-weight: 700; }
+  .now-card .ttl { font-size: 17px; font-weight: 700; margin: 2px 0; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .acts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .now-card .acts { margin-top: 8px; }
+  .now-card .acts button { padding: 5px 12px; }
+
+  /* 오늘 타임라인 */
+  .tl { display: grid; gap: 2px; }
+  .tl-row { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px;
+            border-radius: 8px; border-left: 4px solid transparent; }
+  .tl-row:hover { background: var(--field); }
+  .tl-row .t { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+  .tl-row .what { min-width: 0; }
+  .tl-row .what .meta { display: block; }
+  .tl-row.busy .what { color: var(--muted); }
+  .tl-row.past { opacity: .45; }
+  .tl-row.cur { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+  .tl-row .acts { opacity: .5; }
+  .tl-row:hover .acts, .tl-row.cur .acts { opacity: 1; }
+  .gap { font-size: 12px; color: var(--muted); padding: 2px 8px 2px 110px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
+  .tl-foot { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .done-list { margin-top: 6px; }
+  .done-list div { text-decoration: line-through; opacity: .6; font-size: 13px; }
 
   /* 주간 보드 */
   .board-wrap { overflow-x: auto; }
   .board { display: grid; grid-template-columns: 34px repeat(7, minmax(78px, 1fr)); min-width: 600px; }
   .board .head { text-align: center; font-weight: 600; padding: 4px 0 6px; font-size: 13px; }
   .board .head.today { color: var(--accent); }
+  .board .head.over { color: var(--warn); }
   .axis, .day { position: relative; border-top: 1px solid var(--line); }
   .day { border-left: 1px solid var(--line); }
   .axis div { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); }
   .hour { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
   .blk { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 2px 5px; font-size: 11px; line-height: 1.3;
          overflow: hidden; color: #fff; border-left: 3px solid rgba(0,0,0,.25); }
+  .blk[data-sel] { cursor: pointer; }
+  .blk.sel { outline: 2px solid var(--text); }
   .blk.busy { background: var(--busy); }
   .blk.past { opacity: .45; }
   .blk small { opacity: .85; display: block; }
-  .now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 2; }
+  .nowline { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 2; }
+  .detail { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
 
-  /* 목록 */
+  /* 오른쪽 목록 */
   .due-day { margin: 10px 0 4px; font-weight: 600; font-size: 13px; display: flex; gap: 8px; align-items: center; }
   .badge { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--line); color: var(--text); }
   .badge.d0 { background: var(--danger); color: #fff; } .badge.d1 { background: var(--warn); color: #fff; }
   .badge.late { background: var(--text); color: var(--card); }
   .item { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; }
   .item .txt { flex: 1; min-width: 0; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; transform: translateY(-1px); display: inline-block; }
-  .course { color: var(--muted); }
-  .acts { display: flex; gap: 3px; flex: none; opacity: .55; }
+  .item .acts { opacity: .45; flex: none; }
   .item:hover .acts { opacity: 1; }
-  .acts button { padding: 0 6px; font-size: 12px; line-height: 20px; }
-  .quick { display: flex; gap: 6px; margin-top: 10px; }
-  .quick input { flex: 1; }
+  .item .acts button { padding: 0 6px; font-size: 12px; line-height: 20px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+  .course { color: var(--muted); }
+  form.inline { display: flex; gap: 6px; margin-top: 10px; }
+  form.inline input { flex: 1; }
 
-  /* 막대 */
+  /* 통계 */
+  details.stats { margin-top: 16px; }
+  details.stats > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
   .bars { display: flex; align-items: flex-end; gap: 4px; height: 110px; position: relative; padding-top: 8px; }
   .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
   .bar i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--lecture); }
@@ -99,8 +150,6 @@
   .prog .r { display: flex; justify-content: space-between; font-size: 13px; }
   .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
   .prog .fill { height: 100%; background: var(--todo); }
-  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .empty { color: var(--muted); font-size: 13px; }
 </style>
 </head>
@@ -108,252 +157,345 @@
 <main>
   <header>
     <h1 id="clock">대시보드</h1>
-    <span id="live" class="live">읽는 중…</span>
+    <span id="live" class="pill">읽는 중…</span>
     <span id="status" class="sub"></span>
+    <button id="syncBtn" class="chip" title="Canvas 까지 지금 확인">⟳ 동기화</button>
+    <div class="sum" id="sum"></div>
   </header>
-  <div id="tiles" class="tiles"></div>
+
+  <div class="card" id="inputCard">
+    <form class="quick" id="quickForm" autocomplete="off">
+      <input id="quickInput" type="text" placeholder="무엇을 할까요?  예) 린스타트업 발표 @금 18시 ~2h #창업   ·   하고 싶은 일은 날짜 없이">
+      <button class="primary" type="submit">추가</button><kbd>/</kbd>
+    </form>
+    <span id="quickMsg" class="msg"></span>
+    <details class="more"><summary>자세히 입력 (날짜 고르기·반복)</summary>
+      <form class="full" id="addForm" autocomplete="off">
+        <div class="row"><input name="title" type="text" placeholder="제목" required style="flex:1 1 240px"></div>
+        <div class="row">
+          <label>마감</label><input name="date" type="date"><input name="time" type="time" title="몇 시까지 (비우면 23:59)"><span class="hint">까지</span>
+          <button type="button" class="chip" data-day="0">오늘</button><button type="button" class="chip" data-day="1">내일</button>
+          <button type="button" class="chip" data-day="fri">이번 주 금</button><button type="button" class="chip" data-day="clear">기한 없음</button>
+        </div>
+        <div class="row">
+          <label>예상</label>
+          <select name="minutes"><option value="30">30분</option><option value="60" selected>1시간</option><option value="90">1시간 30분</option>
+            <option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option></select>
+          <label>분류</label><input name="course" type="text" list="courses" placeholder="과목·분류 (선택)" style="flex:1 1 140px">
+          <datalist id="courses"></datalist>
+        </div>
+        <div class="row"><label>반복</label><div class="days" id="days"></div><span class="hint">매주 고른 요일에</span></div>
+        <div class="row"><button class="primary" type="submit">추가</button><span id="addMsg" class="msg"></span></div>
+      </form>
+    </details>
+  </div>
+
+  <div id="timer"></div>
   <div id="warn"></div>
+
   <div class="grid">
-    <div class="stack">
-      <div class="card" id="addCard">
-        <h2>➕ 할 일 추가</h2>
-        <form id="addForm" autocomplete="off">
-          <div class="row"><input class="title" name="title" type="text" placeholder="무엇을 할까요? (예: 리바이어던 발표자료 제출)" required></div>
-          <div class="row">
-            <label>마감</label>
-            <input name="date" type="date">
-            <input name="time" type="time" title="몇 시까지 (비우면 23:59)"> <span class="hint">까지</span>
-            <button type="button" class="chip" data-day="0">오늘</button>
-            <button type="button" class="chip" data-day="1">내일</button>
-            <button type="button" class="chip" data-day="fri">이번 주 금</button>
-            <button type="button" class="chip" data-day="clear">기한 없음</button>
-          </div>
-          <div class="row">
-            <label>예상</label>
-            <select name="minutes">
-              <option value="30">30분</option><option value="60" selected>1시간</option><option value="90">1시간 30분</option>
-              <option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option>
-            </select>
-            <label>분류</label>
-            <input class="course" name="course" type="text" list="courses" placeholder="과목·분류 (선택)">
-            <datalist id="courses"></datalist>
-          </div>
-          <div class="row">
-            <label>반복</label>
-            <div class="days" id="days"></div>
-            <span class="hint">매주 고른 요일에 (마감 날짜는 무시)</span>
-          </div>
-          <div class="row"><button class="primary" type="submit">추가</button><span id="addMsg" class="msg"></span></div>
-        </form>
-      </div>
-      <div class="card"><h2>🗓 이번 주 계획</h2><div class="board-wrap" id="board"></div><div class="legend" id="legend"></div></div>
-      <div class="card"><h2>📊 일별 학습량 (계획, 점선 = 하루 한도)</h2><div id="load"></div></div>
+    <div class="card">
+      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">이번 주</button></span>
+          <span class="hint" id="viewHint"></span></h2>
+      <div id="view"></div>
     </div>
     <div class="stack">
-      <div class="card">
-        <h2>💭 하고 싶은 일 <span class="hint">(기한 없음)</span></h2>
-        <div id="someday"></div>
-        <form class="quick" id="somedayForm" autocomplete="off">
-          <input type="text" name="title" placeholder="하고 싶은 일 추가" required><button type="submit">추가</button>
-        </form>
-      </div>
       <div class="card"><h2>⏰ 다가오는 마감</h2><div id="dues"></div></div>
-      <div class="card"><h2>📚 과목별 진행 <span class="hint">(추적한 항목 중 완료)</span></h2><div id="prog"></div></div>
-      <div class="card"><h2>✅ 완료 추이 (14일)</h2><div id="trend"></div></div>
+      <div class="card"><h2>💭 하고 싶은 일 <span class="hint">기한 없음</span></h2><div id="someday"></div>
+        <form class="inline" id="somedayForm" autocomplete="off"><input type="text" name="title" placeholder="하고 싶은 일 추가" required><button type="submit">추가</button></form>
+      </div>
     </div>
   </div>
+
+  <details class="stats" id="statsBox"><summary>📊 통계 (학습량 · 과목별 진행 · 완료 추이 · 실제 걸린 시간)</summary>
+    <div class="stats-grid">
+      <div class="card"><h2>일별 학습량 <span class="hint">계획, 점선 = 하루 한도</span></h2><div id="load"></div></div>
+      <div class="card"><h2>과목별 진행 <span class="hint">추적한 항목 중 완료</span></h2><div id="prog"></div></div>
+      <div class="card"><h2>완료 추이 <span class="hint">14일</span></h2><div id="trend"></div></div>
+      <div class="card"><h2>오늘 실제로 한 시간 <span class="hint">⏱ 기록</span></h2><div id="sessions"></div></div>
+    </div>
+  </details>
 </main>
 <script src="data.js"></script>
 <script>
-// 대시보드. 감시기 서버(localhost:8765)로 열면 30초마다 최신 데이터를 받고 입력도 된다.
-// 파일로 직접 열거나 Live Server 로 열면 data.js(마지막 실행 결과)로 보기만 한다.
-// '지금'은 항상 이 컴퓨터의 시계를 쓴다.
+// 비서 대시보드. 감시기 서버(localhost:8765)로 열면 30초마다 최신 데이터 + 입력 가능.
+// 파일로 열면 data.js(마지막 결과)로 보기만. '지금'은 항상 이 컴퓨터의 시계.
 const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일" };
 const WD = "일월화수목금토";
-let D = window.PA_DATA || null;
-let LIVE = false;
+let D = window.PA_DATA || null, LIVE = false, selKey = null;
+let view = "today";
+try { view = localStorage.getItem("pa.view") || "today"; } catch {}
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const color = k => `var(--${k})`;
 const pad = n => String(n).padStart(2, "0");
 const ymdOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const dateOf = s => new Date(s);
-const ymd = iso => ymdOf(dateOf(iso));
-const hm = iso => { const d = dateOf(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const mins = iso => { const d = dateOf(iso); return d.getHours() * 60 + d.getMinutes(); };
-const addDays = (ymdStr, n) => { const d = new Date(ymdStr + "T12:00:00"); d.setDate(d.getDate() + n); return ymdOf(d); };
+const dt = s => new Date(s);
+const ymd = iso => ymdOf(dt(iso));
+const hm = iso => { const d = dt(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const mins = iso => { const d = dt(iso); return d.getHours() * 60 + d.getMinutes(); };
+const addDays = (y, n) => { const d = new Date(y + "T12:00:00"); d.setDate(d.getDate() + n); return ymdOf(d); };
 const label = y => { const d = new Date(y + "T12:00:00"); return `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`; };
-const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
+const between = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
 const tick = (d, all) => all.indexOf(d) % 2 ? "&nbsp;" : `${+d.slice(5, 7)}/${+d.slice(8)}`;
 const stamp = iso => iso ? `${label(ymd(iso))} ${hm(iso)}` : "-";
+const dur = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? " " + (m % 60) + "분" : ""}` : `${m}분`;
+const ddayText = (due, today) => { const n = between(today, ymd(due)); return n < 0 ? "지남" : n === 0 ? "오늘" : "D-" + n; };
+const taskOf = k => (D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || null);
 
 async function load() {
-  try {
-    const r = await fetch("/api/data", { cache: "no-store" });
-    if (!r.ok) throw 0;
-    D = await r.json(); LIVE = true;
-  } catch { LIVE = false; }
+  try { const r = await fetch("/api/data", { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
+  catch { LIVE = false; }
   render();
 }
-
 async function post(action, body) {
-  const r = await fetch("/api/" + action, {
-    method: "POST", headers: { "Content-Type": "application/json", "X-PA": "1" }, body: JSON.stringify(body) });
+  const r = await fetch("/api/" + action, { method: "POST", headers: { "Content-Type": "application/json", "X-PA": "1" }, body: JSON.stringify(body || {}) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "실패");
   await load();
+  setTimeout(load, 8000);  // 계획·캘린더는 뒤에서 몇 초 걸림 → 한 번 더 받기
   return j;
 }
 
-function actButtons(t) {
+// 항목 종류별 버튼
+function acts(t, big) {
+  if (!LIVE || !t) return "";
+  const k = esc(t.key), b = [];
+  const isActive = D.active && D.active.key === t.key;
+  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : "▶ 열기"}</button>`);
+  b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
+                  : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
+  b.push(`<button data-act="done" data-key="${k}">${t.kind === "lecture" ? "✓ 들었음" : "✓ 완료"}</button>`);
+  if (t.source === "inbox") b.push(`<button data-act="remove" data-key="${k}" title="삭제">🗑</button>`);
+  else b.push(`<button data-act="ignore" data-key="${k}" title="계속 제외 (조장만 제출 등)">✕</button>`);
+  return `<span class="acts">${b.join("")}</span>`;
+}
+const smallActs = t => {
   if (!LIVE) return "";
   const k = esc(t.key);
-  let b = `<button title="완료" data-act="done" data-key="${k}">✓</button>`;
-  b += t.source === "inbox"
-    ? `<button title="삭제" data-act="remove" data-key="${k}">🗑</button>`
-    : `<button title="계속 제외 (조장만 제출 등)" data-act="ignore" data-key="${k}">✕</button>`;
-  return `<span class="acts">${b}</span>`;
-}
+  return `<span class="acts"><button data-act="done" data-key="${k}" title="완료">✓</button>${
+    t.source === "inbox" ? `<button data-act="remove" data-key="${k}" title="삭제">🗑</button>` : `<button data-act="ignore" data-key="${k}" title="계속 제외">✕</button>`}</span>`;
+};
 
 function render() {
-  const now = new Date();
-  const today = ymdOf(now);
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const now = new Date(), today = ymdOf(now), nowMin = now.getHours() * 60 + now.getMinutes();
   $("clock").textContent = `${label(today)} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   $("live").textContent = LIVE ? "실시간" : "보기 전용";
-  $("live").className = "live" + (LIVE ? " on" : "");
-  $("live").title = LIVE ? "감시기 서버에 연결됨 — 30초마다 갱신, 입력 가능"
-                         : "감시기가 꺼져 있거나 파일로 열었음 — 입력하려면 감시기를 켜고 http://localhost:8765 에서 여세요";
-  $("addCard").style.display = LIVE ? "" : "none";
-  $("somedayForm").style.display = LIVE ? "" : "none";
-  if (!D) { $("status").textContent = "데이터 없음 — bin/pa run 을 실행하세요"; return; }
-  $("status").textContent = `계획 ${stamp(D.plannedAt)} · Canvas 확인 ${stamp(D.canvasSynced)}`;
+  $("live").className = "pill" + (LIVE ? " on" : "");
+  $("live").title = LIVE ? "엔진에 연결됨 — 30초마다 갱신" : "엔진이 꺼져 있음 — 입력하려면 VSCode 에서 '비서: 자동 감시' 실행";
+  $("inputCard").style.display = $("syncBtn").style.display = $("somedayForm").style.display = LIVE ? "" : "none";
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
+  if (!D) { $("status").textContent = "데이터 없음 — bin/pa run"; return; }
+  $("status").textContent = `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)}`;
 
-  const [ds, de] = [D.dayStart, D.dayEnd].map(t => +t.slice(0, 2));
-  const days7 = [...Array(7)].map((_, i) => addDays(today, i));
-  const days14 = [...Array(14)].map((_, i) => addDays(today, i));
-  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
-  const open = D.tasks.filter(t => dateOf(t.due) >= now);
-  const late = D.tasks.filter(t => dateOf(t.due) < now);
-  const soon = open.filter(t => daysBetween(today, ymd(t.due)) <= 3);
-  const doneTotal = Object.values(D.doneByDay).reduce((a, b) => a + b, 0);
-  const todayLeft = D.plan.filter(p => ymd(p.start) === today && dateOf(p.end) > now)
-                          .reduce((s, p) => s + (dateOf(p.end) - Math.max(dateOf(p.start), now)) / 6e4, 0);
-
-  $("tiles").innerHTML = `
-    <div class="tile"><b>${open.length}</b><span>남은 할 일 (3주)</span></div>
-    <div class="tile"><b>${(todayLeft / 60).toFixed(1)}h</b><span>오늘 남은 계획 / 한도 ${D.cap / 60}h</span></div>
-    <div class="tile"><b style="color:${soon.length ? "var(--warn)" : "inherit"}">${soon.length}</b><span>3일 안 마감</span></div>
-    <div class="tile"><b>${doneTotal}</b><span>최근 2주 완료</span></div>`;
-
-  const warns = [...D.warnings];
-  if (!LIVE) warns.unshift("감시기가 꺼져 있어 마지막으로 만든 데이터를 보여 주는 중입니다. VSCode 에서 '작업 실행 → 비서: 자동 감시' 를 켜세요.");
-  $("warn").innerHTML = warns.length ? `<div class="card warn"><h2>⚠️ 확인 필요</h2><ul>${
-    warns.map(w => `<li>${esc(w).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul></div>` : "";
-
+  const open = D.tasks.filter(t => dt(t.due) >= now), late = D.tasks.filter(t => dt(t.due) < now);
+  const soon = open.filter(t => between(today, ymd(t.due)) <= 3);
+  const todayPlan = D.plan.filter(p => ymd(p.start) === today);
+  const leftMin = todayPlan.filter(p => dt(p.end) > now).reduce((s, p) => s + (dt(p.end) - Math.max(dt(p.start), now)) / 6e4, 0);
+  $("sum").innerHTML = `<span class="pill">남은 할 일 ${open.length}</span><span class="pill">오늘 남은 계획 ${dur(Math.round(leftMin))}</span>`
+    + `<span class="pill ${soon.length ? "hot" : ""}">3일 안 마감 ${soon.length}</span>`;
   $("courses").innerHTML = (D.courses || []).map(c => `<option value="${esc(c)}">`).join("");
 
-  // --- 주간 보드 (오늘부터 7일)
-  const PX = 38, H = (de - ds) * PX;
-  const y = m => (m - ds * 60) / 60 * PX;
-  let board = `<div class="board"><div></div>` +
-    days7.map(d => `<div class="head ${d === today ? "today" : ""}">${label(d)}</div>`).join("") +
-    `<div class="axis" style="height:${H}px">` + [...Array(de - ds)].map((_, i) => `<div style="top:${i * PX}px">${ds + i}</div>`).join("") + `</div>`;
-  for (const d of days7) {
-    let col = [...Array(de - ds)].map((_, i) => `<div class="hour" style="top:${i * PX}px"></div>`).join("");
-    const blocks = [...D.busy.filter(b => ymd(b.start) === d).map(b => ({ ...b, busy: true })), ...D.plan.filter(p => ymd(p.start) === d)];
-    for (const b of blocks) {
-      const top = Math.max(0, y(mins(b.start))), h = Math.min(H, y(mins(b.end))) - top;
-      if (h <= 0) continue;
-      const past = dateOf(b.end) <= now ? " past" : "";
-      const text = b.busy ? esc(b.label) : esc(b.summary.replace(/^\[[^\]]+\]\s*/, ""));
-      col += `<div class="blk${b.busy ? " busy" : ""}${past}" style="top:${top}px;height:${h}px;${b.busy ? "" : "background:" + color(b.kind)}"
-        title="${esc(b.summary || b.label)}">${text}<small>${hm(b.start)}–${hm(b.end)}</small></div>`;
-    }
-    if (d === today && nowMin >= ds * 60 && nowMin <= de * 60) col += `<div class="now" style="top:${y(nowMin)}px"></div>`;
-    board += `<div class="day" style="height:${H}px">${col}</div>`;
-  }
-  $("board").innerHTML = board + `</div>`;
-  $("legend").innerHTML = Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")
-    + `<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span>`;
+  // 타이머
+  if (D.active) {
+    $("timer").innerHTML = `<div class="timer">⏱ <span>${esc(D.active.title)}</span> <b id="elapsed"></b>
+      ${D.active.estimate ? `<span class="meta">예상 ${dur(D.active.estimate)}</span>` : ""}
+      <span class="acts" style="margin-left:auto"><button class="primary" data-act="stopdone">✓ 끝내고 완료</button><button data-act="stop">■ 멈춤</button></span></div>`;
+    tickTimer();
+  } else $("timer").innerHTML = "";
 
-  // --- 다가오는 마감 (지난 것 + 14일)
+  const warns = [...D.warnings];
+  if (!LIVE) warns.unshift("엔진이 꺼져 있어 마지막 데이터를 보여 주는 중입니다. VSCode 에서 'Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시'.");
+  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul></div>` : "";
+
+  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : todayView(now, today);
+  $("viewHint").textContent = view === "week" ? "블록을 누르면 버튼이 나옵니다" : "";
+
+  // 오른쪽: 마감
   const item = t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
-    <span class="txt">${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}</span>${actButtons(t)}</div>`;
+    <span class="txt">${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}</span>${smallActs(t)}</div>`;
   let dues = late.length ? `<div class="due-day">지난 마감 <span class="badge late">미완료</span></div>` + late.map(item).join("") : "";
-  for (const d of days14) {
-    const items = open.filter(t => ymd(t.due) === d);
-    if (!items.length) continue;
-    const n = daysBetween(today, d);
-    dues += `<div class="due-day">${label(d)} <span class="badge d${Math.min(n, 2)}">${n === 0 ? "오늘" : "D-" + n}</span></div>` + items.map(item).join("");
+  for (const d of [...Array(14)].map((_, i) => addDays(today, i))) {
+    const its = open.filter(t => ymd(t.due) === d);
+    if (!its.length) continue;
+    const n = between(today, d);
+    dues += `<div class="due-day">${label(d)} <span class="badge d${Math.min(n, 2)}">${n === 0 ? "오늘" : "D-" + n}</span></div>` + its.map(item).join("");
   }
   $("dues").innerHTML = dues || `<p class="empty">2주 안 마감 없음</p>`;
-
-  // --- 하고 싶은 일
-  $("someday").innerHTML = D.someday.length
-    ? D.someday.map(t => `<div class="item"><span class="dot" style="background:var(--todo)"></span>
-        <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>${actButtons(t)}</div>`).join("")
+  $("someday").innerHTML = D.someday.length ? D.someday.map(t => `<div class="item"><span class="dot" style="background:var(--todo)"></span>
+      <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>${smallActs(t)}</div>`).join("")
     : `<p class="empty">아직 없음</p>`;
 
-  // --- 일별 부하
-  const maxLoad = Math.max(D.cap, ...days14.map(planMin));
-  $("load").innerHTML = `<div class="bars"><div class="cap" style="bottom:${D.cap / maxLoad * 100}%"></div>` +
-    days14.map(d => { const m = planMin(d); return `<div class="bar ${m > D.cap ? "over" : ""}" title="${label(d)} ${Math.round(m / 6) / 10}시간">
-      <i style="height:${m / maxLoad * 100}%"></i><span>${tick(d, days14)}</span></div>`; }).join("") + `</div>`;
+  if ($("statsBox").open) renderStats(today);
+}
 
-  // --- 완료 추이
+function todayView(now, today) {
+  const rows = [
+    ...D.busy.filter(b => ymd(b.start) === today).map(b => ({ busy: true, start: b.start, end: b.end, title: b.label })),
+    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: taskOf(p.key), summary: p.summary, kind: p.kind })),
+  ].sort((a, b) => dt(a.start) - dt(b.start));
+
+  // 지금 할 일: 진행 중인 블록 → 오늘 다음 블록 → 가장 급한 마감
+  const cur = rows.find(r => !r.busy && dt(r.start) <= now && now < dt(r.end));
+  const next = rows.find(r => !r.busy && dt(r.start) > now);
+  const pick = cur || next;
+  let html = "";
+  if (pick && pick.t) {
+    const t = pick.t;
+    html += `<div class="now-card"><div class="lbl">${cur ? "▶ 지금 할 일" : `다음 · ${hm(pick.start)} 시작`}</div>
+      <div class="ttl">${esc(t.title)}</div>
+      <div class="meta">${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · ${hm(pick.start)}–${hm(pick.end)} · 마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})</div>
+      ${acts(t, true)}</div>`;
+  } else {
+    const urgent = D.tasks.filter(t => dt(t.due) >= now)[0];
+    html += `<div class="now-card"><div class="lbl">오늘 남은 계획 없음</div>${urgent
+      ? `<div class="meta">가장 급한 일: ${esc(urgent.title)} (${ddayText(urgent.due, today)})</div>${acts(urgent, true)}` : `<div class="meta">쉬어도 됩니다 🙂</div>`}</div>`;
+  }
+
+  // 타임라인 + 빈 시간
+  const [ds, de] = [D.dayStart, D.dayEnd];
+  let cursor = Math.max(dt(`${today}T${ds}:00`), now);
+  const dayEnd = dt(`${today}T${de}:00`);
+  const gap = (a, b) => (b - a) >= 30 * 6e4 ? `<div class="gap">빈 시간 ${hm(new Date(a).toISOString())}–${hm(new Date(b).toISOString())} (${dur(Math.round((b - a) / 6e4))})</div>` : "";
+  html += `<div class="tl">`;
+  for (const r of rows) {
+    const s = dt(r.start), e = dt(r.end);
+    if (s > cursor) html += gap(cursor, s);
+    if (e > cursor) cursor = e;
+    const past = e <= now ? " past" : "", curC = s <= now && now < e ? " cur" : "";
+    if (r.busy) {
+      html += `<div class="tl-row busy${past}${curC}" style="border-left-color:var(--busy)"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
+        <span class="what">🏫 ${esc(r.title)}</span><span></span></div>`;
+    } else {
+      const t = r.t;
+      html += `<div class="tl-row${past}${curC}" style="border-left-color:${color(r.kind)}"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
+        <span class="what">${t ? esc(t.title) : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
+        ${t && !past ? acts(t) : "<span></span>"}</div>`;
+    }
+  }
+  if (dayEnd > cursor) html += gap(cursor, dayEnd);
+  html += `</div>`;
+  if (!rows.length) html += `<p class="empty">오늘은 수업도 계획도 없습니다.</p>`;
+
+  const tomorrow = addDays(today, 1);
+  const tb = D.busy.filter(b => ymd(b.start) === tomorrow).length, tp = D.plan.filter(p => ymd(p.start) === tomorrow).length;
+  html += `<div class="tl-foot">내일 ${label(tomorrow)}: 수업·약속 ${tb} · 할 일 ${tp}</div>`;
+  if (D.todayDone.length) html += `<div class="tl-foot">✓ 오늘 완료 ${D.todayDone.length}<div class="done-list">${D.todayDone.map(t => `<div>${esc(t.title)}</div>`).join("")}</div></div>`;
+  return html;
+}
+
+function weekView(now, today, nowMin) {
+  const [ds, de] = [D.dayStart, D.dayEnd].map(t => +t.slice(0, 2));
+  const days = [...Array(7)].map((_, i) => addDays(today, i));
+  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
+  const PX = 38, H = (de - ds) * PX, y = m => (m - ds * 60) / 60 * PX;
+  let h = `<div class="board-wrap"><div class="board"><div></div>` +
+    days.map(d => `<div class="head ${d === today ? "today" : ""} ${planMin(d) > D.cap ? "over" : ""}">${label(d)}</div>`).join("") +
+    `<div class="axis" style="height:${H}px">` + [...Array(de - ds)].map((_, i) => `<div style="top:${i * PX}px">${ds + i}</div>`).join("") + `</div>`;
+  for (const d of days) {
+    let col = [...Array(de - ds)].map((_, i) => `<div class="hour" style="top:${i * PX}px"></div>`).join("");
+    for (const b of D.busy.filter(b => ymd(b.start) === d)) {
+      const top = Math.max(0, y(mins(b.start))), hh = Math.min(H, y(mins(b.end))) - top;
+      if (hh > 0) col += `<div class="blk busy${dt(b.end) <= now ? " past" : ""}" style="top:${top}px;height:${hh}px">${esc(b.label)}<small>${hm(b.start)}–${hm(b.end)}</small></div>`;
+    }
+    for (const p of D.plan.filter(p => ymd(p.start) === d)) {
+      const top = y(mins(p.start)), hh = y(mins(p.end)) - top;
+      col += `<div class="blk${dt(p.end) <= now ? " past" : ""}${selKey === p.key ? " sel" : ""}" data-sel="${esc(p.key)}" style="top:${top}px;height:${hh}px;background:${color(p.kind)}"
+        title="${esc(p.summary)}">${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}<small>${hm(p.start)}–${hm(p.end)}</small></div>`;
+    }
+    if (d === today && nowMin >= ds * 60 && nowMin <= de * 60) col += `<div class="nowline" style="top:${y(nowMin)}px"></div>`;
+    h += `<div class="day" style="height:${H}px">${col}</div>`;
+  }
+  h += `</div></div><div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
+  const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
+  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b><div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
+    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div><div style="margin-top:6px">${acts(sel)}</div></div>`;
+  return h;
+}
+
+function renderStats(today) {
+  const days14 = [...Array(14)].map((_, i) => addDays(today, i));
+  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
+  const maxLoad = Math.max(D.cap, ...days14.map(planMin));
+  $("load").innerHTML = `<div class="bars"><div class="cap" style="bottom:${D.cap / maxLoad * 100}%"></div>` + days14.map(d => { const m = planMin(d);
+    return `<div class="bar ${m > D.cap ? "over" : ""}" title="${label(d)} ${dur(m)}"><i style="height:${m / maxLoad * 100}%"></i><span>${tick(d, days14)}</span></div>`; }).join("") + `</div>`;
+  $("prog").innerHTML = D.progress.map(p => `<div class="prog"><div class="r"><span>${esc(p.course)}</span><span>${p.done}/${p.total}</span></div>
+    <div class="track"><div class="fill" style="width:${p.total ? p.done / p.total * 100 : 0}%"></div></div></div>`).join("") || `<p class="empty">아직 없음</p>`;
   const past14 = [...Array(14)].map((_, i) => addDays(today, i - 13));
   const maxDone = Math.max(1, ...past14.map(d => D.doneByDay[d] || 0));
   $("trend").innerHTML = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
     <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
-
-  // --- 과목별 진행
-  $("prog").innerHTML = D.progress.map(p => `<div class="prog"><div class="r"><span>${esc(p.course)}</span><span>${p.done}/${p.total}</span></div>
-    <div class="track"><div class="fill" style="width:${p.total ? p.done / p.total * 100 : 0}%"></div></div></div>`).join("") || `<p class="empty">아직 없음</p>`;
+  $("sessions").innerHTML = D.sessionsToday.length ? D.sessionsToday.map(s => { const t = taskOf(s.key);
+    return `<div class="item"><span class="txt">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span>
+      <span class="meta">${s.minutes ? dur(s.minutes) : ""}${t && s.minutes ? ` / 예상 ${dur(t.minutes)}` : ""}</span></div>`; }).join("")
+    : `<p class="empty">⏱ 시작 버튼으로 기록하면 여기에 쌓이고, 쌓인 기록으로 예상 시간을 고칩니다.</p>`;
 }
 
-// ---- 입력
-$("days").innerHTML = ["월", "화", "수", "목", "금", "토", "일"].map((d, i) =>
-  `<label><input type="checkbox" name="every" value="${i}"><span>${d}</span></label>`).join("");
+function tickTimer() {
+  const el = $("elapsed");
+  if (!el || !D || !D.active) return;
+  const s = Math.max(0, Math.floor((Date.now() - dt(D.active.start)) / 1000));
+  el.textContent = `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ":" : ""}${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+}
 
+// ---- 입력·버튼
+$("days").innerHTML = ["월", "화", "수", "목", "금", "토", "일"].map((d, i) => `<label><input type="checkbox" name="every" value="${i}"><span>${d}</span></label>`).join("");
 document.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => {
   const f = $("addForm"), v = b.dataset.day, d = new Date();
   if (v === "clear") { f.date.value = ""; f.time.value = ""; return; }
-  if (v === "fri") d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7));
-  else d.setDate(d.getDate() + +v);
+  if (v === "fri") d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7)); else d.setDate(d.getDate() + +v);
   f.date.value = ymdOf(d);
 }));
-
+async function submitWith(msgEl, fn) {
+  msgEl.className = "msg"; msgEl.textContent = "반영 중…";
+  try { const r = await fn(); msgEl.textContent = "추가됨: " + (r.message || "").replace(/^- \[ \] /, ""); return true; }
+  catch (err) { msgEl.className = "msg err"; msgEl.textContent = err.message; return false; }
+}
+$("quickForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = $("quickInput").value.trim();
+  if (text && await submitWith($("quickMsg"), () => post("quick", { text }))) $("quickInput").value = "";
+});
 $("addForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const f = e.target, msg = $("addMsg");
-  const body = { title: f.title.value, date: f.date.value, time: f.time.value, minutes: f.minutes.value,
-                 course: f.course.value, every: [...f.querySelectorAll("[name=every]:checked")].map(x => x.value) };
-  msg.className = "msg"; msg.textContent = "반영 중…";
-  try {
-    const r = await post("add", body);
-    msg.textContent = "추가됨: " + r.message.replace(/^- \[ \] /, "");
-    f.reset();
-  } catch (err) { msg.className = "msg err"; msg.textContent = err.message; }
+  const f = e.target;
+  const body = { title: f.title.value, date: f.date.value, time: f.time.value, minutes: f.minutes.value, course: f.course.value,
+                 every: [...f.querySelectorAll("[name=every]:checked")].map(x => x.value) };
+  if (await submitWith($("addMsg"), () => post("add", body))) f.reset();
 });
-
 $("somedayForm").addEventListener("submit", async e => {
   e.preventDefault();
-  try { await post("add", { title: e.target.title.value }); e.target.reset(); }
-  catch (err) { alert(err.message); }
+  try { await post("add", { title: e.target.title.value }); e.target.reset(); } catch (err) { alert(err.message); }
 });
+$("syncBtn").addEventListener("click", async () => { try { const r = await post("sync"); $("status").textContent = r.message; } catch (err) { alert(err.message); } });
+$("statsBox").addEventListener("toggle", () => D && $("statsBox").open && renderStats(ymdOf(new Date())));
 
 document.addEventListener("click", async e => {
+  const tab = e.target.closest("[data-view]");
+  if (tab) { view = tab.dataset.view; try { localStorage.setItem("pa.view", view); } catch {} render(); return; }
+  const blk = e.target.closest("[data-sel]");
+  if (blk) { selKey = selKey === blk.dataset.sel ? null : blk.dataset.sel; render(); return; }
   const b = e.target.closest("[data-act]");
   if (!b) return;
-  if (b.dataset.act === "remove" && !confirm("이 할 일을 지울까요?")) return;
+  const act = b.dataset.act, key = b.dataset.key;
+  if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
+  const call = { done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
+                 start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];
   b.disabled = true;
-  try { await post(b.dataset.act, { key: b.dataset.key }); } catch (err) { alert(err.message); b.disabled = false; }
+  try { await post(...call); } catch (err) { alert(err.message); b.disabled = false; }
+});
+// '/' 또는 Ctrl+K → 빠른 입력, t/w → 보기 전환 (입력 중이 아닐 때)
+document.addEventListener("keydown", e => {
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)) { e.preventDefault(); $("quickInput").focus(); return; }
+  if (typing) return;
+  if (e.key === "t" || e.key === "w") { view = e.key === "t" ? "today" : "week"; try { localStorage.setItem("pa.view", view); } catch {} render(); }
 });
 
 load();
-setInterval(load, 30 * 1000);  // 30초마다 시계·데이터 갱신
+setInterval(load, 30 * 1000);
+setInterval(tickTimer, 1000);
 </script>
 </body>
 </html>

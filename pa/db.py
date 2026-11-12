@@ -4,12 +4,14 @@ tasks   할 일 하나당 한 줄. 출처(canvas/inbox)에서 다시 읽을 때�
 events  자동 기록 (추가·완료·제외·마감 변경·계획 누락 …) — 시각화와 3단계 재료
 plan    현재 학습 계획 (Google Calendar 일정 id 포함)
 busy    계획 기간의 대면 수업·약속 (시각화용)
+sessions 실제로 한 시간 기록 (⏱) — 예상 시간 보정에 쓴다
 """
 import json
 import sqlite3
+from datetime import datetime
 
 from pa.config import ROOT
-from pa.model import Task, now, parse_dt
+from pa.model import KST, Task, now, parse_dt
 
 PATH = ROOT / "data" / "pa.db"
 
@@ -47,6 +49,13 @@ CREATE TABLE IF NOT EXISTS plan (
 );
 CREATE TABLE IF NOT EXISTS busy (start TEXT NOT NULL, end TEXT NOT NULL, label TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS sessions (           -- 실제로 한 시간 (⏱ 시작 ~ 끝)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT NOT NULL,
+  start TEXT NOT NULL,
+  end TEXT,                                     -- NULL = 진행 중
+  minutes INTEGER
+);
 """
 
 FIELDS = ("kind", "course", "title", "due", "earliest", "minutes", "url")
@@ -131,3 +140,32 @@ def to_task(row):
 def tasks(conn, where="1", params=()):
     rows = conn.execute(f"SELECT * FROM tasks WHERE {where} ORDER BY due IS NULL, due", params).fetchall()
     return [to_task(r) for r in rows]
+
+
+# ---- 시간 기록 (⏱) ---------------------------------------------------------
+
+def active_session(conn):
+    return conn.execute("SELECT * FROM sessions WHERE end IS NULL ORDER BY id DESC LIMIT 1").fetchone()
+
+
+def start_session(conn, key):
+    """하나만 진행한다 — 다른 게 진행 중이면 먼저 끝낸다."""
+    stop_session(conn)
+    conn.execute("INSERT INTO sessions (key, start) VALUES (?, ?)",
+                 (key, datetime.now(KST).isoformat(timespec="seconds")))
+    log(conn, "session_start", key)
+
+
+def stop_session(conn):
+    """진행 중인 기록을 끝내고 (키, 분) 을 돌려준다. 1분 미만은 버린다."""
+    row = active_session(conn)
+    if not row:
+        return None
+    t_end = datetime.now(KST).replace(microsecond=0)
+    minutes = int((t_end - parse_dt(row["start"])).total_seconds() // 60)
+    if minutes < 1:
+        conn.execute("DELETE FROM sessions WHERE id = ?", (row["id"],))
+        return None
+    conn.execute("UPDATE sessions SET end = ?, minutes = ? WHERE id = ?", (t_end.isoformat(), minutes, row["id"]))
+    log(conn, "session_end", row["key"], minutes=minutes)
+    return row["key"], minutes

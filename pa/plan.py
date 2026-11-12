@@ -117,7 +117,11 @@ def summary(t):
 
 
 def run(conn, service=None, write=True):
-    """계획을 다시 짜서 저장소(plan, busy)와 캘린더에 반영. (plan, failed) 반환."""
+    """계획을 다시 짜서 저장소(plan, busy)와 캘린더에 반영. (plan, failed) 반환.
+
+    Google 과 통신하는 동안에는 DB 에 쓰지 않는다 — 쓰기 잠금을 오래 잡으면
+    대시보드 버튼이 그동안 기다리게 되기 때문. 쓰기는 맨 끝에 한꺼번에.
+    """
     cfg = load_timetable()["planner"]
     t_now = now()
     horizon = t_now + timedelta(days=cfg["horizon_days"])
@@ -126,32 +130,38 @@ def run(conn, service=None, write=True):
     by_key = {t.key: t for t in items}
 
     old = {r["key"]: r for r in conn.execute("SELECT * FROM plan").fetchall()}
-    pinned = {}
+    pinned, missed = {}, []
     for k, r in old.items():
         s, e = parse_dt(r["start"]), parse_dt(r["end"])
         if k in by_key and s <= t_now < e:
             pinned[k] = (s, e)
         elif k in by_key and e <= t_now:
-            db.log(conn, "plan_missed", k, start=r["start"])
+            missed.append((k, r["start"]))
 
+    # --- 통신 (DB 쓰기 없음)
     service = service or get_service()
     busy = fetch_busy(service, t_now.replace(hour=0, minute=0), horizon + timedelta(days=1))
     plan, failed = make_plan(items, busy, cfg, t_now, pinned)
     plan += [(by_key[k], s, e) for k, (s, e) in pinned.items()]
     plan.sort(key=lambda x: x[1])
+    rows = sync_calendar(service, plan, old, t_now) if write else None
 
+    # --- DB 쓰기 (짧게)
+    for k, start in missed:
+        db.log(conn, "plan_missed", k, start=start)
     conn.execute("DELETE FROM busy")
     conn.executemany("INSERT INTO busy VALUES (?, ?, ?)", [(s.isoformat(), e.isoformat(), n) for s, e, n in busy])
-    if write:
-        sync_calendar(conn, service, plan, old, t_now)
+    if rows is not None:
+        conn.execute("DELETE FROM plan")
+        conn.executemany("INSERT INTO plan VALUES (?, ?, ?, ?, ?)", rows)
     db.set_meta(conn, "planned_at", t_now.isoformat())
     db.set_meta(conn, "plan_failed", ",".join(t.key for t in failed))
     conn.commit()
     return plan, failed
 
 
-def sync_calendar(conn, service, plan, old, t_now):
-    """바뀐 블록만 캘린더에 반영하고 plan 표를 새 계획으로 교체한다."""
+def sync_calendar(service, plan, old, t_now):
+    """바뀐 블록만 캘린더에 반영하고, 새 plan 표에 넣을 줄들을 돌려준다."""
     cal_id = get_or_create_calendar(service, CALENDAR_NAME, TZ)
     keep_ids = set()
     rows = []
@@ -182,6 +192,4 @@ def sync_calendar(conn, service, plan, old, t_now):
     for ev in page.get("items", []):
         if ev["id"] not in keep_ids and parse_dt(ev["start"]["dateTime"]) >= t_now:
             service.events().delete(calendarId=cal_id, eventId=ev["id"]).execute()
-
-    conn.execute("DELETE FROM plan")
-    conn.executemany("INSERT INTO plan VALUES (?, ?, ?, ?, ?)", rows)
+    return rows
