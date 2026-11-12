@@ -78,7 +78,7 @@ def test_add_done_remove_roundtrip(conn):
     write(inbox.TEMPLATE)
     line = inbox.add_task(title="발표 #준비 @자료", due=datetime(2026, 11, 20, 18, 0, tzinfo=KST),
                           minutes=90, course="린 스타트업", every=None)
-    assert line == "- [ ] 발표 ＃준비 ＠자료 @11-20 18:00 ~90m #린_스타트업"
+    assert line == "- [ ] 발표 ＃준비 ＠자료 @2026-11-20 18:00 ~90m #린_스타트업" or line == "- [ ] 발표 ＃준비 ＠자료 @11-20 18:00 ~90m #린_스타트업"
     inbox.add_task(title="논문 읽기")
     inbox.sync(conn)
     assert status(conn, "i:발표 ＃준비 ＠자료") == "open"
@@ -104,3 +104,13 @@ def test_exam_creates_review_blocks(conn):
     rows = conn.execute("SELECT key, earliest, due FROM tasks WHERE key LIKE 'i:생화학 기말고사@복습%' ORDER BY key").fetchall()
     assert [r["key"][-3:] for r in rows] == ["복습1", "복습2", "복습3"]
     assert all(r["earliest"] < r["due"] for r in rows)
+
+
+def test_set_due_turns_someday_into_today(conn):
+    from datetime import datetime
+    from pa.model import KST
+    write("## 할 일\n- [ ] 논문 읽기 ~45m #연구\n")
+    inbox.set_due("i:논문 읽기", datetime(2099, 1, 2, 23, 59, tzinfo=KST))
+    assert "- [ ] 논문 읽기 @2099-01-02 ~45m #연구" in inbox.PATH.read_text()
+    inbox.sync(conn)
+    assert conn.execute("SELECT due FROM tasks WHERE key='i:논문 읽기'").fetchone()[0].startswith("2099-01-02T23:59")

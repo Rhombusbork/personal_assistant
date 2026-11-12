@@ -35,9 +35,15 @@ def _token():
 
 
 def _get(url, token):
+    """느린 응답(시간 초과)은 한 번 더 시도한다."""
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read())
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read())
+        except (TimeoutError, urllib.error.URLError) as e:
+            if attempt == 2 or isinstance(e, urllib.error.HTTPError):
+                raise
 
 
 def refresh_token(course_id):

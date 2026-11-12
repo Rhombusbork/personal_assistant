@@ -1,6 +1,7 @@
 """출력 블록: TODAY.md (VSCode 미리보기용), dashboard/data.js (HTML 대시보드용)."""
 import json
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta
 
 from pa import calibrate, db, jobs, materials
 from pa.config import ROOT, load_timetable
@@ -161,8 +162,10 @@ def dashboard_data(conn):
     if db.get_meta(conn, "last_error"):
         warns.append(f"마지막 동기화 실패: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
     lx = db.get_meta(conn, "learningx_error") or db.get_meta(conn, "learningx_lecture_error")
-    if lx:
-        warns.append(f"강의 플랫폼(LearningX) 연결 문제: {lx} — 터미널에서 bin/pa browser login 으로 다시 로그인")
+    if lx and "로그인" in lx:  # 로그인 만료 → 다시 로그인 버튼
+        warns.append(f"강의 플랫폼(LearningX) 로그인 필요: {lx}")
+    elif lx:  # 시간 초과 같은 일시적 오류
+        warns.append(f"강의 플랫폼 확인 중 일시적 오류 ({lx}) — 다음 확인 때 다시 시도합니다")
     warns += [f"마감 전 빈 시간 부족: {label(by_key[k])}" for k in (db.get_meta(conn, "plan_failed") or "").split(",")
               if k in by_key]
     return {
@@ -177,6 +180,7 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "semester": semester_weeks(all_tasks, t_now),
         "notices": [dict(r) for r in conn.execute(
             "SELECT id, course, title, posted_at, summary FROM notices WHERE status = 'new' ORDER BY posted_at DESC")],
         "suggestions": json.loads(db.get_meta(conn, "notice_suggestions") or "[]"),
@@ -212,6 +216,29 @@ def recent_changes(conn, by_key, t_now):
         elif r["type"] in CHANGE_LABEL and not (r["type"] == "task_added" and t and t.source == "inbox"):
             out.append({"ts": r["ts"], "label": CHANGE_LABEL[r["type"]], "name": name})
     return out[:20]
+
+
+EXAM = re.compile(r"(?<!임상)시험|고사")  # '임상시험' 같은 말은 시험이 아님
+
+
+def semester_weeks(all_tasks, t_now):
+    """종강까지 주별 마감 (지난 주 포함 — 이번 학기 전체 모습)."""
+    tt = load_timetable()
+    start = datetime.fromisoformat(tt["semester_start"]).date()
+    end = datetime.fromisoformat(tt["semester_end"]).date()
+    start -= timedelta(days=start.weekday())  # 월요일부터
+    weeks = []
+    d = start
+    while d <= end:
+        nxt = d + timedelta(days=7)
+        its = [{"title": t.title, "course": short_course(t.course), "kind": t.kind, "status": t.status,
+                "due": t.due.isoformat(), "exam": bool(EXAM.search(t.title)) and "@복습" not in t.key}
+               for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status in ("open", "done")
+               and "@복습" not in t.key]
+        weeks.append({"start": d.isoformat(), "items": sorted(its, key=lambda x: x["due"]),
+                      "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
+        d = nxt
+    return weeks
 
 
 def active_json(conn, by_key):

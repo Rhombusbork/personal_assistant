@@ -1,7 +1,8 @@
 """대시보드 로컬 서버 (http://localhost:8765) — 감시기 안에서 함께 돈다.
 
 GET  /               대시보드 (dashboard/index.html)
-GET  /api/data       지금 시각 기준 대시보드 데이터 (요청마다 새로 계산)
+GET  /api/data       지금 시각 기준 대시보드 데이터 (요청마다 새로 계산). ?v=<id> 로 '열려 있음' 신호
+GET  /api/viewers    최근 45초 안에 신호를 보낸 대시보드 탭 수 (VSCode 가 중복으로 열지 않게)
 POST /api/add        할 일 추가 → inbox.md 에 한 줄
 POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료)
 POST /api/ignore     계속 제외 (## 제외)
@@ -17,12 +18,15 @@ POST /api/job/report 보고서 준비 + 초안 (에이전트 작업 대기열에
 POST /api/job/notices 새 공지 요약 + 제외 후보 찾기 (Claude, 버튼으로만)
 POST /api/job/summary 자료 PDF 요약 (Claude, 버튼으로만)
 POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
+POST /api/today      💭 하고 싶은 일을 오늘 하기 (오늘 23:59 마감을 붙임)
+POST /api/browser-login  LearningX 다시 로그인 창 열기
 
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
 """
 import json
 import subprocess
 import threading
+import time
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,6 +39,12 @@ from pa.model import KST
 PORT = 8765
 DASH = ROOT / "dashboard"
 ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}"}
+VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
+
+
+def viewer_count(window=45):
+    cutoff = time.time() - window
+    return sum(1 for t in VIEWERS.values() if t >= cutoff)
 
 
 def parse_add(body):
@@ -100,7 +110,12 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/materials"):
             key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
             return self._json(200, materials_for(key))
+        if self.path.startswith("/api/viewers"):
+            return self._json(200, {"count": viewer_count()})
         if self.path.split("?")[0] == "/api/data":
+            vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
+            if vid:
+                VIEWERS[vid] = time.time()
             conn = db.connect()
             try:
                 data = render.dashboard_data(conn)
@@ -124,11 +139,14 @@ class Handler(SimpleHTTPRequestHandler):
                 inbox.ignore(body["key"]); msg = "제외"
             elif action == "/api/remove":
                 inbox.remove(body["key"]); msg = "삭제"
+            elif action == "/api/today":
+                inbox.set_due(body["key"], datetime.now(KST).replace(hour=23, minute=59, second=0, microsecond=0))
+                msg = "오늘 하기"
             elif action == "/api/quick":
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary",
-                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss"):
+                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -175,6 +193,10 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("할 일을 찾지 못함")
                 jobs.enqueue(conn, "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/browser-login":
+                subprocess.Popen([str(ROOT / "bin" / "pa"), "browser", "login"],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return {"ok": True, "message": "로그인 창을 엽니다 — 로그인하면 저절로 닫힙니다"}
             if action == "/api/job/summary":
                 jobs.enqueue(conn, "summary", body["path"], "요약: " + Path(body["path"]).stem)
                 return {"ok": True}

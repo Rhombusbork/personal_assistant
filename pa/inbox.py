@@ -51,7 +51,7 @@ RE_CHECK = re.compile(r"^\s*[-*]\s+\[( |x|X)\]\s+(.*)$")
 RE_BULLET = re.compile(r"^\s*[-*]\s+(?:\[[ xX]\]\s+)?(.*)$")
 
 
-RE_EXAM = re.compile(r"시험|고사")
+RE_EXAM = re.compile(r"(?<!임상)시험|고사")  # '임상시험' 같은 말은 시험이 아님
 
 
 def exam_reviews(key, base, exam, cfg, t_now):
@@ -142,7 +142,9 @@ def format_line(title, due=None, minutes=None, course="", every=None):
         raise ValueError("제목이 없음")
     parts = [f"- [ ] {title}"]
     if due:
-        parts.append(f"@{due:%m-%d}" + ("" if (due.hour, due.minute) == (23, 59) else f" {due:%H:%M}"))
+        # 올해가 아니면 연도까지 (연도 없는 날짜는 올해/내년으로 짐작하므로)
+        day = f"@{due:%m-%d}" if due.year == now().year else f"@{due:%Y-%m-%d}"
+        parts.append(day + ("" if (due.hour, due.minute) == (23, 59) else f" {due:%H:%M}"))
     if minutes:
         parts.append(f"~{minutes}m")
     if course:
@@ -228,6 +230,17 @@ def mark_done(key):
 
 def ignore(key):
     _insert("ignore", f"- {key}")
+
+
+def set_due(key, due):
+    """기한 없는 inbox 할 일에 마감을 붙인다 (예: 💭 하고 싶은 일 → 오늘 하기)."""
+    lines = PATH.read_text().splitlines()
+    i = _todo_line_index(lines, key[2:]) if key.startswith("i:") else None
+    if i is None:
+        raise ValueError("inbox 에 없는 항목")
+    it = parse_line(RE_CHECK.match(lines[i]).group(2), now().date(), None)
+    lines[i] = format_line(it["title"], due, it["minutes"], it["course"], None)
+    PATH.write_text("\n".join(lines) + "\n")
 
 
 def remove(key):

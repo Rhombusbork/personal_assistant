@@ -49,6 +49,31 @@ def cmd_today(conn, args):
     print(render.TODAY_PATH.read_text())
 
 
+def cmd_dashboard_check(conn, args):
+    """VSCode 작업용: 엔진 서버가 뜰 때까지 기다린 뒤, 대시보드가 이미 열려 있으면 실패(→ 열기 건너뜀)."""
+    import json as _json
+    import time as _time
+    import urllib.request
+    base = "http://localhost:8765"
+    for _ in range(90):
+        try:
+            urllib.request.urlopen(base + "/", timeout=2)
+            break
+        except OSError:
+            _time.sleep(1)
+    else:
+        print("대시보드 서버가 뜨지 않았습니다 (아래 '비서: 자동 감시' 확인)")
+        sys.exit(1)
+    # 다시 연 창에서 복원된 대시보드 탭이 신호를 보낼 시간을 잠깐 준다
+    for _ in range(8):
+        n = _json.loads(urllib.request.urlopen(base + "/api/viewers", timeout=2).read())["count"]
+        if n:
+            print(f"대시보드가 이미 열려 있음 ({n}개) — 새로 열지 않음")
+            sys.exit(3)
+        _time.sleep(1)
+    print("대시보드 열기")
+
+
 def cmd_plan(conn, args):
     result, failed = plan.run(conn, write=not args.dry_run)
     day = None
@@ -97,6 +122,7 @@ def main():
     sp.set_defaults(fn=cmd_run)
     sub.add_parser("watch").set_defaults(fn=cmd_watch)
     sub.add_parser("today").set_defaults(fn=cmd_today)
+    sub.add_parser("dashboard-check").set_defaults(fn=cmd_dashboard_check)
     sp = sub.add_parser("plan")
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(fn=cmd_plan)

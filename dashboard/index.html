@@ -151,6 +151,16 @@
   .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
   .prog .fill { height: 100%; background: var(--todo); }
   .empty { color: var(--muted); font-size: 13px; }
+  .term { display: grid; gap: 2px; }
+  .trow { display: grid; grid-template-columns: 74px 70px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 8px; font-size: 12px; }
+  .trow.cur { background: color-mix(in srgb, var(--accent) 10%, var(--card)); outline: 1px solid var(--accent); }
+  .trow.past { opacity: .5; }
+  .tw small { color: var(--muted); }
+  .tbar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .tbar i { display: block; height: 100%; background: var(--warn); }
+  .titems { display: flex; flex-wrap: wrap; gap: 4px; }
+  .titem { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; }
+  .titem.done { opacity: .5; text-decoration: line-through; }
   .mat { margin-top: 12px; border: 1px solid var(--accent); }
   .ritual { margin-top: 12px; border: 1px solid var(--todo); background: color-mix(in srgb, var(--todo) 6%, var(--card)); }
   .ritual h3 { font-size: 13px; margin: 10px 0 4px; color: var(--muted); }
@@ -203,7 +213,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">이번 주</button></span>
+      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">이번 주</button><button data-view="term">학기</button></span>
           <span class="hint" id="viewHint"></span></h2>
       <div id="view"></div>
     </div>
@@ -256,8 +266,10 @@ const dur = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? " " + (m % 60)
 const ddayText = (due, today) => { const n = between(today, ymd(due)); return n < 0 ? "지남" : n === 0 ? "오늘" : "D-" + n; };
 const taskOf = k => { k = String(k).split("#")[0]; return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || null; };
 
+// 이 탭의 id — 30초마다 '열려 있음' 신호를 겸한다 (VSCode 를 다시 열 때 대시보드를 중복으로 열지 않게)
+const VIEWER = Math.random().toString(36).slice(2, 10);
 async function load() {
-  try { const r = await fetch("/api/data", { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
+  try { const r = await fetch("/api/data?v=" + VIEWER, { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
   catch { LIVE = false; }
   render();
 }
@@ -323,10 +335,11 @@ function render() {
 
   const warns = [...D.warnings];
   if (!LIVE) warns.unshift("엔진이 꺼져 있어 마지막 데이터를 보여 주는 중입니다. VSCode 에서 'Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시'.");
-  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul></div>` : "";
+  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w).replace(/`([^`]+)`/g, "<code>$1</code>")}${
+    LIVE && w.includes("로그인 필요") ? ` <button class="chip" data-act="relogin">다시 로그인</button>` : ""}</li>`).join("")}</ul></div>` : "";
 
-  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : todayView(now, today);
-  $("viewHint").textContent = view === "week" ? "블록을 누르면 버튼이 나옵니다" : "";
+  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : view === "term" ? termView(today) : todayView(now, today);
+  $("viewHint").textContent = view === "week" ? "블록을 누르면 버튼이 나옵니다" : view === "term" ? "주마다 마감 · 막대 = 남은 일의 예상 시간" : "";
 
   // 오른쪽: 마감
   const item = t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
@@ -340,7 +353,8 @@ function render() {
   }
   $("dues").innerHTML = dues || `<p class="empty">2주 안 마감 없음</p>`;
   $("someday").innerHTML = D.someday.length ? D.someday.map(t => `<div class="item"><span class="dot" style="background:var(--todo)"></span>
-      <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>${smallActs(t)}</div>`).join("")
+      <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>
+      ${LIVE && t.source === "inbox" ? `<span class="acts"><button data-act="dotoday" data-key="${esc(t.key)}" title="오늘 빈 시간에 넣기">📅 오늘</button></span>` : ""}${smallActs(t)}</div>`).join("")
     : `<p class="empty">아직 없음</p>`;
 
   $("ritual").innerHTML = LIVE ? ritual(now, today) : "";
@@ -510,6 +524,20 @@ function weekView(now, today, nowMin) {
   return h;
 }
 
+function termView(today) {
+  const weeks = D.semester || [];
+  const maxMin = Math.max(60, ...weeks.map(w => w.minutes));
+  return `<div class="term">${weeks.map((w, i) => {
+    const end = addDays(w.start, 6), cur = w.start <= today && today <= end, past = end < today;
+    const exam = w.items.some(x => x.exam);
+    const items = w.items.map(x => `<span class="titem ${x.status === "done" ? "done" : ""}" title="${esc(x.course)} · ${esc(x.title)} · ${label(ymd(x.due))} ${hm(x.due)}">
+      <i class="dot" style="background:${color(x.kind)}"></i>${x.exam ? "📝 " : ""}${esc(x.title.length > 18 ? x.title.slice(0, 17) + "…" : x.title)}</span>`).join("");
+    return `<div class="trow ${cur ? "cur" : ""} ${past ? "past" : ""}"><span class="tw">${i + 1}주 <small>${label(w.start).replace(/\(.\)/, "")}</small></span>
+      <span class="tbar"><i style="width:${w.minutes / maxMin * 100}%"></i></span>
+      <span class="titems">${exam ? "<b class='badge d0'>시험</b> " : ""}${items || "<span class='meta'>-</span>"}</span></div>`;
+  }).join("")}</div>`;
+}
+
 function renderStats(today) {
   const days14 = [...Array(14)].map((_, i) => addDays(today, i));
   const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
@@ -597,6 +625,8 @@ document.addEventListener("click", async e => {
   }
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
+  if (act === "relogin") { try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
+  if (act === "dotoday") { try { await post("today", { key }); } catch (err) { alert(err.message); } return; }
   const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
                  nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
   if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
@@ -611,7 +641,7 @@ document.addEventListener("keydown", e => {
   const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
   if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)) { e.preventDefault(); $("quickInput").focus(); return; }
   if (typing) return;
-  if (e.key === "t" || e.key === "w") { view = e.key === "t" ? "today" : "week"; try { localStorage.setItem("pa.view", view); } catch {} render(); }
+  if (e.key === "t" || e.key === "w" || e.key === "m") { view = { t: "today", w: "week", m: "term" }[e.key]; try { localStorage.setItem("pa.view", view); } catch {} render(); }
 });
 
 load();
