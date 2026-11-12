@@ -87,6 +87,14 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
   → Repository access: *Only select repositories* → `personal_assistant` → Permissions: **Contents: Read and write** → Generate
 - 비서 코드는 올리지 않는다 (`gh-pages`·`phone-inbox` 브랜치만)
 
+### 휴대폰 알림 (Google Calendar)
+
+비서가 Google Calendar 에 넣는 일정에 알림을 붙인다 → **휴대폰 Google Calendar 앱이 알려 준다 (PC 가 꺼져 있어도)**.
+- '학습 계획' 블록: 시작 **10분 전**
+- '과제' 마감: 마감 **3시간 전**, 하루 종일 마감은 **전날 21:00**
+- 바꾸려면 `config/timetable.yaml` 의 `reminders` (다음 동기화 때 모든 일정에 다시 적용). 0 이면 알림 없음
+- 휴대폰 Google Calendar 앱 → 메뉴(☰)에서 **'학습 계획', '과제' 캘린더가 체크**되어 있어야 하고, 앱 알림이 켜져 있어야 한다
+
 ### 휴대폰 홈 화면에 앱처럼 두기 (처음 한 번)
 
 **Android (Chrome)**

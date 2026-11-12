@@ -16,7 +16,7 @@ from dataclasses import replace
 from datetime import datetime, time, timedelta
 
 from pa import calibrate, db
-from pa.config import load_timetable
+from pa.config import load_timetable, popup, reminders
 from pa.gcal import get_or_create_calendar, get_service
 from pa.model import KIND_LABEL, KST, label, now, parse_dt
 
@@ -219,7 +219,9 @@ def run(conn, service=None, write=True):
     week_end = t_now + timedelta(days=7)
     slack = {"capacity": capacity(t_now, cfg, busy),
              "need": sum(t.minutes for t in items if t.due <= week_end)}
-    rows = sync_calendar(service, plan, old, t_now) if write else None
+    remind = reminders()["plan"]
+    remind_changed = db.get_meta(conn, "plan_reminder") != str(remind)
+    rows = sync_calendar(service, plan, old, t_now, remind, force=remind_changed) if write else None
 
     # --- DB 쓰기 (짧게)
     for k, start in missed:
@@ -232,13 +234,16 @@ def run(conn, service=None, write=True):
     db.set_meta(conn, "planned_at", t_now.isoformat())
     db.set_meta(conn, "plan_failed", ",".join(t.key for t in failed))
     db.set_meta(conn, "plan_why", json.dumps(why, ensure_ascii=False))
+    if rows is not None:
+        db.set_meta(conn, "plan_reminder", str(remind))
     db.set_meta(conn, "slack", json.dumps(slack))
     conn.commit()
     return plan, failed
 
 
-def sync_calendar(service, plan, old, t_now):
-    """바뀐 블록만 캘린더에 반영하고, 새 plan 표에 넣을 줄들을 돌려준다."""
+def sync_calendar(service, plan, old, t_now, remind=0, force=False):
+    """바뀐 블록만 캘린더에 반영하고, 새 plan 표에 넣을 줄들을 돌려준다.
+    remind: 시작 몇 분 전 알림. force: 알림 설정이 바뀌었을 때 모든 블록을 다시 쓴다."""
     cal_id = get_or_create_calendar(service, CALENDAR_NAME, TZ)
     keep_ids = set()
     rows = []
@@ -249,10 +254,12 @@ def sync_calendar(service, plan, old, t_now):
             "end": {"dateTime": e.isoformat(), "timeZone": TZ},
             "description": f"마감: {t.due:%Y-%m-%d %H:%M}\n키: {t.key}\n{t.url}",
             "extendedProperties": {"private": {"pa_source": "plan", "pa_key": t.key}},
+            "reminders": popup(remind),
         }
         o = old.get(t.key)
         ev_id = o["event_id"] if o else None
-        same = o and o["start"] == s.isoformat() and o["end"] == e.isoformat() and o["summary"] == body["summary"]
+        same = (not force and o and o["start"] == s.isoformat() and o["end"] == e.isoformat()
+                and o["summary"] == body["summary"])
         if ev_id and not same:
             try:
                 service.events().update(calendarId=cal_id, eventId=ev_id, body=body).execute()

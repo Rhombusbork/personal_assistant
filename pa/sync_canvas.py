@@ -9,7 +9,7 @@ import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
 from pa import db
-from pa.config import load_env
+from pa.config import load_env, popup, reminders
 from pa.gcal import get_or_create_calendar, get_service
 
 TZ = "Asia/Seoul"
@@ -64,6 +64,8 @@ def build_event(ev):
         "description": f"{url}\n\n{desc}".strip(),
         "transparency": "transparent",  # 마감 표시일 뿐이므로 '바쁨'으로 잡지 않음
         "extendedProperties": {"private": {"pa_source": "canvas", "pa_key": uid}},
+        # 하루 종일 마감 → 전날 밤 / 시각 마감(일정은 마감 30분 전 시작) → 마감 N분 전
+        "reminders": popup(reminders()["deadline"] - (0 if "date" in start else 30)),
     }
 
 
@@ -77,7 +79,7 @@ def fetch_feed():
 
 
 def same(item, ev):
-    return all(item.get(k) == ev[k] for k in ("summary", "description")) and all(
+    return all(item.get(k) == ev[k] for k in ("summary", "description", "reminders")) and all(
         (item[k].get("date") or parse_time(item[k].get("dateTime"))) == (ev[k].get("date") or parse_time(ev[k].get("dateTime")))
         for k in ("start", "end"))
 

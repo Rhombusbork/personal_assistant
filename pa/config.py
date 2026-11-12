@@ -18,3 +18,13 @@ def load_env():
 
 def load_timetable():
     return yaml.safe_load((ROOT / "config" / "timetable.yaml").read_text())
+
+
+def reminders():
+    r = load_timetable().get("reminders") or {}
+    return {"plan": int(r.get("plan_minutes_before", 0)), "deadline": int(r.get("deadline_minutes_before", 0))}
+
+
+def popup(minutes):
+    """Google Calendar 일정 알림 설정 (0 이하면 알림 없음)."""
+    return {"useDefault": False, "overrides": [{"method": "popup", "minutes": minutes}] if minutes > 0 else []}
