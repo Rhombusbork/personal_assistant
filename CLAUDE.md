@@ -35,6 +35,10 @@
   감시기가 꺼져 있을 수 있으니 고친 뒤 `bin/pa run` 을 실행한다.
 - `bin/pa list` 남은 항목과 키 / `bin/pa lectures [과목] [--open N]` 강의 열기
 - 데이터: `data/pa.db` (SQLite, events 표가 자동 기록)
+- 대시보드 http://localhost:8765 — 엔진(`bin/pa watch`) 안의 서버. 보고서 초안·자료 요약·공지 정리는
+  대시보드 버튼 → 에이전트 작업(`pa/jobs.py`, `claude -p`). 엔진은 그 밖에는 Claude 를 쓰지 않는다
+- LearningX(강의 플랫폼)는 `bin/pa browser login` 으로 저장한 로그인으로 **데이터 API 만** 읽는다.
+  강의·자료 **페이지를 자동으로 열지 않는다** (열람·출석 기록이 남을 수 있음). 교수자가 지운 자료는 받지 않는다
 
 ## 원칙
 
