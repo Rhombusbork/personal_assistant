@@ -62,7 +62,14 @@ def find(course_name, title):
     dirs = course_dirs(course_name)
     if not dirs or not dirs[0].exists():
         return None, []
-    mat = dirs[0]
+    return dirs[0], scan(dirs[0], title)
+
+
+def scan(folder, title):
+    """folder 안에서 title 에 맞는 파일 [(점수, 경로)]."""
+    if not folder.exists():
+        return []
+    mat = folder
     want_clues, want_words = clues(title), words(title)
     scored = []
     for f in mat.rglob("*"):
@@ -77,7 +84,7 @@ def find(course_name, title):
         if score:
             scored.append((score, f))
     scored.sort(key=lambda x: (-x[0], str(x[1])))
-    return mat, scored
+    return scored
 
 
 def open_file(path):

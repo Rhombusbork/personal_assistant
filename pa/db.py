@@ -5,6 +5,7 @@ events  자동 기록 (추가·완료·제외·마감 변경·계획 누락 …)
 plan    현재 학습 계획 (Google Calendar 일정 id 포함)
 busy    계획 기간의 대면 수업·약속 (시각화용)
 sessions 실제로 한 시간 기록 (⏱) — 예상 시간 보정에 쓴다
+jobs    에이전트 작업 대기열과 결과 (🤖 작업 칸)
 """
 import json
 import sqlite3
@@ -49,6 +50,19 @@ CREATE TABLE IF NOT EXISTS plan (
 );
 CREATE TABLE IF NOT EXISTS busy (start TEXT NOT NULL, end TEXT NOT NULL, label TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS jobs (               -- 에이전트 작업 (보고서 초안 등)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,                           -- report | …
+  key TEXT,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',        -- queued | running | done | failed
+  step TEXT NOT NULL DEFAULT '',
+  result TEXT,                                  -- 결과 파일 경로
+  error TEXT,
+  claude INTEGER NOT NULL DEFAULT 0,            -- Claude(구독) 호출 횟수
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (           -- 실제로 한 시간 (⏱ 시작 ~ 끝)
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   key TEXT NOT NULL,

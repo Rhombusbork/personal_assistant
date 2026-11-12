@@ -11,7 +11,7 @@ import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, inbox, learningx, materials, plan, render, server, sync_canvas
+from pa import collect_canvas, db, inbox, jobs, learningx, materials, plan, render, server, sync_canvas
 from pa.gcal import get_service
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
@@ -77,6 +77,20 @@ def _download_watcher():
         time.sleep(5)
 
 
+def _job_runner():
+    """에이전트 작업을 하나씩 처리하는 스레드 (보고서 초안 등은 몇 분 걸릴 수 있음)."""
+    conn = db.connect()
+    jobs.reset_stuck(conn)
+    while True:
+        try:
+            if jobs.run_next(conn):
+                log("에이전트 작업 하나 처리")
+                continue
+        except Exception as e:
+            log(f"작업 처리 오류: {e}")
+        time.sleep(2)
+
+
 def watch():
     # 감시기는 하나만 (VSCode 창을 여러 개 열어도 캘린더에 중복으로 쓰지 않게)
     lock = open(db.PATH.parent / "watch.lock", "w")
@@ -98,6 +112,7 @@ def watch():
     else:
         log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
     threading.Thread(target=_download_watcher, daemon=True).start()
+    threading.Thread(target=_job_runner, daemon=True).start()
     log("비서 감시 시작 — inbox.md 저장 시 자동 반영, 15분마다 계획 갱신, Canvas 는 3시간마다 확인")
     run(full=True)
     last_full = last_plan = time.time()

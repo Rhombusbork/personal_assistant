@@ -204,6 +204,7 @@
       <div id="view"></div>
     </div>
     <div class="stack">
+      <div id="jobs"></div>
       <div id="downloads"></div>
       <div class="card"><h2>⏰ 다가오는 마감</h2><div id="dues"></div></div>
       <div class="card"><h2>💭 하고 싶은 일 <span class="hint">기한 없음</span></h2><div id="someday"></div>
@@ -269,6 +270,7 @@ function acts(t, big) {
   const k = esc(t.key), b = [];
   const isActive = D.active && D.active.key === t.key;
   if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : "▶ 열기"}</button>`);
+  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명·자료·내 노트를 모아 보고서 파일을 만들고 초안까지 (Claude 사용)">✍ 초안</button>`);
   if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
   b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
                   : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
@@ -332,6 +334,13 @@ function render() {
   $("someday").innerHTML = D.someday.length ? D.someday.map(t => `<div class="item"><span class="dot" style="background:var(--todo)"></span>
       <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>${smallActs(t)}</div>`).join("")
     : `<p class="empty">아직 없음</p>`;
+
+  const js = (LIVE && D.jobs) || [];
+  const ST = { queued: "⏳ 대기", running: "⚙️ 진행 중", done: "✅ 완료", failed: "⚠️ 실패" };
+  $("jobs").innerHTML = js.length ? `<div class="card"><h2>🤖 작업</h2>${js.map(j => `<div class="item"><span class="txt">
+      <b>${ST[j.status]}</b> ${esc(j.title)}<span class="meta" style="display:block">${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · Claude 사용 " + j.claude + "회" : ""}</span></span>
+      ${j.status === "done" && j.result ? `<button data-act="openfile" data-path="${esc(j.result)}">열기</button>` : ""}</div>`).join("")}</div>` : "";
+  if (js.some(j => j.status === "queued" || j.status === "running")) setTimeout(load, 5000);  // 진행 중이면 자주 갱신
 
   const dls = (LIVE && D.downloads) || [];
   $("downloads").innerHTML = dls.length ? `<div class="card dl"><h2>📥 새로 받은 파일 <span class="hint">과목 폴더로 정리</span></h2>${dls.map(f => `
@@ -518,7 +527,8 @@ document.addEventListener("click", async e => {
   }
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
-  const call = { done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
+  if (act === "report" && !confirm("이 과제의 보고서 파일을 만들고 Claude 로 초안을 씁니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
+  const call = { report: ["job/report", { key }], done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
                  start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];
   b.disabled = true;
   try { await post(...call); } catch (err) { alert(err.message); b.disabled = false; }

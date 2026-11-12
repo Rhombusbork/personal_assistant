@@ -2,7 +2,7 @@
 import json
 from datetime import timedelta
 
-from pa import db, materials
+from pa import db, jobs, materials
 from pa.config import ROOT, load_timetable
 from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
@@ -172,6 +172,7 @@ def dashboard_data(conn):
         "courses": sorted({short_course(t.course) for t in all_tasks if t.course}),
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
+        "jobs": jobs.recent(conn),
         "courseFolders": [c["match"][0] for c in materials._cfg()["courses"]],
         "todayDone": [task_json(by_key[r["key"]]) for r in conn.execute(
             "SELECT key FROM tasks WHERE status = 'done' AND done_at >= ? ORDER BY done_at",
