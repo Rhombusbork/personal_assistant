@@ -160,7 +160,20 @@ def dashboard_data(conn):
 
     warns = [w for w in (db.get_meta(conn, "inbox_warnings") or "").split("\n") if w]
     if db.get_meta(conn, "last_error"):
-        warns.append(f"마지막 동기화 실패: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
+        warns.append(f"마지막 동기화 문제: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
+    ack = db.get_meta(conn, "ack_phone") or "0"
+    fails = conn.execute("SELECT ts FROM events WHERE type = 'phone_input_failed' AND ts > ? ORDER BY ts",
+                         (ack,)).fetchall()
+    if fails:
+        warns.append(f"휴대폰 입력 {len(fails)}건을 반영하지 못했습니다 ({', '.join(fmt_time(r['ts']) for r in fails[:3])}) "
+                     "— 휴대폰에서 다시 입력해 주세요 [ack:phone]")
+    tt = load_timetable()
+    end = datetime.fromisoformat(tt["semester_end"]).date()
+    left = (end - t_now.date()).days
+    if left < 0:
+        warns.append("학기가 끝났습니다 — 다음 학기 시간표·학기 날짜를 채팅에서 알려 주세요 (config/timetable.yaml)")
+    elif left <= 7:
+        warns.append(f"종강({end:%m/%d})까지 {left}일 — 다음 학기 시간표가 나오면 채팅에서 알려 주세요")
     lx = db.get_meta(conn, "learningx_error") or db.get_meta(conn, "learningx_lecture_error")
     if lx and "로그인" in lx:  # 로그인 만료 → 다시 로그인 버튼
         warns.append(f"강의 플랫폼(LearningX) 로그인 필요: {lx}")

@@ -12,6 +12,7 @@
   bin/pa time <키> <분>       예상 소요 시간 조정
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
   bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
+  bin/pa google-login         Google Calendar 다시 로그인 (Windows 브라우저가 열림)
 """
 import argparse
 import sys
@@ -104,6 +105,9 @@ def cmd_time(conn, args):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "google-login":
+        from pa import gcal
+        return gcal.login()
     if len(sys.argv) > 1 and sys.argv[1] == "browser":
         from pa import browser
         return browser.main(sys.argv[2:])

@@ -70,8 +70,8 @@ def modules(course_id, token=None):
     try:
         return _get(url, token), token
     except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
-            raise NeedLogin("LearningX 로그인 만료")
+        if e.code in (400, 401, 403):  # 토큰이 무효면 LearningX 는 400 'Invalid request' 를 준다
+            raise NeedLogin(f"LearningX 로그인 만료 ({e.code})")
         raise
 
 

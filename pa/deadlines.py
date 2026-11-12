@@ -44,9 +44,15 @@ def event_body(t):
     }
 
 
+def _remind_minutes(r):
+    """알림 비교용 — Google 은 알림 목록 순서를 섞어서 돌려주므로 정렬해서 비교한다."""
+    r = r or {}
+    return (bool(r.get("useDefault")), sorted(o.get("minutes", 0) for o in r.get("overrides", [])))
+
+
 def same(ev, body):
     return (ev.get("summary") == body["summary"] and ev.get("description", "") == body["description"]
-            and ev.get("reminders") == body["reminders"]
+            and _remind_minutes(ev.get("reminders")) == _remind_minutes(body["reminders"])
             and all(parse_dt(ev[k].get("dateTime")) == parse_dt(body[k]["dateTime"]) for k in ("start", "end")))
 
 
@@ -60,6 +66,21 @@ def _list(service, cal_id, source):
         token = page.get("nextPageToken")
         if not token:
             return out
+
+
+def signature(conn):
+    import hashlib
+    import json
+    rows = conn.execute("SELECT key, kind, course, title, due, url FROM tasks WHERE status = 'open' AND due IS NOT NULL "
+                        "ORDER BY key").fetchall()
+    return hashlib.sha1(json.dumps([[tuple(r) for r in rows], reminders()], default=str).encode()).hexdigest()
+
+
+def needed(conn, max_age_hours=6):
+    """마감이 바뀌었거나 6시간이 지났을 때만 캘린더를 확인한다 (다른 곳에서 일정을 지웠어도 하루 몇 번은 바로잡힘)."""
+    last = parse_dt(db.get_meta(conn, "deadlines_synced_at"))
+    return (db.get_meta(conn, "deadlines_sig") != signature(conn)
+            or not last or now() - last >= timedelta(hours=max_age_hours))
 
 
 def sync(conn, service=None):
@@ -91,4 +112,6 @@ def sync(conn, service=None):
         if key not in wanted and end and end > t_now:
             service.events().delete(calendarId=cal, eventId=ev["id"]).execute()
             removed += 1
+    db.set_meta(conn, "deadlines_sig", signature(conn))
+    db.set_meta(conn, "deadlines_synced_at", t_now.isoformat())
     return created, updated, removed

@@ -87,15 +87,35 @@ def scan(folder, title):
     return scored
 
 
+def _vscode_open(path):
+    """VSCode 편집기 탭으로 연다. 엔진이 켜진 뒤 VSCode 창을 다시 열었으면 연결 통로(소켓)가 바뀌므로,
+    환경 변수의 것 → 가장 최근 것 순서로 시도한다. 실패하면 False."""
+    import glob
+    code = shutil.which("code") or next(iter(sorted(glob.glob(
+        str(Path.home() / ".vscode-server/bin/*/bin/remote-cli/code")), key=os.path.getmtime, reverse=True)), None)
+    if not code:
+        return False
+    socks = sorted(glob.glob(f"/run/user/{os.getuid()}/vscode-ipc-*.sock"), key=os.path.getmtime, reverse=True)
+    for sock in dict.fromkeys([os.environ.get("VSCODE_IPC_HOOK_CLI")] + socks):
+        if not sock or not os.path.exists(sock):
+            continue
+        try:
+            r = subprocess.run([code, "--reuse-window", str(path)], env={**os.environ, "VSCODE_IPC_HOOK_CLI": sock},
+                               capture_output=True, timeout=8)
+        except (subprocess.TimeoutExpired, OSError):
+            continue
+        if r.returncode == 0:
+            return True
+    return False
+
+
 def open_file(path):
     path = Path(path).resolve()
     if not any(str(path).startswith(str(r)) for r in allowed_roots()):
         raise ValueError("열 수 없는 위치")
     if not path.exists():
         raise ValueError("파일 없음")
-    code = shutil.which("code")
-    if code and os.environ.get("VSCODE_IPC_HOOK_CLI"):
-        subprocess.Popen([code, "--reuse-window", str(path)])
+    if _vscode_open(path):
         return "vscode"
     win = subprocess.run(["wslpath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
     subprocess.Popen(["explorer.exe", win])

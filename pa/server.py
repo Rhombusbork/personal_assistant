@@ -157,7 +157,8 @@ class Handler(SimpleHTTPRequestHandler):
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
-                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz"):
+                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
+                            "/api/google-login", "/api/ack"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -204,6 +205,14 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("할 일을 찾지 못함")
                 jobs.enqueue(conn, "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/google-login":
+                subprocess.Popen([str(ROOT / "bin" / "pa"), "google-login"],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                return {"ok": True, "message": "Windows 브라우저에 Google 로그인 창이 열립니다 — 허용하면 끝 (10분 안에)"}
+            if action == "/api/ack":  # 알림 확인 (휴대폰 입력 실패 등) — 이 시각 이전 것은 더 안 보여 줌
+                db.set_meta(conn, f"ack_{body['what']}", datetime.now(KST).isoformat())
+                conn.commit()
+                return {"ok": True}
             if action == "/api/open-quiz":
                 from pa import quiz
                 subprocess.Popen(["explorer.exe", quiz.cfg()["url"]])

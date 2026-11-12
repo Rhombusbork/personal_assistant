@@ -167,6 +167,30 @@ def capacity(t_now, cfg, busy, days=7):
     return sum(min(cfg["max_minutes_per_day"], m) for m in per_day.values())
 
 
+def signature(conn):
+    """계획에 영향을 주는 것들의 지문 — 할 일·예상 시간·설정·날짜·⏱ 기록. 같으면 다시 계획할 필요가 없다."""
+    import hashlib
+    rows = conn.execute("SELECT key, due, earliest, minutes, minutes_override FROM tasks "
+                        "WHERE status = 'open' AND due IS NOT NULL ORDER BY key").fetchall()
+    tt = load_timetable()
+    ses = conn.execute("SELECT COUNT(*), COALESCE(SUM(minutes), 0) FROM sessions").fetchone()
+    raw = json.dumps([[tuple(r) for r in rows], now().date().isoformat(), tt.get("planner"), tt.get("reminders"),
+                      tuple(ses)], sort_keys=True, default=str)
+    return hashlib.sha1(raw.encode()).hexdigest()
+
+
+def needed(conn, max_age_minutes=60):
+    """다시 계획해야 하나: 할 일이 바뀜 / 1시간 지남(새 약속 반영) / 계획 블록이 지나감(놓친 일 옮기기)."""
+    if db.get_meta(conn, "plan_sig") != signature(conn):
+        return True
+    planned = parse_dt(db.get_meta(conn, "planned_at"))
+    t_now = now()
+    if not planned or t_now - planned >= timedelta(minutes=max_age_minutes):
+        return True
+    return bool(conn.execute("SELECT 1 FROM plan WHERE end > ? AND end <= ? LIMIT 1",
+                             (planned.isoformat(), t_now.isoformat())).fetchone())
+
+
 def summary(t):
     return f"[{KIND_LABEL[t.kind]}] {label(t)}"
 
@@ -234,6 +258,8 @@ def run(conn, service=None, write=True):
     db.set_meta(conn, "planned_at", t_now.isoformat())
     db.set_meta(conn, "plan_failed", ",".join(t.key for t in failed))
     db.set_meta(conn, "plan_why", json.dumps(why, ensure_ascii=False))
+    if write:
+        db.set_meta(conn, "plan_sig", signature(conn))
     if rows is not None:
         db.set_meta(conn, "plan_reminder", str(remind))
     db.set_meta(conn, "slack", json.dumps(slack))
