@@ -20,6 +20,7 @@ POST /api/job/summary 자료 PDF 요약 (Claude, 버튼으로만)
 POST /api/job/summary-for  강의·과제에 맞는 자료를 찾아 바로 요약 (이미 있으면 그 정리를 연다)
 POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
 POST /api/today      💭 하고 싶은 일을 오늘 하기 (오늘 23:59 마감을 붙임)
+POST /api/open-quiz  퀴즈 앱을 Windows 브라우저로 열기
 POST /api/browser-login  LearningX 다시 로그인 창 열기
 
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
@@ -147,7 +148,7 @@ class Handler(SimpleHTTPRequestHandler):
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
-                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login"):
+                            "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -194,6 +195,10 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("할 일을 찾지 못함")
                 jobs.enqueue(conn, "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/open-quiz":
+                from pa import quiz
+                subprocess.Popen(["explorer.exe", quiz.cfg()["url"]])
+                return {"ok": True}
             if action == "/api/browser-login":
                 subprocess.Popen([str(ROOT / "bin" / "pa"), "browser", "login"],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

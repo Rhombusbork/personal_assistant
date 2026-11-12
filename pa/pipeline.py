@@ -11,7 +11,7 @@ import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, inbox, jobs, learningx, materials, plan, render, server, sync_canvas
+from pa import collect_canvas, db, inbox, jobs, learningx, materials, plan, quiz, render, server, sync_canvas
 from pa.gcal import get_service
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
@@ -48,6 +48,12 @@ def _run(full):
     try:
         warns = inbox.sync(conn)
         steps.append(f"inbox{' ⚠️' + str(len(warns)) if warns else ''}")
+        try:
+            n = quiz.sync(conn)
+            if n:
+                steps.append(f"퀴즈 기록 +{n}")
+        except Exception as e:  # 퀴즈 연결 문제로 전체가 멈추지 않게
+            steps.append(f"퀴즈 기록 오류: {e}")
         service = None
         if full:
             steps.append(f"Canvas {collect_canvas.sync(conn)}건")

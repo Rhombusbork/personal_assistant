@@ -5,20 +5,20 @@ from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
 WEEKDAY = "월화수목금토일"
-KIND_LABEL = {"lecture": "강의", "quiz": "퀴즈", "assignment": "과제", "todo": "할 일"}
+KIND_LABEL = {"lecture": "강의", "quiz": "퀴즈", "assignment": "과제", "todo": "할 일", "review": "퀴즈 복습"}
 
 
 @dataclass
 class Task:
     key: str
-    kind: str  # lecture | quiz | assignment | todo
+    kind: str  # lecture | quiz | assignment | todo | review(퀴즈 앱 복습)
     course: str
     title: str
     due: datetime | None
     minutes: int
     url: str = ""
     earliest: datetime | None = None  # 이 시각 이전에는 배치하지 않음 (반복 할 일)
-    source: str = "canvas"  # canvas | inbox
+    source: str = "canvas"  # canvas | inbox | quiz
     status: str = "open"  # open | done | ignored | gone
 
 

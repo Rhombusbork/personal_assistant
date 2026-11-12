@@ -3,7 +3,7 @@ import json
 import re
 from datetime import datetime, timedelta
 
-from pa import calibrate, db, jobs, materials
+from pa import calibrate, db, jobs, materials, quiz
 from pa.config import ROOT, load_timetable
 from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
@@ -180,6 +180,7 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "quiz": quiz.status(conn),
         "semester": semester_weeks(all_tasks, t_now),
         "notices": [dict(r) for r in conn.execute(
             "SELECT id, course, title, posted_at, summary FROM notices WHERE status = 'new' ORDER BY posted_at DESC")],

@@ -20,3 +20,8 @@ courses:
   - match: [물리약학]
     materials: physical_pharmacy
     notes: 물리약학
+
+# 퀴즈 앱 (R11: '기록 내보내기' 파일로 복습 일정)
+quiz:
+  dir: ~/quiz_system_project/pharmacy
+  url: https://rhombusbork.github.io/Pharmacy/

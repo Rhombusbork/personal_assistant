@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #6b7385; --line: #e3e6ec; --field: #f1f3f6;
-    --lecture: #3b82f6; --quiz: #8b5cf6; --assignment: #f59e0b; --todo: #10b981; --busy: #9aa3b2;
+    --lecture: #3b82f6; --quiz: #8b5cf6; --assignment: #f59e0b; --todo: #10b981; --review: #ec4899; --busy: #9aa3b2;
     --danger: #ef4444; --warn: #f97316; --accent: #2563eb;
   }
   @media (prefers-color-scheme: dark) {
@@ -254,6 +254,7 @@
       <div class="card"><h2>완료 추이 <span class="hint">14일</span></h2><div id="trend"></div></div>
       <div class="card"><h2>오늘 실제로 한 시간 <span class="hint">⏱ 기록</span></h2><div id="sessions"></div></div>
       <div class="card"><h2>예상 시간 보정 <span class="hint">⏱ 기록 3번 이상부터</span></h2><div id="calib"></div></div>
+      <div class="card"><h2>퀴즈 복습 <span class="hint">퀴즈 앱 '기록 내보내기' 기준</span></h2><div id="quizStat"></div></div>
     </div>
   </details>
 </main>
@@ -261,7 +262,7 @@
 <script>
 // 비서 대시보드. 감시기 서버(localhost:8765)로 열면 30초마다 최신 데이터 + 입력 가능.
 // 파일로 열면 data.js(마지막 결과)로 보기만. '지금'은 항상 이 컴퓨터의 시계.
-const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일" };
+const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일", review: "퀴즈 복습" };
 const WD = "일월화수목금토";
 let D = window.PA_DATA || null, LIVE = false, selKey = null;
 let view = "today";
@@ -308,7 +309,7 @@ function acts(t, big) {
   if (!LIVE || !t) return "";
   const k = esc(t.key), b = [];
   const isActive = D.active && D.active.key === t.key;
-  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : "▶ 열기"}</button>`);
+  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : t.kind === "review" ? "▶ 퀴즈 풀기" : "▶ 열기"}</button>`);
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명·자료·내 노트를 모아 보고서 파일을 만들고 초안까지 (Claude 사용)">✍ 보고서 작성</button>`);
   if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
   if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`);
@@ -434,6 +435,8 @@ function ritual(now, today) {
       <ul><li>수업·약속 ${cls.length}개${cls.length ? " (" + cls.map(b => `${hm(b.start)} ${esc(b.label)}`).join(", ") + ")" : ""}</li>
         <li>계획된 할 일 ${todayPlan.length}개 · ${dur(Math.round(mins))}${todayPlan[0] ? ` · 첫 블록 ${hm(todayPlan[0].start)}` : ""}</li></ul>
       ${soon.length ? `<h3>이틀 안 마감</h3><ul>${soon.map(t => `<li>${ddayText(t.due, today)} ${hm(t.due)} ${esc(t.title)}</li>`).join("")}</ul>` : ""}
+      ${D.quiz && D.quiz.stale ? `<h3>📝 퀴즈 복습</h3><ul><li>퀴즈 기록을 ${D.quiz.backupAt ? label(ymd(D.quiz.backupAt)) + " 이후로" : "아직"} 가져오지 않았어요.
+        퀴즈 앱에서 <b>[기록 내보내기]</b>를 누르면 틀린 문제 복습 일정이 생깁니다. <button class="chip" data-act="openquiz">퀴즈 앱 열기</button></li></ul>` : ""}
       ${D.recent.length ? `<h3>지난 하루 동안 바뀐 것</h3><ul>${D.recent.map(r => `<li>${r.label} · ${esc(r.name)}</li>`).join("")}</ul>` : ""}</div>`;
   }
   return "";
@@ -545,7 +548,7 @@ function weekView(now, today, nowMin) {
   else h += `<p class="empty">${end < today ? "지난 주입니다" : "계획은 2주 앞까지만 짭니다"} — 아래 목록으로 보세요.</p>`;
 
   // 그 주에 할 것 (마감 기준), 종류별
-  const groups = [["lecture", "📘 강의"], ["assignment", "📝 과제"], ["quiz", "❓ 퀴즈"], ["todo", "✅ 할 일"]];
+  const groups = [["lecture", "📘 강의"], ["assignment", "📝 과제"], ["quiz", "❓ 퀴즈"], ["review", "🔁 퀴즈 복습"], ["todo", "✅ 할 일"]];
   const its = w.items;
   h += `<h3 class="wl-h">이 주에 마감인 것 ${its.filter(x => x.status === "open").length}개 남음 / 전체 ${its.length}개</h3>`;
   for (const [kind, name] of groups) {
@@ -605,6 +608,11 @@ function renderStats(today) {
   $("trend").innerHTML = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
     <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
   renderCalib();
+  const q = D.quiz || {};
+  $("quizStat").innerHTML = `<div class="meta">마지막으로 가져온 기록: ${q.backupAt ? stamp(q.backupAt) : "없음"}${q.stale ? " (오래됨 — 복습 일정을 만들지 않음)" : ""}</div>
+    ${Object.entries(q.dueBySubject || {}).map(([sub, n]) => `<div class="item"><span class="txt">${esc(sub)}</span><span class="meta">복습할 문제 ${n}</span></div>`).join("")}
+    ${LIVE ? `<button class="chip" data-act="openquiz" style="margin-top:6px">퀴즈 앱 열기</button>` : ""}
+    <p class="hint">퀴즈 앱 첫 화면의 [기록 내보내기] → 다운로드 폴더에 저장되면 비서가 자동으로 읽습니다.</p>`;
   $("sessions").innerHTML = D.sessionsToday.length ? D.sessionsToday.map(s => { const t = taskOf(s.key);
     return `<div class="item"><span class="txt">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span>
       <span class="meta">${s.minutes ? dur(s.minutes) : ""}${t && s.minutes ? ` / 예상 ${dur(t.minutes)}` : ""}</span></div>`; }).join("")
@@ -689,6 +697,7 @@ document.addEventListener("click", async e => {
     try { const r = await post("job/summary-for", { key }); if (r.message) alert(r.message); }
     catch (err) { alert(err.message); } b.disabled = false; return;
   }
+  if (act === "openquiz") { try { await post("open-quiz"); } catch (err) { alert(err.message); } return; }
   if (act === "dotoday") { try { await post("today", { key }); } catch (err) { alert(err.message); } return; }
   const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
                  nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
