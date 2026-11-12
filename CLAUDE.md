@@ -42,6 +42,11 @@
   **비서가 스스로 다시 로그인하지 않는다** — 비서용 로그인이 평소 브라우저의 강의 콘텐츠 로그인을 끊은 일이 있음.
   다시 로그인은 사용자가 대시보드 버튼이나 `bin/pa browser login` 을 직접 할 때만
 
+## git
+
+- 코드 백업: `origin` (https://github.com/Rhombusbork/personal_assistant, public) 의 `main` 브랜치. 커밋한 뒤 `git push` 한다.
+- `gh-pages`(휴대폰 화면)·`phone-inbox`(휴대폰 입력) 브랜치는 엔진(`pa/mobile.py`)이 관리한다. 손으로 고치지 않는다.
+
 ## 원칙
 
 - 과제·퀴즈를 사용자 대신 제출하거나, 출석을 대신 채우지 않는다. 초안·정리·계획까지만 한다.
