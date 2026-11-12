@@ -5,7 +5,8 @@ GET  /api/data       지금 시각 기준 대시보드 데이터 (요청마다 �
 GET  /api/viewers    최근 45초 안에 신호를 보낸 대시보드 탭 수 (VSCode 가 중복으로 열지 않게)
 POST /api/add        할 일 추가 → inbox.md 에 한 줄
 POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료)
-POST /api/ignore     계속 제외 (## 제외)
+POST /api/ignore     계속 제외 (## 제외). pattern=true 면 같은 이름의 앞으로 생길 과제도
+POST /api/unignore   제외 취소 (## 제외 의 그 줄을 지움)
 POST /api/remove     inbox 할 일 삭제
 POST /api/quick      빠른 입력 한 줄 ('@내일 18시 ~2h #과목')
 POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop 에 done=true 면 완료까지)
@@ -137,8 +138,16 @@ class Handler(SimpleHTTPRequestHandler):
                 msg = inbox.add_task(**parse_add(body))
             elif action == "/api/done":
                 inbox.mark_done(body["key"]); msg = "완료"
+            elif action == "/api/ignore" and body.get("pattern"):
+                conn = db.connect()
+                try:
+                    msg = "앞으로도 제외: " + inbox.ignore_like(conn, body["key"])
+                finally:
+                    conn.close()
             elif action == "/api/ignore":
                 inbox.ignore(body["key"]); msg = "제외"
+            elif action == "/api/unignore":
+                inbox.unignore(body["text"]); msg = "제외 취소"
             elif action == "/api/remove":
                 inbox.remove(body["key"]); msg = "삭제"
             elif action == "/api/today":

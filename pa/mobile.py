@@ -157,8 +157,16 @@ def apply_entry(op):
         inbox.add_task(**parse_add(op.get("fields", {})))
     elif kind == "done":
         inbox.mark_done(op["key"])
+    elif kind == "ignore" and op.get("pattern"):
+        conn = db.connect()
+        try:
+            inbox.ignore_like(conn, op["key"])
+        finally:
+            conn.close()
     elif kind == "ignore":
         inbox.ignore(op["key"])
+    elif kind == "unignore":
+        inbox.unignore(op["text"])
     elif kind == "remove":
         inbox.remove(op["key"])
     elif kind == "today":

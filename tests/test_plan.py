@@ -61,3 +61,9 @@ def test_lecture_before_quiz_on_same_deadline():
     lec = task("lec", 30, 2, kind="lecture", course="분석")
     plan, _, _ = make_plan([q, lec], [], CFG, NOW, {})
     assert [t.key for t, s, e in plan] == ["lec", "quiz"] and plan[1][1] >= plan[0][2]
+
+
+def test_popup_reminders():
+    from pa.config import popup
+    assert popup([1410, 150, 30])["overrides"] == [{"method": "popup", "minutes": m} for m in (1410, 150, 30)]
+    assert popup(0)["overrides"] == [] and popup(10)["overrides"][0]["minutes"] == 10

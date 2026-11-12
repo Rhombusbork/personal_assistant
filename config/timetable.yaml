@@ -59,4 +59,4 @@ planner:
 # 휴대폰 알림 — 비서가 Google Calendar 일정에 붙이는 알림 (휴대폰 Google Calendar 앱이 알려 줌, PC 꺼져도 됨)
 reminders:
   plan_minutes_before: 10           # '학습 계획' 블록 시작 몇 분 전 (0 이면 알림 없음)
-  deadline_minutes_before: 180      # '과제' 마감 몇 분 전. 하루 종일 마감은 전날 밤 (자정 기준 이만큼 전 = 21:00)
+  deadline_minutes_before: [1440, 180, 60]   # '과제' 마감 하루 전 · 3시간 전 · 1시간 전 (최대 5개)

@@ -18,7 +18,7 @@ from datetime import date, datetime, time, timedelta
 
 from pa import db
 from pa.config import ROOT, load_timetable
-from pa.model import KST, label, now
+from pa.model import KST, label, now, short_course
 
 PATH = ROOT / "inbox.md"
 TEMPLATE = """# 📥 inbox — 할 일 입력 (저장하면 자동 반영)
@@ -230,6 +230,47 @@ def mark_done(key):
 
 def ignore(key):
     _insert("ignore", f"- {key}")
+
+
+def ignore_like(conn, key):
+    """이 과제와 같은 이름이면 앞으로 생길 것도 계속 제외 — '과목 제목' 단어로 적는다."""
+    row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (key,)).fetchone()
+    if not row:
+        raise ValueError("할 일을 찾지 못함")
+    text = " ".join(f"{short_course(row['course'])} {row['title']}".split())
+    _insert("ignore", f"- {text}")
+    return text
+
+
+def unignore(text):
+    """## 제외 칸에서 그 줄을 지운다 (키든 단어든). 다음 반영 때 다시 나타난다."""
+    lines = PATH.read_text().splitlines()
+    section, in_comment, hit = "todo", False, None
+    for i, line in enumerate(lines):
+        if in_comment or line.lstrip().startswith("<!--"):
+            in_comment = "-->" not in line
+            continue
+        if line.startswith("#"):
+            section = "done" if "완료" in line else "ignore" if "제외" in line else "todo"
+            continue
+        m = RE_BULLET.match(line)
+        if section == "ignore" and m and m.group(1).strip().strip("`") == text:
+            hit = i
+            break
+    if hit is None:
+        raise ValueError("제외 목록에 없는 항목")
+    del lines[hit]
+    PATH.write_text("\n".join(lines) + "\n")
+
+
+def excluded(conn):
+    """대시보드용: ## 제외 의 각 줄과 그 줄에 걸린 과제들."""
+    out = []
+    for _, _, text in read_sections()["ignore"]:
+        keys = match(conn, text, ("open", "ignored", "done"))
+        titles = [r["title"] for k in keys[:5] if (r := conn.execute("SELECT title FROM tasks WHERE key = ?", (k,)).fetchone())]
+        out.append({"text": text, "pattern": not re.fullmatch(r"[a-z]\d+|[a-z]:\S+", text), "count": len(keys), "titles": titles})
+    return out
 
 
 def set_due(key, due):

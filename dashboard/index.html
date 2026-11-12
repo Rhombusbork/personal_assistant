@@ -250,6 +250,7 @@
       <div class="card"><h2>💭 하고 싶은 일 <span class="hint">기한 없음</span></h2><div id="someday"></div>
         <form class="inline" id="somedayForm" autocomplete="off"><input type="text" name="title" placeholder="하고 싶은 일 추가" required><button type="submit">추가</button></form>
       </div>
+      <div id="excluded"></div>
     </div>
   </div>
 
@@ -340,7 +341,7 @@ function askPassword(msg) {
 async function phonePost(action, body) {
   if (action === "open-quiz") { window.open(D.quiz.url, "_blank"); return {}; }
   const toOp = { quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
-                 ignore: b => ({ op: "ignore", key: b.key }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }) }[action];
+                 ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }) }[action];
   if (!toOp) throw new Error("이 기능은 PC 대시보드에서만 됩니다");
   const tok = ls.get("pa.ghtoken");
   if (!tok) { mobileSettings(); throw new Error("GitHub 토큰을 먼저 넣어 주세요 (⚙)"); }
@@ -488,6 +489,11 @@ function render() {
       <button data-act="ignore" data-key="${esc(x.key)}">제외</button><button data-act="sgno" data-key="${esc(x.key)}">아니요</button></span></div>`).join("")}` : ""}
     ${ns.length ? `<div class="acts" style="margin-top:8px"><button data-act="njob" title="Claude 가 새 공지를 읽고 한 줄 요약 + 제외 후보 (구독 사용)">🤖 요약·제외 후보 찾기</button>
       <button data-act="nreadall">모두 읽음</button></div>` : ""}</div>` : "";
+
+  const ex = D.excluded || [];
+  $("excluded").innerHTML = ex.length ? `<details class="card"><summary><b>🚫 제외한 것 ${ex.length}</b> <span class="hint">눌러서 보기 · 취소하면 다시 나타남</span></summary>
+    ${ex.map(x => `<div class="item"><span class="txt">${esc(x.text)}<span class="meta" style="display:block">${x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만"} · 걸린 과제 ${x.count}개${
+      x.titles.length ? " · " + esc(x.titles[0]) : ""}</span></span>${LIVE || MOB ? `<button data-act="unign" data-text="${esc(x.text)}">취소</button>` : ""}</div>`).join("")}</details>` : "";
 
   const js = (LIVE && D.jobs) || [];
   const ST = { queued: "⏳ 대기", running: "⚙️ 진행 중", done: "✅ 완료", failed: "⚠️ 실패" };
@@ -771,6 +777,20 @@ document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act, key = b.dataset.key;
+  if (act === "ignore") {  // 이것만 / 앞으로도 / 취소
+    b.parentElement.innerHTML = `<span class="meta">제외:</span><button data-act="ign-one" data-key="${esc(key)}">이것만</button>
+      <button data-act="ign-all" data-key="${esc(key)}" title="같은 과목·같은 이름의 과제가 앞으로 또 생겨도 계속 제외">앞으로도</button><button data-act="ign-cancel">취소</button>`;
+    return;
+  }
+  if (act === "ign-cancel") { render(); return; }
+  if (act === "ign-one" || act === "ign-all" || act === "unign") {
+    b.disabled = true;
+    try {
+      const r = act === "unign" ? await post("unignore", { text: b.dataset.text }) : await post("ignore", { key, pattern: act === "ign-all" });
+      if (act === "ign-all" && r.message) $("quickMsg").textContent = r.message;
+    } catch (err) { alert(err.message); b.disabled = false; }
+    return;
+  }
   if (act === "matclose") { $("matPanel").innerHTML = ""; return; }
   if (act === "ritualclose") { try { localStorage.setItem(b.dataset.k, ymdOf(new Date())); } catch {} render(); return; }
   if (act === "mat") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }

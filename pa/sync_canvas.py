@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 from pa import db
 from pa.config import load_env, popup, reminders
 from pa.gcal import get_or_create_calendar, get_service
+from pa.model import KST
 
 TZ = "Asia/Seoul"
 CALENDAR_NAME = "과제"
@@ -45,9 +46,11 @@ def parse_ics(text):
 def to_gcal_times(value, params):
     """Canvas 는 종일 마감을 'VALUE=DATE:20261014T000000', 시각 마감을 UTC 로 준다."""
     if "VALUE=DATE" in params:
+        # 하루 종일 일정에는 '3시간 전·1시간 전' 알림을 걸 수 없어서, 그날 23:59 마감으로 넣는다
         d = date(int(value[:4]), int(value[4:6]), int(value[6:8]))
-        return {"date": d.isoformat()}, {"date": (d + timedelta(days=1)).isoformat()}
-    due = datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+        due = datetime(d.year, d.month, d.day, 23, 59, tzinfo=KST)
+    else:
+        due = datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
     start = due - timedelta(minutes=30)
     return {"dateTime": start.isoformat(), "timeZone": TZ}, {"dateTime": due.isoformat(), "timeZone": TZ}
 
@@ -64,8 +67,8 @@ def build_event(ev):
         "description": f"{url}\n\n{desc}".strip(),
         "transparency": "transparent",  # 마감 표시일 뿐이므로 '바쁨'으로 잡지 않음
         "extendedProperties": {"private": {"pa_source": "canvas", "pa_key": uid}},
-        # 하루 종일 마감 → 전날 밤 / 시각 마감(일정은 마감 30분 전 시작) → 마감 N분 전
-        "reminders": popup(reminders()["deadline"] - (0 if "date" in start else 30)),
+        # 마감 하루 전·3시간 전·1시간 전 (일정은 마감 30분 전에 시작하므로 30분을 뺀다)
+        "reminders": popup([m - 30 for m in reminders()["deadline"]]),
     }
 
 

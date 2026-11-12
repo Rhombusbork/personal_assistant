@@ -114,3 +114,32 @@ def test_set_due_turns_someday_into_today(conn):
     assert "- [ ] 논문 읽기 @2099-01-02 ~45m #연구" in inbox.PATH.read_text()
     inbox.sync(conn)
     assert conn.execute("SELECT due FROM tasks WHERE key='i:논문 읽기'").fetchone()[0].startswith("2099-01-02T23:59")
+
+
+def test_ignore_like_covers_future_tasks_and_unignore(conn):
+    write(inbox.TEMPLATE)
+    text = inbox.ignore_like(conn, "a1")
+    assert text == "생약학Ⅰ 조별학습활동 보고서 제출 게시판"
+    inbox.sync(conn)
+    assert status(conn, "a1") == "ignored"
+    # 다음 주에 같은 이름의 새 과제가 생기면 그것도 제외
+    db.sync_source(conn, "canvas", [{"key": "a2", "kind": "assignment", "course": "생약학Ⅰ 676205",
+                                     "title": "조별학습활동 보고서 제출 게시판", "due": "2099-01-08T23:59:00+09:00",
+                                     "earliest": None, "minutes": 60, "url": ""}])
+    inbox.sync(conn)
+    assert status(conn, "a2") == "ignored"
+    ex = inbox.excluded(conn)
+    assert ex[0]["pattern"] and ex[0]["count"] == 2
+    inbox.unignore(text)
+    inbox.sync(conn)
+    assert status(conn, "a1") == "open" and status(conn, "a2") == "open"
+
+
+def test_unignore_single_key(conn):
+    write(inbox.TEMPLATE)
+    inbox.ignore("a1")
+    inbox.sync(conn)
+    assert status(conn, "a1") == "ignored" and inbox.excluded(conn)[0]["pattern"] is False
+    inbox.unignore("a1")
+    inbox.sync(conn)
+    assert status(conn, "a1") == "open"

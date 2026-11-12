@@ -180,6 +180,7 @@ def dashboard_data(conn):
         "active": active_json(conn, by_key),
         "downloads": materials.pending_downloads(conn),
         "jobs": jobs.recent(conn),
+        "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),
         "semester": semester_weeks(all_tasks, t_now),
         "notices": [dict(r) for r in conn.execute(
@@ -241,6 +242,14 @@ def semester_weeks(all_tasks, t_now):
                       "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
         d = nxt
     return weeks
+
+
+def inbox_excluded(conn):
+    from pa import inbox
+    try:
+        return inbox.excluded(conn)
+    except OSError:
+        return []
 
 
 def active_json(conn, by_key):
