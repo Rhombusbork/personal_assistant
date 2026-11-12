@@ -61,7 +61,7 @@ def run_next(conn):
         return False
     _update(conn, row["id"], status="running", step="시작")
     try:
-        result = {"report": report_job, "notices": notices_job}[row["kind"]](conn, row)
+        result = {"report": report_job, "notices": notices_job, "summary": summary_job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
         db.log(conn, "job_done", row["key"], kind=row["kind"], result=str(result))
     except Exception as e:
@@ -231,3 +231,49 @@ exclude 에는 공지가 '이 학생은 내지 않아도 된다'고 분명히 �
     db.set_meta(conn, "notice_suggestions", _json.dumps(sugg, ensure_ascii=False))
     conn.commit()
     return f"공지 {len(notes)}개 요약 · 제외 후보 {len(sugg)}개"
+
+
+# ---- 자료 요약 (버튼을 눌렀을 때만) ------------------------------------------
+
+MAX_SUMMARY_BYTES = 25 * 1024 * 1024  # 교과서 통째 같은 큰 파일은 요약하지 않음 (사용량 보호)
+
+
+def summary_path(pdf):
+    pdf = Path(pdf)
+    return pdf.parent / "요약" / f"{pdf.stem}_요약.md"
+
+
+def summary_job(conn, job):
+    """materials 의 PDF → 같은 과목 폴더의 요약/<이름>_요약.md (내 노트 notes/ 와 섞지 않는다)."""
+    pdf = Path(job["key"]).resolve()
+    root = materials._cfg()["root"].resolve() / "materials"
+    if not str(pdf).startswith(str(root)) or not pdf.exists():
+        raise ValueError("materials 안의 파일만 요약합니다")
+    if pdf.stat().st_size > MAX_SUMMARY_BYTES:
+        raise ValueError("파일이 너무 큽니다 (교과서 전체 등) — 필요한 장만 따로 저장해서 요약하세요")
+    out = summary_path(pdf)
+    if out.exists():
+        materials.open_file(out)
+        return out
+    _update(conn, job["id"], step="요약 쓰는 중 (Claude, 몇 분 걸림)")
+    prompt = f"""약학과 학생이 공부할 강의 자료를 요약한다. 이 파일을 Read 로 읽는다: {pdf}
+
+마크다운만 출력한다 (인사·설명·코드 블록 표시 없이). 구성:
+# {pdf.stem} 요약
+## 핵심 내용 — 자료의 흐름대로, 슬라이드에 있는 내용만
+## 꼭 알아야 할 용어·식 — 표 (용어 | 뜻)
+## 시험에 나올 만한 포인트 — 자료에서 강조된 것 위주
+## 헷갈리기 쉬운 것
+자료에 없는 내용은 쓰지 않는다. 그림·구조식은 말로 설명하고 몇 쪽에 있는지 적는다. 해라체."""
+    text = ai.ask(prompt, cwd=pdf.parent, timeout=900)
+    conn.execute("UPDATE jobs SET claude = claude + 1 WHERE id = ?", (job["id"],))
+    text = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", text.strip())
+    if not text.startswith("#"):
+        raise ValueError("요약 형식이 이상함: " + text[:120])
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(text + "\n")
+    try:
+        materials.open_file(out)
+    except Exception:
+        pass
+    return out

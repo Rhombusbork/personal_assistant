@@ -47,3 +47,22 @@ def test_notices_job_parses_suggestions(conn, monkeypatch):
     assert conn.execute("SELECT summary FROM notices WHERE id='n1'").fetchone()[0] == "조장만 낸다"
     sugg = __import__("json").loads(db.get_meta(conn, "notice_suggestions"))
     assert [x["key"] for x in sugg] == ["a9"]  # 없는 키는 버림
+
+
+def test_summary_job_writes_beside_material(conn, monkeypatch, tmp_path):
+    from pa import materials
+    root = tmp_path / "study"
+    pdf = root / "materials" / "ethics" / "강의.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(materials, "_cfg", lambda: {"root": root, "courses": []})
+    monkeypatch.setattr(materials, "open_file", lambda p: None)
+    monkeypatch.setattr(jobs.ai, "ask", lambda *a, **k: "```markdown\n# 강의 요약\n내용\n```")
+    jobs.enqueue(conn, "summary", str(pdf), "요약")
+    jobs.run_next(conn)
+    out = root / "materials" / "ethics" / "요약" / "강의_요약.md"
+    assert out.read_text().startswith("# 강의 요약") and jobs.recent(conn)[0]["status"] == "done"
+    outside = tmp_path / "x.pdf"; outside.write_bytes(b"%PDF")
+    jobs.enqueue(conn, "summary", str(outside), "요약2")
+    jobs.run_next(conn)
+    assert jobs.recent(conn)[0]["status"] == "failed"  # materials 밖은 거절

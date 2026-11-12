@@ -15,6 +15,7 @@ POST /api/open-file  자료 파일을 VSCode 탭으로 열기 (study_system·rep
 POST /api/move-download, /api/dismiss-download   다운로드 폴더의 새 파일 정리
 POST /api/job/report 보고서 준비 + 초안 (에이전트 작업 대기열에 넣음)
 POST /api/job/notices 새 공지 요약 + 제외 후보 찾기 (Claude, 버튼으로만)
+POST /api/job/summary 자료 PDF 요약 (Claude, 버튼으로만)
 POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
 
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
@@ -22,9 +23,10 @@ POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
 import json
 import subprocess
 import threading
-from urllib.parse import parse_qs, urlparse
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from pa import db, inbox, jobs, materials, render
 from pa.config import ROOT
@@ -61,7 +63,9 @@ def materials_for(key):
     mat, scored = materials.find(row["course"], row["title"])
     return {"dir": str(mat) if mat else None, "clues": sorted("".join(c) for c in materials.clues(row["title"])),
             "strong": bool(scored) and scored[0][0] >= 10,
-            "files": [{"name": str(f.relative_to(mat)), "path": str(f), "score": sc} for sc, f in scored[:8]]}
+            "files": [{"name": str(f.relative_to(mat)), "path": str(f), "score": sc,
+                       "pdf": f.suffix.lower() == ".pdf", "summary": str(jobs.summary_path(f)) if jobs.summary_path(f).exists() else None}
+                      for sc, f in scored[:8] if "요약" not in f.parts]}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -123,7 +127,7 @@ class Handler(SimpleHTTPRequestHandler):
             elif action == "/api/quick":
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
             elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
-                            "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices",
+                            "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss"):
                 return self._json(200, self.side_action(action, body))
             else:
@@ -171,6 +175,9 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("할 일을 찾지 못함")
                 jobs.enqueue(conn, "report", body["key"], row["title"])
                 return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+            if action == "/api/job/summary":
+                jobs.enqueue(conn, "summary", body["path"], "요약: " + Path(body["path"]).stem)
+                return {"ok": True}
             if action == "/api/job/notices":
                 jobs.enqueue(conn, "notices", "notices", "새 공지 정리")
                 return {"ok": True}

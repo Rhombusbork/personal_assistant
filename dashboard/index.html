@@ -414,7 +414,10 @@ async function showMaterials(key) {
   else {
     if (r.clues.length && !r.strong) body += `<p class="msg">${esc(r.clues.join(", "))} 자료가 아직 없습니다 — Canvas 에서 받으면 '📥 새로 받은 파일'에 뜹니다.</p>`;
     body += r.files.length ? r.files.map(f => `<div class="item"><span class="txt">${f.score >= 10 ? "⭐ " : ""}${esc(f.name)}</span>
-      <button data-act="openfile" data-path="${esc(f.path)}">열기</button></div>`).join("") : `<p class="empty">맞는 파일 없음</p>`;
+      <span class="acts" style="opacity:1"><button data-act="openfile" data-path="${esc(f.path)}">열기</button>
+      ${f.summary ? `<button data-act="openfile" data-path="${esc(f.summary)}">요약 열기</button>`
+        : f.pdf ? `<button data-act="summarize" data-path="${esc(f.path)}" title="Claude 가 핵심 정리를 만듭니다 (구독 사용, 몇 분)">🤖 요약</button>` : ""}</span></div>`).join("")
+      : `<p class="empty">맞는 파일 없음</p>`;
   }
   $("matPanel").innerHTML = `<div class="card mat"><h2>📄 ${esc(t ? t.title : key)} <span class="hint">${esc(r.dir || "")}</span>
     <button class="chip" data-act="matclose" style="margin-left:auto">닫기</button></h2>${body}</div>`;
@@ -587,6 +590,10 @@ document.addEventListener("click", async e => {
     const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
     if (!course) { alert("과목을 골라 주세요"); return; }
     try { await post("move-download", { path: b.dataset.path, course }); } catch (err) { alert(err.message); } return;
+  }
+  if (act === "summarize") {
+    if (!confirm("이 자료의 요약을 Claude 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
+    try { await post("job/summary", { path: b.dataset.path }); $("matPanel").innerHTML = ""; } catch (err) { alert(err.message); } return;
   }
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
