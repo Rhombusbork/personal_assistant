@@ -84,6 +84,9 @@ def _run(full, force_plan):
                 got = step("강의 자료", lambda: learningx.sync(conn, collect_canvas.online_courses()))
                 if got:
                     steps.append(f"자료 +{got[0]}" + (f" ⚠️{got[1]}" if got[1] else ""))
+            last = db.get_meta(conn, "events_pruned_at")
+            if not last or last[:10] != datetime.now().strftime("%Y-%m-%d"):  # 하루 한 번: 1년 넘은 기록 정리
+                step("기록 정리", lambda: db.prune_events(conn))
         need_plan = force_plan or step("계획 확인", lambda: plan.needed(conn))
         need_deadlines = force_plan or step("마감 확인", lambda: deadlines.needed(conn))
         if need_plan or need_deadlines:

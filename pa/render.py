@@ -201,6 +201,8 @@ def dashboard_data(conn):
         "jobs": jobs.recent(conn),
         "links": _link_names(conn, {t.key for t in all_tasks if t.status == "open"}),
         "exams": _exam_suggestions(conn),
+        "grades": new_grades(conn),
+        "weekReview": week_review(conn, t_now),
         "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),
         "semester": semester_weeks(all_tasks, t_now),
@@ -222,7 +224,7 @@ def dashboard_data(conn):
 
 
 CHANGE_LABEL = {"task_added": "🆕 새로 생김", "due_changed": "🔁 마감 바뀜", "material_downloaded": "📥 자료 받음",
-                "job_done": "🤖 작업 완료"}
+                "job_done": "🤖 작업 완료", "grade_posted": "🎓 점수 나옴"}
 
 
 def recent_changes(conn, by_key, t_now):
@@ -263,6 +265,38 @@ def semester_weeks(all_tasks, t_now):
                       "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
         d = nxt
     return weeks
+
+
+def new_grades(conn):
+    """[확인] 이후 새로 나온 점수 (Canvas 확인 때 모은 것 — 요청 추가 없음)."""
+    ack = parse_dt(db.get_meta(conn, "ack_grades"))
+    out = [dict(g, course=short_course(g["course"])) for g in json.loads(db.get_meta(conn, "grades") or "[]")
+           if ack and parse_dt(g["graded_at"]) > ack]
+    return sorted(out, key=lambda g: g["graded_at"], reverse=True)
+
+
+def week_review(conn, t_now):
+    """이번 주 돌아보기 (코드로 숫자만): 끝낸 일, ⏱ 기록, 놓친 것, 다음 주 몰림."""
+    monday = (t_now - timedelta(days=t_now.weekday())).replace(hour=0, minute=0)
+    nxt, after = monday + timedelta(days=7), monday + timedelta(days=14)
+    done = {}
+    for r in conn.execute("SELECT kind FROM tasks WHERE status = 'done' AND done_at >= ?", (monday.isoformat(),)):
+        done[r["kind"]] = done.get(r["kind"], 0) + 1
+    tracked = conn.execute("SELECT COALESCE(SUM(minutes), 0), COUNT(*) FROM sessions WHERE start >= ? AND minutes IS NOT NULL",
+                           (monday.isoformat(),)).fetchone()
+    estimated = conn.execute("SELECT COALESCE(SUM(COALESCE(t.minutes_override, t.minutes)), 0) FROM sessions s "
+                             "JOIN tasks t ON t.key = s.key WHERE s.start >= ? AND s.minutes IS NOT NULL",
+                             (monday.isoformat(),)).fetchone()[0]
+    missed = [{"title": r["title"], "kind": r["kind"], "due": r["due"]} for r in conn.execute(
+        "SELECT title, kind, due FROM tasks WHERE status = 'open' AND kind IN ('lecture', 'assignment', 'quiz') "
+        "AND due >= ? AND due < ? ORDER BY due", (monday.isoformat(), t_now.isoformat()))]
+    upcoming = [r for r in conn.execute("SELECT key, title, COALESCE(minutes_override, minutes) AS m FROM tasks "
+                                        "WHERE status = 'open' AND due >= ? AND due < ?", (nxt.isoformat(), after.isoformat()))
+                if "@복습" not in r["key"]]
+    return {"from": monday.isoformat(), "done": done, "doneTotal": sum(done.values()),
+            "trackedMinutes": tracked[0], "trackedCount": tracked[1], "trackedEstimate": estimated,
+            "missed": missed, "nextCount": len(upcoming), "nextMinutes": sum(r["m"] or 0 for r in upcoming),
+            "nextExams": [r["title"] for r in upcoming if EXAM.search(r["title"])]}
 
 
 def _link_names(conn, keys):

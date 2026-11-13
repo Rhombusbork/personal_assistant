@@ -194,3 +194,12 @@ def stop_session(conn):
     conn.execute("UPDATE sessions SET end = ?, minutes = ? WHERE id = ?", (t_end.isoformat(), minutes, row["id"]))
     log(conn, "session_end", row["key"], minutes=minutes)
     return row["key"], minutes
+
+
+def prune_events(conn, days=365):
+    """오래된 자동 기록 지우기 (하루 한 번, 전체 동기화 때). 지운 개수."""
+    from datetime import timedelta
+    n = conn.execute("DELETE FROM events WHERE ts < ?", ((now() - timedelta(days=days)).isoformat(),)).rowcount
+    set_meta(conn, "events_pruned_at", now().isoformat())
+    conn.commit()
+    return n

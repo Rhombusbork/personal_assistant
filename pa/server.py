@@ -13,6 +13,7 @@ POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop �
 POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
+GET  /api/note-for?key=…  강의를 들은 뒤 열 내 노트 (번호가 맞는 notes/<과목>/ 파일)
 GET  /api/files       찾기 범위의 파일 이름 목록 (1분 보관 — 실시간 찾기는 화면이 이 목록으로)
 GET  /api/ls?root=&path=   📁 둘러보기: 폴더 하나의 바로 아래 (범위 밖 거부)
 GET  /api/downloads   다운로드 폴더의 최근 받은 문서 (엔진의 30초 감시 결과 — 폴더를 다시 열지 않음)
@@ -101,6 +102,17 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(403, {"error": "host"})
         if self.path.startswith(("/api/files", "/api/downloads", "/api/ls", "/api/links")):
             return self._links_get()
+        if self.path.startswith("/api/note-for"):  # 강의를 들은 뒤: 그 강의의 내 노트가 있으면 (study_system/notes)
+            key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
+            conn = db.connect()
+            try:
+                row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (key,)).fetchone()
+            finally:
+                conn.close()
+            dirs = materials.course_dirs(row["course"]) if row else None
+            best = next((f for sc, f in materials.scan(dirs[1], row["title"]) if sc >= 10), None) if dirs else None
+            return self._json(200, {"path": str(best), "name": best.name} if best else
+                              {"folder": dirs[1].name if dirs else ""})
         if self.path.startswith("/api/report-path"):  # 보고서 초안 파일이 이미 있나
             key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
             conn = db.connect()
@@ -263,7 +275,9 @@ class Handler(SimpleHTTPRequestHandler):
                 subprocess.Popen([str(ROOT / "bin" / "pa"), "google-login"],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                 return {"ok": True, "message": "Windows 브라우저에 Google 로그인 창이 열립니다 — 허용하면 끝 (10분 안에)"}
-            if action == "/api/ack":  # 알림 확인 (휴대폰 입력 실패 등) — 이 시각 이전 것은 더 안 보여 줌
+            if action == "/api/ack":  # 알림 확인 (휴대폰 입력 실패·새 점수 등) — 이 시각 이전 것은 더 안 보여 줌
+                if not str(body["what"]).isidentifier():
+                    raise ValueError("잘못된 확인 요청")
                 db.set_meta(conn, f"ack_{body['what']}", datetime.now(KST).isoformat())
                 conn.commit()
                 return {"ok": True}

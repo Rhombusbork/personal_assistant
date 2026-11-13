@@ -28,11 +28,13 @@ def lecture_deadline(module_name, week, sem_start):
 
 pairs_found = []
 pair_candidates = {}  # 짝을 못 정한 강의 → 같은 주차 자료 후보 (📄 추천용)
+grades_found = []     # 채점된 과제·퀴즈 (🎓 새 점수)
 
 
 def collect():
     pairs_found.clear()
     pair_candidates.clear()
+    grades_found.clear()
     tt = load_timetable()
     minutes = tt["planner"]["minutes"]
     sem_start = date.fromisoformat(tt["semester_start"])
@@ -44,10 +46,13 @@ def collect():
     for c in canvas.active_courses():
         cname = c["name"]
         for a in canvas.get(f"/courses/{c['id']}/assignments", **{"include[]": "submission"}):
+            sub = a.get("submission") or {}
+            if sub.get("graded_at") and sub.get("score") is not None and a.get("points_possible"):  # 점수 (요청 추가 없음)
+                grades_found.append({"key": f"a{a['id']}", "course": cname, "title": a["name"].strip(), "score": sub["score"],
+                                     "points": a["points_possible"], "graded_at": sub["graded_at"], "url": a.get("html_url", "")})
             due = parse_dt(a.get("due_at"))
             if not due or due < t_now - timedelta(days=7) or SKIP_TYPES & set(a.get("submission_types", [])):
                 continue
-            sub = a.get("submission") or {}
             kind = "quiz" if a.get("quiz_id") else "assignment"
             items.append({
                 "key": f"a{a['id']}", "kind": kind, "course": cname, "title": a["name"].strip(),
@@ -138,9 +143,25 @@ def sync(conn):
         db.log(conn, "pairs_added", None, count=n)
     for key in not_lectures:
         db.set_status(conn, key, "gone", "auto")
+    save_grades(conn, grades_found)
     db.set_meta(conn, "learningx_lecture_error", "; ".join(f"{k}: {v}" for k, v in learningx_errors.items()))
     db.set_meta(conn, "canvas_synced_at", now().isoformat())
     return len(items)
+
+
+def save_grades(conn, grades):
+    """점수 목록 저장. 새로 나온 점수는 events 에 (아침 브리핑 '바뀐 것'). 처음 한 번은 기록만 — 예전 점수를 '새 점수'로 쏟지 않게."""
+    seen = db.get_meta(conn, "grades_seen")
+    known = json.loads(seen or "{}")
+    for g in grades:
+        if known.get(g["key"]) != g["graded_at"]:
+            if seen is not None:
+                db.log(conn, "grade_posted", g["key"], title=g["title"], score=g["score"], points=g["points"])
+            known[g["key"]] = g["graded_at"]
+    db.set_meta(conn, "grades_seen", json.dumps(known))
+    db.set_meta(conn, "grades", json.dumps(grades, ensure_ascii=False))
+    if not db.get_meta(conn, "ack_grades"):
+        db.set_meta(conn, "ack_grades", now().isoformat())
 
 
 def online_courses():

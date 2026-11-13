@@ -213,6 +213,10 @@
   .crumb { font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
   button.link { border: 0; background: none; padding: 0 2px; color: var(--accent); }
   button.link:hover { text-decoration: underline; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10; max-width: min(640px, calc(100vw - 32px));
+           background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 24px #0003;
+           display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+  .toast[hidden] { display: none; }
   .clip { font-size: 11px; color: var(--muted); margin-left: 4px; cursor: pointer; white-space: nowrap; }
   .clip:hover { color: var(--accent); }
   .mat kbd, .mat code { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
@@ -269,6 +273,7 @@
       <div id="view"></div>
     </div>
     <div class="stack">
+      <div id="grades"></div>
       <div id="exams"></div>
       <div id="notices"></div>
       <div id="jobs"></div>
@@ -289,9 +294,11 @@
       <div class="card"><h2>오늘 실제로 한 시간 <span class="hint">⏱ 기록</span></h2><div id="sessions"></div></div>
       <div class="card"><h2>예상 시간 보정 <span class="hint">⏱ 기록 3번 이상부터</span></h2><div id="calib"></div></div>
       <div class="card"><h2>퀴즈 복습 <span class="hint">퀴즈 앱 '기록 내보내기' 기준</span></h2><div id="quizStat"></div></div>
+      <div class="card"><h2>🗓 이번 주 돌아보기 <span class="hint">월요일부터 · 일요일 저녁 마무리에도</span></h2><div id="weekrev"></div></div>
     </div>
   </details>
 </main>
+<div id="toast" class="toast" hidden></div>
 <script src="data.js"></script>
 <script>
 // 비서 대시보드. 감시기 서버(localhost:8765)로 열면 30초마다 최신 데이터 + 입력 가능.
@@ -525,6 +532,11 @@ function render() {
 
   $("ritual").innerHTML = LIVE || MOB ? ritual(now, today) : "";
 
+  const gr = (LIVE || MOB) ? (D.grades || []).filter(g => !(MOB && (ls.get("pa.ack.grades") || "") >= g.graded_at)) : [];
+  $("grades").innerHTML = gr.length ? `<div class="card"><h2>🎓 새 점수 ${gr.length}
+      <button class="chip" data-act="gradeack" style="margin-left:auto" title="봤음 — 다음 새 점수부터 다시 보임">확인</button></h2>${gr.map(g => `
+    <div class="item"><span class="txt"><span class="course">${esc(g.course)}</span> ${esc(g.title)}</span>
+      <span class="meta"><b>${g.score}</b> / ${g.points}</span></div>`).join("")}</div>` : "";
   const exs = (LIVE || MOB) ? (D.exams || []) : [];
   $("exams").innerHTML = exs.length ? `<div class="card"><h2>📝 시험 일정 후보 <span class="hint">공지에서 찾음 · 맞으면 추가</span></h2>${exs.map(x => `
     <div class="item"><span class="txt"><b>${esc(x.title)}</b> ${label(x.date)}${x.time ? " " + x.time : ""}<span class="meta" style="display:block">「${esc(x.line)}」</span></span>
@@ -579,6 +591,7 @@ function ritual(now, today) {
       ${missed.length ? `<h3>계획했지만 아직 안 끝난 일 — 실제로 했으면 ✓, 아니면 다음 빈 시간으로 자동으로 옮겨집니다</h3>${missed.map(t => `<div class="item"><span class="txt">${esc(t.title)}</span>
         <button data-act="done" data-key="${esc(t.key)}">✓ 했음</button></div>`).join("")}` : ""}
       ${worked ? `<h3>⏱ 오늘 기록한 시간 ${dur(worked)}</h3>` : ""}
+      ${now.getDay() === 0 && D.weekReview ? `<h3>🗓 이번 주 돌아보기</h3>${weekReviewHtml(D.weekReview)}` : ""}
       <h3>내일 ${label(tomorrow)}</h3><ul><li>${firstTomorrow ? `첫 일정 ${hm(firstTomorrow.start)} ${esc(firstTomorrow.label || firstTomorrow.summary)}` : "일정 없음"}</li></ul></div>`;
   }
   if (!evening && !seenToday("pa.morning")) {
@@ -1007,6 +1020,7 @@ function renderStats(today) {
   $("trend").innerHTML = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
     <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
   renderCalib();
+  $("weekrev").innerHTML = weekReviewHtml(D.weekReview) || `<p class="empty">아직 없음</p>`;
   const q = D.quiz || {};
   $("quizStat").innerHTML = `<div class="meta">마지막으로 가져온 기록: ${q.backupAt ? stamp(q.backupAt) : "없음"}${q.stale ? " (오래됨 — 복습 일정을 만들지 않음)" : ""}</div>
     ${Object.entries(q.dueBySubject || {}).map(([sub, n]) => `<div class="item"><span class="txt">${esc(sub)}</span><span class="meta">복습할 문제 ${n}</span></div>`).join("")}
@@ -1016,6 +1030,32 @@ function renderStats(today) {
     return `<div class="item"><span class="txt">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span>
       <span class="meta">${s.minutes ? dur(s.minutes) : ""}${t && s.minutes ? ` / 예상 ${dur(t.minutes)}` : ""}</span></div>`; }).join("")
     : `<p class="empty">⏱ 시작 버튼으로 기록하면 여기에 쌓이고, 쌓인 기록으로 예상 시간을 고칩니다.</p>`;
+}
+
+// 이번 주 돌아보기: 코드로 숫자만 (끝낸 일 · ⏱ 기록 · 놓친 마감 · 다음 주)
+function weekReviewHtml(W) {
+  if (!W) return "";
+  return `<ul style="margin:0;padding-left:18px;font-size:13px">
+    <li>끝낸 일 <b>${W.doneTotal}</b>${W.doneTotal ? " (" + Object.entries(W.done).map(([k, n]) => `${KIND[k] || k} ${n}`).join(", ") + ")" : ""}</li>
+    <li>⏱ 기록 ${W.trackedCount ? `${W.trackedCount}번 · 실제 ${dur(W.trackedMinutes)} / 예상 ${dur(W.trackedEstimate)}` : "없음 — ⏱ 로 재면 예상 시간이 정확해집니다"}</li>
+    <li>${W.missed.length ? `마감이 지났는데 안 끝난 것 ${W.missed.length}: ${W.missed.map(m => esc(m.title)).join(", ")}` : "놓친 마감 없음 👍"}</li>
+    <li>다음 주 마감 ${W.nextCount}개 · 예상 ${dur(W.nextMinutes)}${W.nextExams.length ? " · 📝 " + W.nextExams.map(esc).join(", ") : ""}</li></ul>`;
+}
+
+// 알림 띠 (잠깐 보였다 사라짐)
+function toast(html, ms = 15000) {
+  const el = $("toast");
+  el.innerHTML = html + ` <button class="chip" data-act="toastclose" style="margin-left:auto">✕</button>`;
+  el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
+}
+// 강의를 들은 뒤: 그 강의의 내 노트가 있으면 바로 열 수 있게 (기록은 study_system 규칙대로 내 말로)
+async function noteAfter(key, title) {
+  try {
+    const r = await getJSON("/api/note-for?key=" + encodeURIComponent(key));
+    toast(r.path ? `✓ 들었음 — 기억할 것을 적어 둘까요? <button data-act="openfile" data-path="${esc(r.path)}">📝 ${esc(r.name)} 열기</button>`
+                 : `✓ 들었음 — 기록하려면 Claude 채팅에서 "공부하자 ${esc(title)}" (내 노트 ${esc(r.folder || "")})`);
+  } catch {}
 }
 
 function renderCalib() {
@@ -1093,6 +1133,18 @@ document.addEventListener("click", async e => {
       const r = act === "unign" ? await post("unignore", { text: b.dataset.text }) : await post("ignore", { key, pattern: act === "ign-all" });
       if (act === "ign-all" && r.message) $("quickMsg").textContent = r.message;
     } catch (err) { alert(err.message); b.disabled = false; }
+    return;
+  }
+  if (act === "toastclose") { $("toast").hidden = true; return; }
+  if (act === "gradeack") {
+    if (MOB) { ls.set("pa.ack.grades", (D.grades || []).reduce((m, g) => g.graded_at > m ? g.graded_at : m, "")); render(); return; }
+    try { await post("ack", { what: "grades" }); } catch (err) { alert(err.message); } return;
+  }
+  if (act === "done" && !MOB) {  // 강의면 들은 뒤 노트 열기 제안
+    const t = taskOf(key);
+    b.disabled = true;
+    try { await post("done", { key }); } catch (err) { alert(err.message); b.disabled = false; return; }
+    if (t && t.kind === "lecture") noteAfter(key, t.title);
     return;
   }
   if (act === "matclose") { $("matPanel").innerHTML = ""; MP = null; return; }
