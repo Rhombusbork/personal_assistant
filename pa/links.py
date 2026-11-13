@@ -190,6 +190,7 @@ def add_download(conn, key, path, course=None):
         return {"needCourse": True, "courses": [c["match"][0] for c in materials._cfg()["courses"]]}
     dst = materials.move_download(conn, str(src), course or row["course"])
     _index["files"] = None  # 목록 새로
+    RECENT_DOWNLOADS["files"] = [f for f in RECENT_DOWNLOADS["files"] if f["p"] != str(src)]  # 다음 감시를 기다리지 않게
     add(conn, key, dst)
     return {"ok": True, "message": f"과목 폴더로 옮겨 연결: {dst.name}"}
 
@@ -201,8 +202,12 @@ _PREFIX = re.compile(r"^\s*\[[^\]]*\]\s*")
 _LECTURE_WORDS = re.compile(r"lecture|leture|강의영상|\d\)", re.I)
 
 
-def _norm(s):
+def norm_title(s):
+    """이름 비교용: 글자·숫자만 (공백·기호·대소문자 무시)."""
     return re.sub(r"[^0-9a-z가-힣]", "", s.lower())
+
+
+_norm = norm_title
 
 
 def _core(title):

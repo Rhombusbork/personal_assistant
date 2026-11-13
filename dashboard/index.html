@@ -190,6 +190,32 @@
   .ritual h3 { font-size: 13px; margin: 10px 0 4px; color: var(--muted); }
   .ritual ul { margin: 0; padding-left: 18px; font-size: 13px; }
   .mat .item button { font-size: 12px; }
+  .lchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .lchip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 99px; background: var(--field); font-size: 12px; max-width: 100%; }
+  .lchip button { border: 0; background: none; padding: 2px 7px; font-size: 12px; border-radius: 99px; overflow: hidden; text-overflow: ellipsis; }
+  .lchip button:hover { background: var(--line); }
+  .lchip.miss { border-color: var(--warn); color: var(--warn); padding-left: 8px; }
+  .lchip i { font-style: normal; font-size: 11px; margin-left: 4px; }
+  .msearch { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .msearch input[type=text] { flex: 1 1 260px; font-size: 14px; }
+  .mres { margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; max-height: 340px; overflow: auto; }
+  .mres:empty { display: none; }
+  .mrow { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px dashed var(--line); font-size: 13px; cursor: pointer; }
+  .mrow:last-child { border-bottom: 0; }
+  .mrow.on, .mrow:hover { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+  .mrow .p { min-width: 0; overflow-wrap: anywhere; }
+  .mrow .p b { color: var(--accent); }
+  .mrow small { color: var(--muted); margin-left: 4px; }
+  .mrow .acts { flex: none; }
+  .mrow .acts button { padding: 0 7px; font-size: 12px; line-height: 20px; }
+  .mres > .chip { margin: 6px 8px; }
+  .mbrowse { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; }
+  .crumb { font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+  button.link { border: 0; background: none; padding: 0 2px; color: var(--accent); }
+  button.link:hover { text-decoration: underline; }
+  .clip { font-size: 11px; color: var(--muted); margin-left: 4px; cursor: pointer; white-space: nowrap; }
+  .clip:hover { color: var(--accent); }
+  .mat kbd, .mat code { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
   .dl select { font-size: 12px; padding: 1px 4px; }
 </style>
 </head>
@@ -389,11 +415,15 @@ async function load() {
   catch { LIVE = false; }
   render();
 }
-async function post(action, body) {
-  if (MOB) return phonePost(action, body);
+async function api(action, body) {  // 엔진에 요청만 (화면 다시 읽기 없음)
   const r = await fetch("/api/" + action, { method: "POST", headers: { "Content-Type": "application/json", "X-PA": "1" }, body: JSON.stringify(body || {}) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "실패");
+  return j;
+}
+async function post(action, body) {
+  if (MOB) return phonePost(action, body);
+  const j = await api(action, body);
   await load();
   setTimeout(load, 8000);  // 계획·캘린더는 뒤에서 몇 초 걸림 → 한 번 더 받기
   return j;
@@ -408,7 +438,8 @@ function acts(t, big) {
   if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : t.kind === "review" ? "▶ 퀴즈 풀기" : "▶ 열기"}</button>`);
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명·자료·내 노트를 모아 보고서 파일을 만들고 초안까지 (Claude 사용)">✍ 보고서 작성</button>`);
   if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
-  if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`);
+  if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`,
+                                  `<button data-act="quizcopy" data-key="${k}" title="이 강의 자료로 퀴즈를 만드는 요청 문장을 복사 — Claude 채팅에 붙여 넣기">🧩</button>`);
   b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
                   : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
   b.push(`<button data-act="done" data-key="${k}">${t.kind === "lecture" ? "✓ 들었음" : "✓ 완료"}</button>`);
@@ -416,6 +447,13 @@ function acts(t, big) {
   else b.push(`<button data-act="ignore" data-key="${k}" title="계속 제외 (조장만 제출 등)">✕</button>`);
   return `<span class="acts">${b.join("")}</span>`;
 }
+// 📎 연결된 자료 수 — PC 는 누르면 자료 창, 휴대폰은 이름만 (파일은 PC 에 있음)
+const clip = t => {
+  const n = t && D && (D.links || {})[t.key];
+  if (!n || !n.length) return "";
+  const act = MOB ? "clipnames" : LIVE ? "matshow" : "";
+  return ` <span class="clip" ${act ? `data-act="${act}" data-key="${esc(t.key)}"` : ""} title="연결된 자료: ${esc(n.join(", "))}">📎${n.length}</span>`;
+};
 const smallActs = t => {
   if (MOB) return mobileActs(t, true);
   if (!LIVE) return "";
@@ -471,7 +509,7 @@ function render() {
 
   // 오른쪽: 마감
   const item = t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
-    <span class="txt">${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}</span>${smallActs(t)}</div>`;
+    <span class="txt">${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}${clip(t)}</span>${smallActs(t)}</div>`;
   let dues = late.length ? `<div class="due-day">지난 마감 <span class="badge late">미완료</span></div>` + late.map(item).join("") : "";
   for (const d of [...Array(14)].map((_, i) => addDays(today, i))) {
     const its = open.filter(t => ymd(t.due) === d);
@@ -561,25 +599,266 @@ function ritual(now, today) {
   return "";
 }
 
-// 📄 자료: 강한 단서(17강·Ch24·11주)로 하나가 맞으면 바로 열고, 아니면 후보 목록
-async function showMaterials(key) {
-  const t = taskOf(key);
-  const r = await (await fetch("/api/materials?key=" + encodeURIComponent(key))).json();
-  const strong = r.files.filter(f => f.score >= 10);
-  if (r.strong && strong.length === 1) { await post("open-file", { path: strong[0].path }); return; }
-  let body = "";
-  if (!r.dir) body = `<p class="empty">이 과목의 자료 폴더가 정해져 있지 않습니다 (config/courses.yaml).</p>`;
-  else {
-    if (r.clues.length && !r.strong) body += `<p class="msg">${esc(r.clues.join(", "))} 자료가 아직 없습니다 — Canvas 에서 받으면 '📥 새로 받은 파일'에 뜹니다.</p>`;
-    if (r.deleted && r.deleted.length) body += `<p class="msg" title="${esc(r.deleted.join("\n"))}">이 과목에서 교수님이 지운 자료 ${r.deleted.length}개는 받지 않았습니다 (마우스를 올리면 목록).</p>`;
-    body += r.files.length ? r.files.map(f => `<div class="item"><span class="txt">${f.score >= 10 ? "⭐ " : ""}${esc(f.name)}</span>
-      <span class="acts" style="opacity:1"><button data-act="openfile" data-path="${esc(f.path)}">열기</button>
-      ${f.summary ? `<button data-act="openfile" data-path="${esc(f.summary)}">요약 열기</button>`
-        : f.pdf ? `<button data-act="summarize" data-path="${esc(f.path)}" title="Claude 가 핵심 정리를 만듭니다 (구독 사용, 몇 분)">🤖 요약</button>` : ""}</span></div>`).join("")
-      : `<p class="empty">맞는 파일 없음</p>`;
+// ---- 📄 자료 창: 연결된 자료(칩) · 추천 · 실시간 찾기(/ 경로 + Tab) · 📁 둘러보기 · 📥 최근 다운로드
+// 찾기는 화면 안에서 한다 — 파일 '이름' 목록을 1분에 한 번 받아 두고 글자를 칠 때마다 여기서 거름 (디스크·서버 0).
+// 범위·개수 같은 규칙은 config/materials.yaml (바꾸려면 채팅에서).
+let MP = null;  // 열린 자료 창의 상태
+const FILES = { at: 0, list: [], roots: [] };
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" }), j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "실패");
+  return j;
+}
+async function fileIndex() {
+  if (Date.now() - FILES.at > 60000) { const j = await getJSON("/api/files"); Object.assign(FILES, { at: Date.now(), list: j.files, roots: j.roots }); }
+  return FILES.list;
+}
+const full = f => f.r + "/" + f.rel;
+const fdate = m => { const d = new Date(m * 1000); return `${d.getMonth() + 1}/${d.getDate()}`; };
+function hl(s, words) {  // 맞은 글자 굵게 (escape 하면서)
+  const low = s.toLowerCase(), on = new Array(s.length).fill(false);
+  for (const w of words) for (let i = w ? low.indexOf(w) : -1; i >= 0; i = low.indexOf(w, i + w.length)) on.fill(true, i, i + w.length);
+  let out = "", b = false;
+  for (let i = 0; i < s.length; i++) { if (on[i] !== b) { out += on[i] ? "<b>" : "</b>"; b = on[i]; } out += esc(s[i]); }
+  return out + (b ? "</b>" : "");
+}
+function mpMsg(text) { const el = $("mpMsg"); if (el) { el.className = "msg err"; el.textContent = text || ""; } }
+
+// 단어 찾기: 모든 단어가 경로에 있어야. 파일 이름에서 맞음 > 경로에서만 · 단어 앞부분 · 이 과목 폴더 · 최근 파일 가산
+function mpSearch(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean), nowS = Date.now() / 1000, out = [];
+  for (const f of [...FILES.list, ...(MP.dl || [])]) {
+    const path = full(f).toLowerCase(), name = path.slice(path.lastIndexOf("/") + 1);
+    let sc = 0;
+    for (const w of words) {
+      const i = name.indexOf(w);
+      if (i >= 0) sc += 10 + (i === 0 || /[\s_\-\[(.·]/.test(name[i - 1]) ? 4 : 0);
+      else if (path.includes(w)) sc += 3;
+      else { sc = -1; break; }
+    }
+    if (sc < 0) continue;
+    if (MP.scope.some(s => full(f).startsWith(s + "/"))) sc += 5;
+    sc += Math.max(0, 3 - (nowS - f.m) / 86400 / 7);
+    out.push([sc, f]);
   }
-  $("matPanel").innerHTML = `<div class="card mat"><h2>📄 ${esc(t ? t.title : key)} <span class="hint">${esc(r.dir || "")}</span>
-    <button class="chip" data-act="matclose" style="margin-left:auto">닫기</button></h2>${body}</div>`;
+  return out.sort((a, b) => b[0] - a[0]).map(x => ({ f: x[1], dir: false, name: full(x[1]) }));
+}
+// 경로 모드 ('/' 가 있으면): 그 폴더 바로 아래의 폴더·파일만
+function mpSplit(q) { q = q.replace(/^\/+/, ""); const cut = q.lastIndexOf("/"); return [cut >= 0 ? q.slice(0, cut) : "", q.slice(cut + 1)]; }
+function mpPath(q) {
+  const [dir, part] = mpSplit(q), low = part.toLowerCase(), list = [...FILES.list, ...(MP.dl || [])], kids = new Map();
+  if (!dir) for (const r of [...FILES.roots, ...(MP.dl ? ["다운로드"] : [])]) kids.set(r, { name: r, dir: true, count: list.filter(f => f.r === r).length });
+  else for (const f of list) {
+    const p = full(f);
+    if (!p.startsWith(dir + "/")) continue;
+    const rest = p.slice(dir.length + 1), i = rest.indexOf("/");
+    if (i < 0) { kids.set(rest, { name: rest, dir: false, f }); continue; }
+    const k = kids.get(rest.slice(0, i)) || { name: rest.slice(0, i), dir: true, count: 0 };
+    k.count++; kids.set(k.name, k);
+  }
+  return [...kids.values()].filter(k => k.name.toLowerCase().includes(low))
+    .sort((a, b) => (b.name.toLowerCase().startsWith(low) - a.name.toLowerCase().startsWith(low)) || (b.dir - a.dir) || a.name.localeCompare(b.name, "ko"))
+    .map(k => ({ ...k, path: (dir ? dir + "/" : "") + k.name }));
+}
+function mpResults() {
+  const inp = $("mpQ"), box = $("mpRes");
+  if (!inp || !MP) return;
+  const q = inp.value;
+  if (!q.trim()) { MP.items = []; box.innerHTML = ""; return; }
+  if (!FILES.at) { box.innerHTML = `<p class="hint">파일 목록 읽는 중…</p>`; return; }
+  const pathMode = q.includes("/"), items = MP.items = pathMode ? mpPath(q) : mpSearch(q);
+  MP.sel = Math.max(0, Math.min(MP.sel, items.length - 1));
+  const words = pathMode ? [mpSplit(q)[1].toLowerCase()] : q.toLowerCase().split(/\s+/).filter(Boolean);
+  const have = new Set(MP.links.map(x => x.p)), shown = items.slice(0, MP.limit);
+  box.innerHTML = items.length ? shown.map((k, i) => {
+    const on = i === MP.sel ? " on" : "";
+    if (k.dir) return `<div class="mrow${on}" data-mi="${i}"><span class="p">📁 ${hl(k.name, words)} <small>${k.count}개</small></span>
+      <span class="acts"><button data-act="mpin" data-i="${i}">들어가기</button></span></div>`;
+    const f = k.f, dl = f.r === "다운로드";
+    return `<div class="mrow${on}" data-mi="${i}"><span class="p">${dl ? "📥" : "📄"} ${hl(k.name, words)} <small>${fdate(f.m)}</small></span>
+      <span class="acts"><button data-act="openfile" data-path="${esc(f.p)}">열어보기</button>${have.has(f.p) ? `<span class="meta">연결됨</span>`
+        : `<button data-act="mplink" data-i="${i}">${dl ? "옮겨서 연결" : "+ 연결"}</button>`}</span></div>`;
+  }).join("") + (items.length > shown.length ? `<button class="chip" data-act="mpmore">외 ${items.length - shown.length}개 더 보기</button>` : "")
+    : `<p class="empty">맞는 파일 없음${MP.dl ? "" : " — 📥 다운로드에서도 찾기를 켜 보거나, 찾기 범위 밖이면 채팅에서 범위 추가를 요청하세요"}</p>`;
+  const cur = box.querySelector(".mrow.on");
+  if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+function mpKey(e) {
+  const inp = e.target, items = MP.items || [];
+  if (e.key === "Escape") { e.preventDefault(); if (inp.value) { inp.value = ""; mpResults(); } else { $("matPanel").innerHTML = ""; MP = null; } return; }
+  if (!items.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    MP.sel = (MP.sel + (e.key === "ArrowDown" ? 1 : -1) + Math.min(items.length, MP.limit)) % Math.min(items.length, MP.limit);
+    return mpResults();
+  }
+  if (e.key === "Tab") {  // 채우기: 경로 모드면 공통 앞부분까지 → 고른 것 (폴더면 '/' 붙여 한 단계 들어감)
+    e.preventDefault();
+    const k = items[MP.sel];
+    if (inp.value.includes("/")) {
+      const [dir, part] = mpSplit(inp.value);
+      let pre = items[0].name;
+      for (const x of items) while (!x.name.startsWith(pre)) pre = pre.slice(0, -1);
+      inp.value = items.length > 1 && pre.length > part.length ? (dir ? dir + "/" : "") + pre : k.path + (k.dir ? "/" : "");
+    } else inp.value = full(k.f);
+    MP.sel = 0;
+    return mpResults();
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const k = items[MP.sel];
+    if (k.dir) { inp.value = k.path + "/"; MP.sel = 0; return mpResults(); }
+    mpLink([k.f]);
+  }
+}
+
+function mpDraw() {
+  const live = MP.links.filter(x => x.exists).length;
+  const chips = MP.links.map(x => x.exists
+    ? `<span class="lchip" title="${esc(full(x))}${x.origin === "pair" ? " · 강의 플랫폼에서 같은 주차의 자료라 자동으로 연결됨" : ""}"><button data-act="openfile" data-path="${esc(x.p)}">${x.origin === "pair" ? "🔗" : "📄"} ${esc(x.name)}</button>${
+        x.pdf ? (x.summary ? `<button data-act="openfile" data-path="${esc(x.summary)}" title="만들어 둔 요약 열기">📝</button>`
+                           : `<button data-act="summarize" data-path="${esc(x.p)}" title="🤖 이 PDF 의 핵심 정리 만들기 (Claude 사용, 몇 분)">🤖</button>`) : ""}<button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`
+    : `<span class="lchip miss" title="${esc(x.p)}">⚠️ ${esc(x.name)} <i>파일 없음</i><button data-act="refind" data-name="${esc(x.name)}" title="같은 이름으로 다시 찾기">다시 찾기</button><button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`).join("");
+  $("mpTop").innerHTML = `<div class="meta">연결된 자료 ${live}/${MP.max}${MP.links.length ? " · 누르면 열림 · ✍ 보고서·🤖 내용정리가 이것만 참고" : " — 아직 없음. 고르면 ✍ 보고서·🤖 내용정리가 이것을 참고 (없으면 제목으로 추측)"}</div>
+    ${MP.links.length ? `<div class="lchips">${chips}</div>` : ""}
+    ${MP.suggest.length ? `<div class="meta">추천 <span class="hint">⭐ 제목 번호가 맞음 · 누르면 연결</span></div><div class="lchips">${MP.suggest.map(s =>
+      `<button class="chip" data-act="mplinkp" data-path="${esc(s.p)}" title="${esc(s.why)}">${s.why.startsWith("번호") ? "⭐ " : ""}+ ${esc(s.name)}</button>`).join("")}</div>` : ""}
+    ${MP.note ? `<p class="msg">${esc(MP.note)}</p>` : ""}`;
+  $("mpDays").textContent = MP.days;
+  $("mpFoot").innerHTML = `${MP.deleted.length ? `<p class="hint" title="${esc(MP.deleted.join("\n"))}">이 과목에서 교수님이 지운 자료 ${MP.deleted.length}개는 받지 않았습니다 (마우스를 올리면 목록).</p>` : ""}
+    <div class="row" style="margin-top:6px"><button class="chip" data-act="quizcopy" data-key="${esc(MP.key)}" title="채팅에 붙여 넣으면 연결된 자료로 퀴즈를 만듭니다 (퀴즈 프로젝트 규칙: 계획서 → 승인 → 제작)">🧩 퀴즈 요청 복사</button>
+      <span class="hint">찾기: 단어 몇 개 · <code>/</code> 로 폴더 (예: 자료/) · <kbd>↑↓</kbd> 고르기 · <kbd>Tab</kbd> 채우기 · <kbd>Enter</kbd> 연결 · <kbd>Esc</kbd> 지우기·닫기</span></div>`;
+  if (MP.browse) mpBrowseList();
+}
+
+async function showMaterials(key, opts = {}) {
+  const j = await getJSON("/api/links?key=" + encodeURIComponent(key));
+  const fresh = !MP || MP.key !== key || !$("mpQ");
+  if (fresh) {
+    MP = { key, sel: 0, limit: 8, dl: null, browse: null, items: [], note: "" };
+    $("matPanel").innerHTML = `<div class="card mat"><h2>📄 <span id="mpTitle"></span>
+        <button class="chip" data-act="matclose" style="margin-left:auto">닫기</button></h2>
+      <div id="mpTop"></div>
+      <div class="msearch"><input id="mpQ" type="text" autocomplete="off" spellcheck="false" placeholder="자료 찾기 — 예) 17강 배포   ·   자료/ 처럼 / 로 폴더 따라가기">
+        <button data-act="mpbrowse" title="폴더를 눌러 다니며 여러 개 고르기">📁 둘러보기</button>
+        <label class="hint" title="Windows 다운로드 폴더에서 최근에 받은 문서도 찾기 — 연결하면 이 할 일의 과목 폴더로 옮겨짐"><input type="checkbox" id="mpDl"> 📥 다운로드에서도 찾기 (최근 <span id="mpDays"></span>일)</label></div>
+      <div id="mpMsg" class="msg"></div><div id="mpRes" class="mres"></div><div id="mpBrowse"></div><div id="mpFoot"></div></div>`;
+    $("mpQ").addEventListener("input", () => { MP.sel = 0; MP.limit = 8; mpResults(); });
+    $("mpQ").addEventListener("keydown", mpKey);
+    $("mpDl").addEventListener("change", async e => {
+      try { MP.dl = e.target.checked ? (await getJSON("/api/downloads")).files : null; } catch (err) { mpMsg(err.message); }
+      mpResults();
+      if (MP.browse) mpBrowseDraw();
+    });
+    $("matPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  Object.assign(MP, j);
+  if (opts.note !== undefined) MP.note = opts.note;
+  $("mpTitle").textContent = j.title;
+  if (opts.openSingle) {  // 연결된 자료가 하나면 바로 연다 (창은 그대로 — 더 넣을 수 있게)
+    const ok = MP.links.filter(x => x.exists);
+    if (ok.length === 1) { MP.note = "연결된 자료를 열었습니다: " + ok[0].name; api("open-file", { path: ok[0].p }).catch(err => mpMsg(err.message)); }
+  }
+  mpDraw();
+  if (fresh) { $("mpQ").focus({ preventScroll: true }); fileIndex().then(mpResults).catch(err => mpMsg("파일 목록을 읽지 못함: " + err.message)); }
+  else mpResults();
+}
+
+// 연결: 일반 파일은 한 번에, 다운로드 파일은 과목 폴더로 옮긴 뒤 하나씩
+async function mpLink(fs) {
+  mpMsg("");
+  try {
+    const plain = fs.filter(f => f.r !== "다운로드").map(f => f.p);
+    if (plain.length) await api("link", { key: MP.key, paths: plain });
+    for (const f of fs.filter(f => f.r === "다운로드")) {
+      let r = await api("link-download", { key: MP.key, path: f.p });
+      if (r.needCourse) {
+        const c = prompt(`이 할 일의 과목을 몰라서, 어느 과목 폴더로 옮길지 정해 주세요.\n과목: ${r.courses.join(", ")}`);
+        if (!c) continue;
+        r = await api("link-download", { key: MP.key, path: f.p, course: c.trim() });
+        if (r.needCourse) throw new Error("그 과목을 찾지 못했습니다: " + c);
+      }
+      MP.note = r.message || "";
+      if (MP.dl) MP.dl = MP.dl.filter(x => x.p !== f.p);
+      FILES.at = 0;
+    }
+    if (MP.browse) MP.browse.checked.clear();
+    $("mpQ").value = "";
+  } catch (err) { mpMsg(err.message); }
+  if (FILES.at === 0) await fileIndex().catch(() => {});
+  await showMaterials(MP.key);
+  if (MP.browse) await mpBrowse(MP.browse.root, MP.browse.path);
+  load();
+}
+
+// 📁 둘러보기: 누른 폴더 하나만 받아 온다. 체크는 폴더를 옮겨 다녀도 유지
+async function mpBrowse(root, path) {
+  const j = await getJSON(`/api/ls?root=${encodeURIComponent(root)}&path=${encodeURIComponent(path || "")}`);
+  const old = MP.browse;
+  MP.browse = { ...j, checked: old ? old.checked : new Map(), sort: old ? old.sort : "name", filter: "" };
+  mpBrowseDraw();
+}
+function mpBrowseDraw() {
+  const B = MP.browse, el = $("mpBrowse");
+  if (!B) { el.innerHTML = ""; return; }
+  const roots = [...(FILES.roots.length ? FILES.roots : ["자료", "노트", "보고서"]), "다운로드"], parts = B.path ? B.path.split("/") : [];
+  const go = (p, label) => `<button class="link" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc(p)}">${esc(label)}</button>`;
+  el.innerHTML = `<div class="mbrowse">
+    <div class="row">${roots.map(r => `<button class="chip ${r === B.root ? "primary" : ""}" data-act="mpls" data-root="${esc(r)}" data-path="">${r === "다운로드" ? `📥 다운로드 (최근 ${MP.days}일)` : esc(r)}</button>`).join("")}
+      <button class="chip" data-act="mpbclose" style="margin-left:auto">접기</button></div>
+    <div class="crumb">${go("", B.root)}${parts.map((p, i) => " / " + go(parts.slice(0, i + 1).join("/"), p)).join("")}
+      ${parts.length ? `<button class="chip" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc(parts.slice(0, -1).join("/"))}" title="한 단계 위로">⬆</button>` : ""}</div>
+    <div class="row"><input id="mpBF" type="text" placeholder="이 폴더에서 거르기" autocomplete="off" style="flex:1 1 160px">
+      <select id="mpBS"><option value="name">이름순</option><option value="m" ${B.sort === "m" ? "selected" : ""}>최근순</option></select></div>
+    <div id="mpBL" class="mres"></div>
+    <div class="row" style="margin-top:6px"><button class="primary" data-act="mpbadd" id="mpBAdd" disabled>선택한 0개 연결</button>
+      ${B.root === "다운로드" ? `<span class="hint">다운로드 파일은 이 할 일의 과목 자료 폴더로 옮긴 뒤 연결합니다</span>` : ""}</div></div>`;
+  $("mpBF").addEventListener("input", e => { B.filter = e.target.value.toLowerCase(); mpBrowseList(); });
+  $("mpBS").addEventListener("change", e => { B.sort = e.target.value; mpBrowseList(); });
+  $("mpBL").addEventListener("change", e => {
+    const p = e.target.dataset.bp;
+    if (p) { e.target.checked ? B.checked.set(p, { p, r: e.target.dataset.br }) : B.checked.delete(p); mpBrowseCount(); }
+  });
+  mpBrowseList();
+}
+function mpBrowseList() {
+  const B = MP.browse, el = $("mpBL");
+  if (!B || !el) return;
+  const have = new Set(MP.links.map(x => x.p)), nm = x => x.name || x.rel;
+  const dirs = B.dirs.filter(d => d.name.toLowerCase().includes(B.filter));
+  const files = B.files.filter(x => nm(x).toLowerCase().includes(B.filter)).sort((a, b) => B.sort === "m" ? b.m - a.m : nm(a).localeCompare(nm(b), "ko"));
+  el.innerHTML = dirs.map(d => `<div class="mrow" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc((B.path ? B.path + "/" : "") + d.name)}">
+      <span class="p">📁 ${esc(d.name)} <small>${d.count}개</small></span><span></span></div>`).join("")
+    + files.map(x => `<div class="mrow"><label class="p"><input type="checkbox" data-bp="${esc(x.p)}" data-br="${esc(x.r)}" ${B.checked.has(x.p) ? "checked" : ""} ${have.has(x.p) ? "disabled" : ""}>
+      ${esc(nm(x))} <small>${fdate(x.m)}${have.has(x.p) ? " · 연결됨" : ""}</small></label>
+      <span class="acts"><button data-act="openfile" data-path="${esc(x.p)}">열어보기</button></span></div>`).join("")
+    || `<p class="empty">${B.root === "다운로드" ? `최근 ${MP.days}일 안에 받은 문서가 없습니다` : "비어 있음"}</p>`;
+  mpBrowseCount();
+}
+function mpBrowseCount() {
+  const n = MP.browse.checked.size, b = $("mpBAdd");
+  if (b) { b.disabled = !n; b.textContent = `선택한 ${n}개 연결`; }
+}
+
+// 🧩 퀴즈 요청: 채팅에 붙여 넣을 문장 (퀴즈 제작은 판단이 필요해서 채팅에서 — 엔진은 Claude 안 씀)
+async function quizCopy(key) {
+  const t = taskOf(key);
+  let files = MP && MP.key === key ? MP.links : null;
+  if (!files) { try { files = (await getJSON("/api/links?key=" + encodeURIComponent(key))).links; } catch { files = []; } }
+  files = files.filter(x => x.exists);
+  const text = `/quiz ${t && t.course ? t.course + " " : ""}${t ? t.title : key} — 이 자료로 퀴즈 만들어줘 (할 일 키 ${key})\n`
+    + (files.length ? "연결된 자료:\n" + files.map(x => "- " + x.p).join("\n") : "연결된 자료 없음 — study_system 의 이 강의 자료·노트에서 찾아서");
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+  if (!ok) {
+    const ta = Object.assign(document.createElement("textarea"), { value: text });
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
+  if (!ok) { prompt("복사해서 채팅에 붙여 넣으세요", text); return; }
+  if (MP && MP.key === key) { MP.note = "🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요"; mpDraw(); }
+  else alert("🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요\n\n" + text);
 }
 
 function todayView(now, today) {
@@ -597,7 +876,7 @@ function todayView(now, today) {
   if (pick && pick.t) {
     const t = pick.t;
     html += `<div class="now-card"><div class="lbl">${cur ? "▶ 지금 할 일" : `다음 · ${hm(pick.start)} 시작`}</div>
-      <div class="ttl">${esc(t.title)}${pick.part ? ` <span class="hint">(${pick.part})</span>` : ""}</div>
+      <div class="ttl">${esc(t.title)}${pick.part ? ` <span class="hint">(${pick.part})</span>` : ""}${clip(t)}</div>
       <div class="meta">${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · ${hm(pick.start)}–${hm(pick.end)} · 마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})</div>
       ${pick.why ? `<div class="meta">왜 지금? ${esc(pick.why)}</div>` : ""}
       ${acts(t, true)}</div>`;
@@ -624,7 +903,7 @@ function todayView(now, today) {
     } else {
       const t = r.t;
       html += `<div class="tl-row${past}${curC}" style="border-left-color:${color(r.kind)}"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
-        <span class="what" title="${esc(r.why || "")}">${t ? esc(t.title) + (r.part ? ` (${r.part})` : "") : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
+        <span class="what" title="${esc(r.why || "")}">${t ? esc(t.title) + (r.part ? ` (${r.part})` : "") + clip(t) : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
         ${t && !past ? acts(t) : "<span></span>"}</div>`;
     }
   }
@@ -677,7 +956,7 @@ function weekView(now, today, nowMin) {
     h += `<div class="wl-g">${name} <span class="meta">${g.filter(x => x.status === "open").length}/${g.length}</span></div>` + g.map(x => {
       const done = x.status === "done", late = !done && dt(x.due) < now;
       return `<div class="wl ${done ? "done" : ""}"><span class="dot" style="background:${color(x.kind)}"></span>
-        <span class="txt">${x.exam ? "📝 " : ""}${esc(x.title)}<span class="meta">${x.course ? esc(x.course) + " · " : ""}마감 ${label(ymd(x.due))} ${hm(x.due)}
+        <span class="txt">${x.exam ? "📝 " : ""}${esc(x.title)}${clip(x)}<span class="meta">${x.course ? esc(x.course) + " · " : ""}마감 ${label(ymd(x.due))} ${hm(x.due)}
           ${done ? "· 완료" : late ? "· <b style='color:var(--danger)'>지남</b>" : "· " + ddayText(x.due, today)}${x.minutes ? " · 예상 " + dur(x.minutes) : ""}</span></span>
         ${done ? "" : acts(x)}</div>`;
     }).join("");
@@ -685,7 +964,7 @@ function weekView(now, today, nowMin) {
   if (!its.length) h += `<p class="empty">이 주에 마감인 것이 없습니다.</p>`;
 
   const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
-  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b><div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
+  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b>${clip(sel)}<div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
     ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div>
     ${sp && sp.why ? `<div class="meta">왜 여기? ${esc(sp.why)}</div>` : ""}<div style="margin-top:6px">${acts(sel)}</div></div>`;
   return h;
@@ -792,6 +1071,13 @@ document.addEventListener("click", async e => {
   if (wkb) { wkIdx = +wkb.dataset.wk; selKey = null; render(); return; }
   const blk = e.target.closest("[data-sel]");
   if (blk) { selKey = selKey === blk.dataset.sel ? null : blk.dataset.sel; render(); return; }
+  const mrow = e.target.closest("[data-mi]");  // 자료 찾기 결과 줄: 고르기 (폴더면 들어가기)
+  if (mrow && MP && !e.target.closest("[data-act]")) {
+    MP.sel = +mrow.dataset.mi;
+    const k = MP.items[MP.sel];
+    if (k && k.dir) { $("mpQ").value = k.path + "/"; MP.sel = 0; }
+    mpResults(); $("mpQ").focus(); return;
+  }
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act, key = b.dataset.key;
@@ -809,10 +1095,23 @@ document.addEventListener("click", async e => {
     } catch (err) { alert(err.message); b.disabled = false; }
     return;
   }
-  if (act === "matclose") { $("matPanel").innerHTML = ""; return; }
+  if (act === "matclose") { $("matPanel").innerHTML = ""; MP = null; return; }
   if (act === "ritualclose") { try { localStorage.setItem(b.dataset.k, ymdOf(new Date())); } catch {} render(); return; }
-  if (act === "mat") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }
-  if (act === "openfile") { try { await post("open-file", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
+  if (act === "mat") { try { await showMaterials(key, { openSingle: true }); } catch (err) { alert(err.message); } return; }
+  if (act === "matshow") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }
+  if (act === "clipnames") { alert("연결된 자료 (파일은 PC 에 있음)\n\n" + ((D.links || {})[key] || []).join("\n")); return; }
+  if (act === "quizcopy") { await quizCopy(key); return; }
+  if (act === "unlink") { try { await api("unlink", { key: MP.key, path: b.dataset.path }); await showMaterials(MP.key); load(); } catch (err) { mpMsg(err.message); } return; }
+  if (act === "refind") { const q = $("mpQ"); q.value = b.dataset.name.replace(/\.[^.]+$/, ""); MP.sel = 0; mpResults(); q.focus(); return; }
+  if (act === "mplinkp") { await mpLink([{ p: b.dataset.path, r: "" }]); return; }
+  if (act === "mplink") { await mpLink([MP.items[+b.dataset.i].f]); return; }
+  if (act === "mpin") { const q = $("mpQ"); q.value = MP.items[+b.dataset.i].path + "/"; MP.sel = 0; mpResults(); q.focus(); return; }
+  if (act === "mpmore") { MP.limit += 20; mpResults(); return; }
+  if (act === "mpbrowse") { try { if (MP.browse) { MP.browse = null; mpBrowseDraw(); } else await mpBrowse(MP.start.root, MP.start.path); } catch (err) { mpMsg(err.message); } return; }
+  if (act === "mpls") { try { await mpBrowse(b.dataset.root, b.dataset.path); } catch (err) { mpMsg(err.message); } return; }
+  if (act === "mpbclose") { MP.browse = null; mpBrowseDraw(); return; }
+  if (act === "mpbadd") { b.disabled = true; await mpLink([...MP.browse.checked.values()]); return; }
+  if (act === "openfile") { try { await api("open-file", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "dlmove") {
     const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
     if (!course) { alert("과목을 골라 주세요"); return; }
@@ -820,7 +1119,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "summarize") {
     if (!confirm("이 자료의 요약을 Claude 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
-    try { await post("job/summary", { path: b.dataset.path }); $("matPanel").innerHTML = ""; } catch (err) { alert(err.message); } return;
+    try { await post("job/summary", { path: b.dataset.path }); $("matPanel").innerHTML = ""; MP = null; } catch (err) { alert(err.message); } return;
   }
   if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
   if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
@@ -841,7 +1140,11 @@ document.addEventListener("click", async e => {
     try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
   if (act === "sumfor") {
     b.disabled = true;
-    try { const r = await post("job/summary-for", { key }); if (r.message) alert(r.message); }
+    try {
+      const r = await post("job/summary-for", { key });
+      if (r.choose) await showMaterials(key, { note: "연결된 PDF 가 여러 개입니다 — 정리할 자료 칩의 🤖 를 누르세요 (이미 만든 정리는 📝 로 열림)" });
+      else if (r.message) alert(r.message);
+    }
     catch (err) { alert(err.message); } b.disabled = false; return;
   }
   if (act === "openquiz") { try { await post("open-quiz"); } catch (err) { alert(err.message); } return; }

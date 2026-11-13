@@ -5,6 +5,7 @@
 """
 import re
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 
 from pa import canvas, db, links, materials
 from pa.config import load_timetable
@@ -57,6 +58,7 @@ def collect():
         lec_start = len(items)
         dirs = materials.course_dirs(cname)
         local = [x["p"] for x in links.index() if dirs and x["p"].startswith(str(dirs[0]) + "/")]
+        local_names = {links.norm_title(Path(f).stem) for f in local}
         for m in canvas.get(f"/courses/{c['id']}/modules", **{"include[]": "items"}):
             if local:  # 같은 주차의 강의 ↔ 자료 짝 (모든 주차, 이미 받은 파일 기준)
                 pairs_found.extend(links.find_pairs(m.get("items", []), local))
@@ -66,6 +68,9 @@ def collect():
             due = lecture_deadline(m["name"], int(wk.group(1)), sem_start)
             for i in m.get("items", []):
                 if i["type"] != "ExternalTool" or MATERIAL.search(i["title"]):
+                    continue
+                if links.norm_title(i["title"]) in local_names:  # 이미 받은 자료와 이름이 같음 → 강의가 아니라 자료
+                    not_lectures.add(f"m{i['id']}")             # (LearningX 로그인이 끊겨도 자료를 강의로 잘못 올리지 않게)
                     continue
                 items.append({
                     "key": f"m{i['id']}", "kind": "lecture", "course": cname, "title": i["title"].strip(),

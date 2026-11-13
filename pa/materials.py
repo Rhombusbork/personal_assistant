@@ -110,8 +110,10 @@ def _vscode_open(path):
 
 
 def open_file(path):
+    """study_system·report 안의 파일, 또는 다운로드 폴더 맨 위의 파일(📄 자료 창에서 '열어보기')만 연다."""
     path = Path(path).resolve()
-    if not any(str(path).startswith(str(r)) for r in allowed_roots()):
+    inside = any(r == path or r in path.parents for r in allowed_roots())
+    if not inside and not (path.parent == downloads_dir() and path.suffix.lower() in DOC_EXT):
         raise ValueError("열 수 없는 위치")
     if not path.exists():
         raise ValueError("파일 없음")

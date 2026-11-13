@@ -12,8 +12,13 @@ POST /api/quick      빠른 입력 한 줄 ('@내일 18시 ~2h #과목')
 POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop 에 done=true 면 완료까지)
 POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
-GET  /api/materials?key=…   그 항목에 맞는 자료 후보
-POST /api/open-file  자료 파일을 VSCode 탭으로 열기 (study_system·report 안만)
+GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
+GET  /api/files       찾기 범위의 파일 이름 목록 (1분 보관 — 실시간 찾기는 화면이 이 목록으로)
+GET  /api/ls?root=&path=   📁 둘러보기: 폴더 하나의 바로 아래 (범위 밖 거부)
+GET  /api/downloads   다운로드 폴더의 최근 받은 문서 (엔진의 30초 감시 결과 — 폴더를 다시 열지 않음)
+POST /api/link, /api/unlink   자료 연결·빼기 (paths 로 여러 개)
+POST /api/link-download   다운로드 파일을 그 과목 자료 폴더로 옮긴 뒤 연결
+POST /api/open-file  자료 파일을 VSCode 탭으로 열기 (study_system·report·최근 다운로드만)
 POST /api/move-download, /api/dismiss-download   다운로드 폴더의 새 파일 정리
 POST /api/job/report 보고서 준비 + 초안 (에이전트 작업 대기열에 넣음)
 POST /api/job/notices 새 공지 요약 + 제외 후보 찾기 (Claude, 버튼으로만)
@@ -65,32 +70,6 @@ def parse_add(body):
     }
 
 
-def _meta(k):
-    conn = db.connect()
-    try:
-        return db.get_meta(conn, k)
-    finally:
-        conn.close()
-
-
-def materials_for(key):
-    conn = db.connect()
-    try:
-        row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (key,)).fetchone()
-    finally:
-        conn.close()
-    if not row:
-        return {"files": [], "dir": None, "strong": False}
-    mat, scored = materials.find(row["course"], row["title"])
-    deleted = json.loads(_meta("deleted_materials") or "{}").get(row["course"], [])
-    return {"dir": str(mat) if mat else None, "deleted": deleted,
-            "clues": sorted("".join(c) for c in materials.clues(row["title"])),
-            "strong": bool(scored) and scored[0][0] >= 10,
-            "files": [{"name": str(f.relative_to(mat)), "path": str(f), "score": sc,
-                       "pdf": f.suffix.lower() == ".pdf", "summary": str(jobs.summary_path(f)) if jobs.summary_path(f).exists() else None}
-                      for sc, f in scored[:8] if "요약" not in f.parts]}
-
-
 class Handler(SimpleHTTPRequestHandler):
     on_change = None  # 입력 후 호출할 함수 (계획 다시 짜기)
     on_sync = None    # 전체 동기화 함수
@@ -120,9 +99,6 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self._host_ok():
             return self._json(403, {"error": "host"})
-        if self.path.startswith("/api/materials"):
-            key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
-            return self._json(200, materials_for(key))
         if self.path.startswith(("/api/files", "/api/downloads", "/api/ls", "/api/links")):
             return self._links_get()
         if self.path.startswith("/api/report-path"):  # 보고서 초안 파일이 이미 있나
@@ -227,8 +203,15 @@ class Handler(SimpleHTTPRequestHandler):
                 dirs = materials.course_dirs(row["course"]) if row else None
                 start = links.root_of(dirs[0]) if dirs else None
                 deleted = json.loads(db.get_meta(conn, "deleted_materials") or "{}").get(row["course"], []) if row else []
-                return self._json(200, {"links": links.get(conn, key), "suggest": links.suggest(conn, key),
-                                        "max": links.cfg()["max_links"], "title": row["title"] if row else key,
+                linked = links.get(conn, key)
+                for x in linked:  # PDF 는 🤖 요약 / 📝 요약 열기
+                    x["pdf"] = x["p"].lower().endswith(".pdf")
+                    sp = jobs.summary_path(x["p"]) if x["pdf"] else None
+                    x["summary"] = str(sp) if sp and sp.exists() else ""
+                scope = [f"{r[0]}/{r[1]}" for d in (dirs or []) for r in [links.root_of(d)] if r]
+                return self._json(200, {"links": linked, "suggest": links.suggest(conn, key), "scope": scope,
+                                        "max": links.cfg()["max_links"], "days": links.cfg()["downloads"]["recent_days"],
+                                        "title": row["title"] if row else key,
                                         "kind": row["kind"] if row else "", "deleted": deleted,
                                         "start": {"root": start[0], "path": start[1]} if start else {"root": "자료", "path": ""}})
             finally:
