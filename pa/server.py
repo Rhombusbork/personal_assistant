@@ -13,6 +13,8 @@ POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop �
 POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
+GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일 이름·있는지 · 저장한 작성 지침
+POST /api/report-brief, /api/report-file   작성 지침 저장 / Claude 없이 규칙 이름의 빈 파일 만들고 열기
 GET  /api/note-for?key=…  강의를 들은 뒤 열 내 노트 (번호가 맞는 notes/<과목>/ 파일)
 GET  /api/files       찾기 범위의 파일 이름 목록 (1분 보관 — 실시간 찾기는 화면이 이 목록으로)
 GET  /api/ls?root=&path=   📁 둘러보기: 폴더 하나의 바로 아래 (범위 밖 거부)
@@ -113,18 +115,25 @@ class Handler(SimpleHTTPRequestHandler):
             best = next((f for sc, f in materials.scan(dirs[1], row["title"]) if sc >= 10), None) if dirs else None
             return self._json(200, {"path": str(best), "name": best.name} if best else
                               {"folder": dirs[1].name if dirs else ""})
-        if self.path.startswith("/api/report-path"):  # 보고서 초안 파일이 이미 있나
+        if self.path.startswith("/api/report-info"):  # ✍ 창: 과제 설명·파일·지침
             key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
             conn = db.connect()
             try:
                 row = conn.execute("SELECT * FROM tasks WHERE key = ?", (key,)).fetchone()
-                p = jobs.report_path(dict(row)) if row else None
+                if not row:
+                    raise ValueError("할 일을 찾지 못함")
+                t = dict(row)
+                p = jobs.report_path(t, conn)
+                try:
+                    desc = jobs.assignment_text(t) if t["kind"] == "assignment" else ""
+                except Exception as e:  # Canvas 가 안 돼도 창은 연다
+                    desc = f"(Canvas 과제 설명을 읽지 못함: {str(e)[:80]})"
+                return self._json(200, {"title": t["title"], "due": t["due"], "kind": t["kind"], "desc": desc,
+                                        "exists": p.exists(), "path": str(p), "name": p.name, "brief": jobs.brief(conn, key)})
             except Exception as e:
                 return self._json(400, {"error": str(e)})
             finally:
                 conn.close()
-            return self._json(200, {"exists": bool(p and p.exists()), "path": str(p) if p else None,
-                                    "name": p.name if p else None})
         if self.path.startswith("/api/viewers"):
             return self._json(200, {"count": viewer_count()})
         if self.path.split("?")[0] == "/api/data":
@@ -176,7 +185,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
-                            "/api/link", "/api/unlink", "/api/link-download"):
+                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -252,7 +261,15 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("열 수 있는 링크가 없음")
                 subprocess.Popen(["explorer.exe", row["url"]])  # Windows 기본 브라우저 (학교 로그인 유지)
                 return {"ok": True}
+            if action == "/api/report-brief":
+                jobs.save_brief(conn, body["key"], body.get("text", ""), body.get("blanks", True))
+                return {"ok": True}
+            if action == "/api/report-file":
+                path = jobs.blank_report(conn, body["key"])
+                return {"ok": True, "path": str(path), "where": materials.open_file(path)}
             if action == "/api/job/report":
+                if "text" in body:  # ✍ 창의 지침을 저장한 뒤 초안
+                    jobs.save_brief(conn, body["key"], body["text"], body.get("blanks", True))
                 row = conn.execute("SELECT title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
                 if not row:
                     raise ValueError("할 일을 찾지 못함")

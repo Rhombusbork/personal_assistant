@@ -111,8 +111,11 @@ def cmd_task(conn, args):
     print(f"{t['title']}\n  종류 {KIND_LABEL.get(t['kind'], t['kind'])} · 과목 {t['course'] or '-'} · 상태 {t['status']}"
           f" · 마감 {t['due'] or '없음'}\n  {t['url'] or ''}".rstrip())
     if t["kind"] in ("assignment", "todo") and t["due"]:
-        path = jobs.report_path(t)
+        path = jobs.report_path(t, conn)
         print(f"보고서 파일: {path}" + (" (있음)" if path.exists() else " (아직 없음)"))
+        b = jobs.brief(conn, args.key)
+        if b["text"]:
+            print("✍ 창에 적은 작성 지침: " + b["text"] + ("" if b["blanks"] else " (내 생각 자리도 초안으로)"))
     if t["kind"] == "assignment":
         try:
             print("\n[Canvas 과제 설명]\n" + (jobs.assignment_text(t) or "(설명 없음)"))

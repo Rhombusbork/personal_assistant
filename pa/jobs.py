@@ -101,7 +101,16 @@ def subject(task):
     return re.split(r"[\s_]+", task["title"])[0]
 
 
-def report_path(task):
+def report_path(task, conn=None):
+    """이 과제의 보고서 파일. 한 번 만든 파일은 기억해 두고 계속 같은 파일 (번호 없는 제목도 _2, _3 으로 새로 생기지 않게)."""
+    if conn is not None:
+        known = db.get_meta(conn, "report_file:" + task["key"])
+        if not known:  # 예전에 🤖 초안으로 만든 파일
+            row = conn.execute("SELECT result FROM jobs WHERE key = ? AND kind LIKE 'report%' AND status = 'done' "
+                               "ORDER BY id DESC LIMIT 1", (task["key"],)).fetchone()
+            known = row["result"] if row else None
+        if known and Path(known).exists() and Path(known).parent == REPORT_DIR:
+            return Path(known)
     sid, name = student()
     subj, kind = subject(task), doc_kind(task["title"])
     prefix = f"{sid}_{name}_{subj}_{kind}_"
@@ -131,6 +140,38 @@ def assignment_text(task):
     return (re.sub(r"\n{3,}", "\n\n", text).strip() + "\n" + " · ".join(extra)).strip()
 
 
+def brief(conn, key):
+    """✍ 창에서 적은 작성 지침 (다시 열면 그대로, 새로 쓰기에도 씀)."""
+    import json as _json
+    return {"text": "", "blanks": True, **_json.loads(db.get_meta(conn, "report_brief:" + key) or "{}")}
+
+
+def save_brief(conn, key, text, blanks=True):
+    import json as _json
+    db.set_meta(conn, "report_brief:" + key, _json.dumps({"text": str(text or "").strip()[:4000], "blanks": bool(blanks)},
+                                                         ensure_ascii=False))
+    conn.commit()
+
+
+def _template(task):
+    sid, name = student()
+    return f"# {task['title']}\n\n<div align=\"right\">{sid} {name}</div>\n\n"
+
+
+def blank_report(conn, key):
+    """Claude 없이: 규칙에 맞는 이름의 파일만 만든다 (제목·학번 이름 줄). 이미 있으면 그대로."""
+    task = conn.execute("SELECT * FROM tasks WHERE key = ?", (key,)).fetchone()
+    if not task:
+        raise ValueError("할 일을 찾지 못함")
+    path = report_path(dict(task), conn)
+    if not path.exists():
+        path.write_text(_template(task))
+        db.set_meta(conn, "report_file:" + key, str(path))
+        db.log(conn, "report_file_created", key, path=path.name)
+        conn.commit()
+    return path
+
+
 def report_job(conn, job, force=False):
     task = conn.execute("SELECT * FROM tasks WHERE key = ?", (job["key"],)).fetchone()
     if not task:
@@ -154,11 +195,14 @@ def report_job(conn, job, force=False):
         notes = [f for sc, f in materials.scan(dirs[1], task["title"])[:3] if sc >= 2] if dirs else []
 
     _update(conn, job["id"], step="3/5 파일 만들기")
-    path = report_path(task)
+    path = report_path(task, conn)
+    db.set_meta(conn, "report_file:" + task["key"], str(path))
     if path.exists() and not force:
         _update(conn, job["id"], step="이미 있는 파일 열기")
         materials.open_file(path)
         return path
+    if path.exists() and path.read_text().strip() == _template(task).strip():  # 📝 로 만든 빈 파일이면 그냥 덮어씀
+        path.unlink()
     if path.exists():  # 새로 쓰기: 지금 파일은 _old 로 보관 (지우지 않음)
         n = 1
         while (old := path.with_name(f"{path.stem}_old{n}{path.suffix}")).exists():
@@ -166,6 +210,10 @@ def report_job(conn, job, force=False):
         path.rename(old)
 
     _update(conn, job["id"], step="4/5 초안 쓰기 (Claude, 몇 분 걸림)")
+    b = brief(conn, task["key"])
+    blanks = ("- 학생 자신의 생각, 관찰, 경험, 의견이 들어가야 할 자리는 지어내지 말고\n"
+              "  [✍ 내 생각: 여기에 무엇을 쓰면 좋을지 한 줄 안내] 로 비워 둔다." if b["blanks"] else
+              "- 학생의 의견 부분도 지침과 노트를 근거로 초안을 쓴다. 노트·지침에 없는 개인 경험은 지어내지 않는다.")
     sid, name = student()
     due = parse_dt(task["due"])
     prompt = f"""학생의 과제 초안을 쓴다. 이 폴더의 CLAUDE.md(글쓰기 규칙)를 모두 지킨다.
@@ -175,6 +223,9 @@ def report_job(conn, job, force=False):
 마감: {due:%Y-%m-%d %H:%M} 까지
 과제 설명 (Canvas):
 {desc or '(설명 없음 — 제목으로 판단)'}
+
+학생의 작성 지침 (가장 먼저 따른다. 단 CLAUDE.md 규칙과 사실 확인 원칙 안에서):
+{b['text'] or '(없음 — 과제 설명대로)'}
 
 참고 자료 (필요한 부분만 Read 로 읽는다):
 {chr(10).join('- ' + str(f) for f in mats) or '- (없음)'}
@@ -186,8 +237,7 @@ def report_job(conn, job, force=False):
 - 문서 본문 마크다운만 출력한다. 앞뒤 인사, 설명, 코드 블록 표시를 넣지 않는다.
 - 첫 줄은 "# 제목", 바로 아래 줄은 <div align="right">{sid} {name}</div>
 - 과제 설명이 정한 형식과 분량을 따른다. 정해진 게 없으면 A4 한두 쪽.
-- 학생 자신의 생각, 관찰, 경험, 의견이 들어가야 할 자리는 지어내지 말고
-  [✍ 내 생각: 여기에 무엇을 쓰면 좋을지 한 줄 안내] 로 비워 둔다.
+{blanks}
 - 확인하지 않은 사실과 참고문헌은 쓰지 않는다. 자료에서 가져온 내용은 어느 자료인지 괄호로 적는다.
 """
     text = ai.ask(prompt, cwd=REPORT_DIR, add_dirs=[materials._cfg()["root"]], timeout=900)

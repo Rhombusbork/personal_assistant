@@ -66,3 +66,17 @@ def test_summary_job_writes_beside_material(conn, monkeypatch, tmp_path):
     jobs.enqueue(conn, "summary", str(outside), "요약2")
     jobs.run_next(conn)
     assert jobs.recent(conn)[0]["status"] == "failed"  # materials 밖은 거절
+
+
+def test_brief_and_blank_file(conn, tmp_path, monkeypatch):
+    monkeypatch.setattr(jobs, "REPORT_DIR", tmp_path)
+    monkeypatch.setattr(jobs, "student", lambda: ("2024", "홍길동"))
+    db.sync_source(conn, "canvas", [{"key": "a5", "kind": "assignment", "course": "", "title": "리바이어던 텍스트 제출",
+                                     "due": "2099-01-01T23:59:00+09:00", "earliest": None, "minutes": 60, "url": ""}])
+    assert jobs.brief(conn, "a5") == {"text": "", "blanks": True}
+    jobs.save_brief(conn, "a5", " 1쪽, 자연 상태 중심 ", False)
+    assert jobs.brief(conn, "a5") == {"text": "1쪽, 자연 상태 중심", "blanks": False}
+    p = jobs.blank_report(conn, "a5")
+    assert p.read_text().startswith("# 리바이어던 텍스트 제출") and "2024 홍길동" in p.read_text()
+    p.write_text(p.read_text() + "내가 쓴 문장\n")
+    assert jobs.blank_report(conn, "a5").read_text().endswith("내가 쓴 문장\n")  # 있는 파일은 건드리지 않음

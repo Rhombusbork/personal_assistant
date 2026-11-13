@@ -213,6 +213,12 @@
   .crumb { font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
   button.link { border: 0; background: none; padding: 0 2px; color: var(--accent); }
   button.link:hover { text-decoration: underline; }
+  .rep textarea { width: 100%; min-height: 96px; resize: vertical; font: inherit; background: var(--field); border: 1px solid var(--line);
+                  border-radius: 8px; padding: 8px 10px; color: inherit; }
+  .rep .desc { white-space: pre-wrap; font-size: 12px; color: var(--muted); max-height: 180px; overflow: auto; margin: 4px 0 0; }
+  .rep .ways { display: grid; gap: 6px; margin-top: 8px; }
+  .rep .ways button { text-align: left; white-space: normal; padding: 6px 10px; }
+  .rep .ways small { display: block; color: var(--muted); font-weight: normal; }
   .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10; max-width: min(640px, calc(100vw - 32px));
            background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 24px #0003;
            display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
@@ -262,6 +268,7 @@
   </div>
 
   <div id="ritual"></div>
+  <div id="repPanel"></div>
   <div id="matPanel"></div>
   <div id="timer"></div>
   <div id="warn"></div>
@@ -443,7 +450,7 @@ function acts(t, big) {
   const k = esc(t.key), b = [];
   const isActive = D.active && D.active.key === t.key;
   if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : t.kind === "review" ? "▶ 퀴즈 풀기" : "▶ 열기"}</button>`);
-  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명·자료·내 노트를 모아 보고서 파일을 만들고 초안까지 (Claude 사용)">✍ 보고서 작성</button>`);
+  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명 보기 → 참고 자료 고르기 → 작성 지침 적기 → 채팅에서 같이 쓰기 / 초안 한 번에 / 빈 파일">✍ 보고서 작성</button>`);
   if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
   if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`,
                                   `<button data-act="quizcopy" data-key="${k}" title="이 강의 자료로 퀴즈를 만드는 요청 문장을 복사 — Claude 채팅에 붙여 넣기">🧩</button>`);
@@ -853,14 +860,7 @@ function mpBrowseCount() {
   if (b) { b.disabled = !n; b.textContent = `선택한 ${n}개 연결`; }
 }
 
-// 🧩 퀴즈 요청: 채팅에 붙여 넣을 문장 (퀴즈 제작은 판단이 필요해서 채팅에서 — 엔진은 Claude 안 씀)
-async function quizCopy(key) {
-  const t = taskOf(key);
-  let files = MP && MP.key === key ? MP.links : null;
-  if (!files) { try { files = (await getJSON("/api/links?key=" + encodeURIComponent(key))).links; } catch { files = []; } }
-  files = files.filter(x => x.exists);
-  const text = `/quiz ${t && t.course ? t.course + " " : ""}${t ? t.title : key} — 이 자료로 퀴즈 만들어줘 (할 일 키 ${key})\n`
-    + (files.length ? "연결된 자료:\n" + files.map(x => "- " + x.p).join("\n") : "연결된 자료 없음 — study_system 의 이 강의 자료·노트에서 찾아서");
+async function copyText(text) {  // 클립보드 → 안 되면 옛 방식 → 그래도 안 되면 보여 주고 직접 복사
   let ok = false;
   try { await navigator.clipboard.writeText(text); ok = true; } catch {}
   if (!ok) {
@@ -869,7 +869,70 @@ async function quizCopy(key) {
     try { ok = document.execCommand("copy"); } catch {}
     ta.remove();
   }
-  if (!ok) { prompt("복사해서 채팅에 붙여 넣으세요", text); return; }
+  if (!ok) prompt("복사해서 채팅에 붙여 넣으세요", text);
+  return ok;
+}
+
+// ---- ✍ 보고서 작성 창: 과제 설명 확인 → 자료 고르기(아래 📄 창) → 지침 적기 → 어떻게 쓸지 고르기
+let REP = null;
+async function showReport(key) {
+  const r = await getJSON("/api/report-info?key=" + encodeURIComponent(key));
+  REP = { key, ...r };
+  const due = r.due ? `${label(ymd(r.due))} ${hm(r.due)}` : "기한 없음";
+  $("repPanel").innerHTML = `<div class="card mat rep"><h2>✍ ${esc(r.title)} <span class="hint">마감 ${due}</span>
+      <button class="chip" data-act="repclose" style="margin-left:auto">닫기</button></h2>
+    ${r.desc ? `<details ${r.desc.length < 300 ? "open" : ""}><summary class="meta">Canvas 과제 설명</summary><p class="desc">${esc(r.desc)}</p></details>` : ""}
+    <div class="meta" style="margin-top:6px">파일: <b>${esc(r.name)}</b> ${r.exists ? `— 이미 있음 <button class="chip" data-act="openfile" data-path="${esc(r.path)}">열기</button>` : "— 아직 없음"}</div>
+    <div class="meta">참고 자료: 아래 📄 창에서 고른 것만 씀 (하나도 없으면 제목으로 자동 추측)</div>
+    <label class="meta" for="repText" style="display:block;margin-top:8px">어떻게 쓸까요? (분량·구성·강조할 내용·내 의견·말투 등 — 비워도 됨)</label>
+    <textarea id="repText" placeholder="예) A4 1쪽. 홉스의 자연 상태와 사회 계약을 중심으로, 마지막 문단에 오늘날 국가 권력과 비교한 내 생각 (내 생각은 비워 둬)">${esc(r.brief.text)}</textarea>
+    <label class="meta"><input type="checkbox" id="repBlank" ${r.brief.blanks ? "checked" : ""}> 내 생각·경험이 들어갈 자리는 비워 두기 (<code>[✍ 내 생각: …]</code> 표시)</label>
+    <div class="ways">
+      <button class="primary" data-act="repchat">💬 채팅에서 같이 쓰기 <small>보고서 파일을 VSCode 에 열고, 과제·자료·지침을 담은 요청을 복사 → 오른쪽 Claude 채팅에 붙여 넣기. 대화하며 한 부분씩</small></button>
+      <button data-act="repdraft">🤖 초안 한 번에 만들기 <small>Claude 가 뒤에서 전체 초안을 씀 (구독 사용, 몇 분)${r.exists ? " — 지금 파일은 _old 로 보관" : ""}</small></button>
+      <button data-act="repfile">📝 빈 파일만 만들고 열기 <small>규칙에 맞는 이름·제목·학번 줄만. Claude 안 씀</small></button>
+    </div><p id="repMsg" class="msg"></p></div>`;
+  await showMaterials(key);
+  $("repPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("repText").focus({ preventScroll: true });
+}
+const repBrief = () => ({ key: REP.key, text: $("repText").value, blanks: $("repBlank").checked });
+async function repAction(act) {
+  const msg = $("repMsg");
+  msg.className = "msg"; msg.textContent = "…";
+  try {
+    if (act === "repdraft") {
+      if (REP.exists && !confirm(`이미 있는 ${REP.name} 은 _old 로 보관하고 새로 씁니다 (Claude 사용, 몇 분). 진행할까요?`)) { msg.textContent = ""; return; }
+      await post("job/report", { ...repBrief(), force: REP.exists });
+      msg.textContent = "🤖 초안을 쓰는 중 — 오른쪽 🤖 작업 칸에서 진행 상황, 끝나면 VSCode 에 열립니다";
+    } else if (act === "repfile") {
+      await api("report-file", { key: REP.key });
+      msg.textContent = "VSCode 에 열었습니다"; REP.exists = true;
+    } else if (act === "repchat") {
+      await api("report-brief", repBrief());
+      const f = await api("report-file", { key: REP.key });  // 없으면 빈 파일을 만들어 열어 둠
+      const b = repBrief(), files = (MP && MP.key === REP.key ? MP.links : []).filter(x => x.exists);
+      const text = `/assignment ${REP.key} ${REP.title} — 이 과제 보고서를 채팅에서 같이 쓰자.\n`
+        + `보고서 파일: ${f.path} (VSCode 에 열어 둠${REP.exists ? ", 이미 쓴 내용 있음" : ""})\n`
+        + `내 지침: ${b.text.trim() || "(없음 — 과제 설명대로, 먼저 구성을 제안해 줘)"}\n`
+        + (files.length ? "참고 자료 (이것만):\n" + files.map(x => "- " + x.p).join("\n") + "\n" : "참고 자료: 연결 없음 — 맞는 자료를 찾아 먼저 보여 줘\n")
+        + (b.blanks ? "내 생각·경험이 들어갈 자리는 지어내지 말고 나에게 물어봐 줘." : "");
+      REP.exists = true;
+      if (await copyText(text)) msg.textContent = "📋 요청을 복사했습니다 — 오른쪽 Claude 채팅에 붙여 넣으세요 (Ctrl+V)";
+      else msg.textContent = "";
+    }
+  } catch (err) { msg.className = "msg err"; msg.textContent = err.message; }
+}
+
+// 🧩 퀴즈 요청: 채팅에 붙여 넣을 문장 (퀴즈 제작은 판단이 필요해서 채팅에서 — 엔진은 Claude 안 씀)
+async function quizCopy(key) {
+  const t = taskOf(key);
+  let files = MP && MP.key === key ? MP.links : null;
+  if (!files) { try { files = (await getJSON("/api/links?key=" + encodeURIComponent(key))).links; } catch { files = []; } }
+  files = files.filter(x => x.exists);
+  const text = `/quiz ${t && t.course ? t.course + " " : ""}${t ? t.title : key} — 이 자료로 퀴즈 만들어줘 (할 일 키 ${key})\n`
+    + (files.length ? "연결된 자료:\n" + files.map(x => "- " + x.p).join("\n") : "연결된 자료 없음 — study_system 의 이 강의 자료·노트에서 찾아서");
+  if (!await copyText(text)) return;
   if (MP && MP.key === key) { MP.note = "🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요"; mpDraw(); }
   else alert("🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요\n\n" + text);
 }
@@ -1204,22 +1267,9 @@ document.addEventListener("click", async e => {
   const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
                  nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
   if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
-  if (act === "report") {  // 이미 초안이 있으면: 새로 쓰기(지금 것은 _old 로) 또는 열기
-    b.disabled = true;
-    try {
-      const st = await (await fetch("/api/report-path?key=" + encodeURIComponent(key))).json();
-      if (st.error) throw new Error(st.error);
-      if (st.exists) {
-        if (confirm(`이미 초안 파일이 있습니다: ${st.name}\n\n[확인] 새로 쓰기 — 지금 파일은 _old 로 보관 (Claude 사용, 몇 분)\n[취소] 지금 파일 열기`))
-          await post("job/report", { key, force: true });
-        else await post("open-file", { path: st.path });
-      } else if (confirm("이 과제의 보고서 파일을 만들고 Claude 로 초안을 씁니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) {
-        await post("job/report", { key });
-      }
-    } catch (err) { alert(err.message); }
-    b.disabled = false;
-    return;
-  }
+  if (act === "report") { try { await showReport(key); } catch (err) { alert(err.message); } return; }
+  if (act === "repdraft" || act === "repfile" || act === "repchat") { b.disabled = true; await repAction(act); b.disabled = false; return; }
+  if (act === "repclose") { $("repPanel").innerHTML = $("matPanel").innerHTML = ""; REP = MP = null; return; }
   const call = { report: ["job/report", { key }], done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
                  start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];
   b.disabled = true;
