@@ -154,3 +154,17 @@ def test_open_file_scope(tmp_path, monkeypatch):
     for bad in (sibling, deep):  # 이름이 비슷한 옆 폴더, 다운로드의 하위 폴더는 안 됨
         with pytest.raises(ValueError):
             materials.open_file(bad)
+
+
+def test_ambiguous_pairs_become_suggestions(roots, conn):
+    a, b = (str((roots / "materials" / "organic_chemistry" / n).resolve()) for n in ("17강_배포용.pdf", "18강_배포용.pdf"))
+    cands = {}
+    items = [_item(1, "윤리 강의"), _item(2, "17강_배포용"), _item(3, "18강_배포용")]
+    assert links.find_pairs(items, [a, b], cands) == [] and cands == {"m1": [a, b]}
+    import json
+    db.set_meta(conn, "pair_candidates", json.dumps(cands))
+    db.sync_source(conn, "canvas", [{"key": "m1", "kind": "lecture", "course": "", "title": "윤리 강의",
+                                     "due": "2099-01-01T23:59:00+09:00", "earliest": None, "minutes": 50, "url": ""}])
+    assert [s["p"] for s in links.suggest(conn, "m1")] == [a, b]
+    links.add(conn, "m1", a)
+    assert [s["p"] for s in links.suggest(conn, "m1")] == [b]  # 연결한 건 추천에서 빠짐

@@ -3,6 +3,7 @@
 - 과제·퀴즈: 마감이 있는 것 (지난 7일 이내 마감 포함). 제출했으면 자동 완료 처리.
 - 강의: 온라인 수업의 이번 주·다음 주 강의 영상 (배포용 자료는 제외).
 """
+import json
 import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -26,10 +27,12 @@ def lecture_deadline(module_name, week, sem_start):
 
 
 pairs_found = []
+pair_candidates = {}  # 짝을 못 정한 강의 → 같은 주차 자료 후보 (📄 추천용)
 
 
 def collect():
     pairs_found.clear()
+    pair_candidates.clear()
     tt = load_timetable()
     minutes = tt["planner"]["minutes"]
     sem_start = date.fromisoformat(tt["semester_start"])
@@ -61,7 +64,7 @@ def collect():
         local_names = {links.norm_title(Path(f).stem) for f in local}
         for m in canvas.get(f"/courses/{c['id']}/modules", **{"include[]": "items"}):
             if local:  # 같은 주차의 강의 ↔ 자료 짝 (모든 주차, 이미 받은 파일 기준)
-                pairs_found.extend(links.find_pairs(m.get("items", []), local))
+                pairs_found.extend(links.find_pairs(m.get("items", []), local, pair_candidates))
             wk = re.match(r"(\d+)주차", m["name"])
             if not wk or not this_week <= int(wk.group(1)) <= this_week + 1:
                 continue
@@ -130,6 +133,7 @@ def sync(conn):
     items = collect()
     db.sync_source(conn, "canvas", items)
     n = links.save_pairs(conn, pairs_found)
+    db.set_meta(conn, "pair_candidates", json.dumps(pair_candidates, ensure_ascii=False))
     if n:
         db.log(conn, "pairs_added", None, count=n)
     for key in not_lectures:

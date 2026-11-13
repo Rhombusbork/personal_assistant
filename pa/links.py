@@ -7,6 +7,7 @@
   다운로드 폴더는 엔진의 30초 감시가 기억한 목록(RECENT_DOWNLOADS)만 쓴다 — 이 모듈이 Windows 폴더를 직접 열지 않는다.
 - 파일 내용은 읽지 않는다 (내용정리·보고서를 누를 때만 그 파일).
 """
+import json
 import os
 import re
 import time
@@ -112,9 +113,9 @@ def ls(root_name, rel=""):
     for e in sorted(folder.iterdir()) if folder.is_dir() else []:
         if _skip(e.name, c):
             continue
-        if e.is_dir():
-            n = sum(1 for x in e.rglob("*") if x.is_file() and x.suffix.lower() in r["ext"] and not _skip(x.name, c))
-            dirs.append({"name": e.name, "count": n})
+        if e.is_dir():  # 개수는 1분 보관하는 목록에서 센다 (폴더를 다시 훑지 않음)
+            prefix = str(e) + os.sep
+            dirs.append({"name": e.name, "count": sum(1 for x in index() if x["p"].startswith(prefix))})
         elif e.suffix.lower() in r["ext"]:
             st = e.stat()
             files.append({"name": e.name, "p": str(e), "r": root_name, "rel": str(e.relative_to(r["path"])),
@@ -218,9 +219,10 @@ def _core(title):
     return _norm(t)
 
 
-def find_pairs(module_items, local_files):
+def find_pairs(module_items, local_files, candidates=None):
     """한 주차(모듈)의 항목들 → [(강의 키, 자료 경로)].
-    자료 = 과목 폴더에 같은 이름의 파일이 있는 항목. 강의 하나에 자료 후보가 하나로 정해질 때만 짝 (아니면 추천으로만)."""
+    자료 = 과목 폴더에 같은 이름의 파일이 있는 항목. 강의 하나에 자료 후보가 하나로 정해질 때만 짝.
+    정하지 못하면 candidates[강의 키] = [후보 경로…] 에 남긴다 (📄 추천으로만 — 연결은 사용자가)."""
     by_norm = {}
     for f in local_files:
         by_norm.setdefault(_norm(Path(f).stem), f)
@@ -243,6 +245,8 @@ def find_pairs(module_items, local_files):
                      or (lclues and lclues & materials.clues(m["title"]))]
         if len(cands) == 1:
             pairs.append((f"m{lec['id']}", cands[0][1]))
+        elif mats and candidates is not None:
+            candidates[f"m{lec['id']}"] = [f for _, f in (cands or mats)]
     return pairs
 
 
@@ -265,7 +269,12 @@ def suggest(conn, key, limit=8):
     if not row:
         return []
     have = {x["p"] for x in get(conn, key)}
-    out, seen = [], set(have)
+    removed = {r["path"] for r in conn.execute("SELECT path FROM links WHERE key = ? AND origin = 'removed'", (key,))}
+    out, seen = [], have | removed
+    for f in json.loads(db.get_meta(conn, "pair_candidates") or "{}").get(key, []):  # 같은 주차 자료가 여럿이라 짝을 못 정한 것
+        if f not in seen and Path(f).exists():
+            seen.add(f)
+            out.append({"p": f, "name": Path(f).name, "why": "같은 주차 자료 (강의 플랫폼)"})
     dirs = materials.course_dirs(row["course"])
     if dirs:
         for label, folder in (("번호가 맞는 자료", dirs[0]), ("번호가 맞는 내 노트", dirs[1])):
