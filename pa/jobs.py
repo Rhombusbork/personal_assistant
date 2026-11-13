@@ -257,7 +257,7 @@ def summary_job(conn, job):
     """materials 의 PDF → 같은 과목 폴더의 요약/<이름>_요약.md (내 노트 notes/ 와 섞지 않는다)."""
     pdf = Path(job["key"]).resolve()
     root = materials._cfg()["root"].resolve() / "materials"
-    if not str(pdf).startswith(str(root)) or not pdf.exists():
+    if root not in pdf.parents or not pdf.exists():
         raise ValueError("materials 안의 파일만 요약합니다")
     if pdf.stat().st_size > MAX_SUMMARY_BYTES:
         raise ValueError("파일이 너무 큽니다 (교과서 전체 등) — 필요한 장만 따로 저장해서 요약하세요")

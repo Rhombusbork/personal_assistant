@@ -115,3 +115,42 @@ def test_find_pairs_picks_by_number_when_several():
     items = [_item(1, "9강 강의영상"), _item(2, "10강 강의영상"),
              _item(3, "[강의자료] 9강"), _item(4, "[강의자료] 10강")]
     assert sorted(links.find_pairs(items, local)) == [("m1", "/m/[강의자료] 9강.pdf"), ("m2", "/m/[강의자료] 10강.pdf")]
+
+
+def test_download_is_moved_to_course_folder_then_linked(roots, conn, monkeypatch):
+    from pa import materials
+    dl = roots / "Downloads"
+    dl.mkdir()
+    f = dl / "Ch26 handout.pdf"
+    f.write_bytes(b"x")
+    course_dir = roots / "materials" / "organic_chemistry"
+    monkeypatch.setattr(materials, "downloads_dir", lambda: dl)
+    monkeypatch.setattr(materials, "course_dirs", lambda c: (course_dir, roots / "notes") if c else None)
+    links.update_recent_downloads([(f, f.stat())])
+    db.sync_source(conn, "canvas", [{"key": "m9", "kind": "lecture", "course": "유기약화학Ⅱ", "title": "Ch26",
+                                     "due": "2099-01-01T23:59:00+09:00", "earliest": None, "minutes": 50, "url": ""}])
+    r = links.add_download(conn, "m9", str(f))
+    assert r["ok"] and not f.exists() and (course_dir / "Ch26 handout.pdf").exists()
+    assert [x["name"] for x in links.get(conn, "m9")] == ["Ch26 handout.pdf"]
+    assert links.recent_downloads() == []  # 옮긴 파일은 바로 목록에서 빠짐
+    g = dl / "x.pdf"
+    g.write_bytes(b"x")
+    assert links.add_download(conn, "없는키", str(g))["needCourse"]  # 과목을 모르면 옮기지 않고 묻는다
+    assert g.exists()
+
+
+def test_open_file_scope(tmp_path, monkeypatch):
+    from pa import materials
+    root, dl = tmp_path / "study", tmp_path / "Downloads"
+    for d in (root, tmp_path / "study_other", dl / "sub"):
+        d.mkdir(parents=True)
+    ok, sibling, top, deep = root / "a.pdf", tmp_path / "study_other" / "b.pdf", dl / "c.pdf", dl / "sub" / "d.pdf"
+    for x in (ok, sibling, top, deep):
+        x.write_bytes(b"x")
+    monkeypatch.setattr(materials, "allowed_roots", lambda: [root.resolve()])
+    monkeypatch.setattr(materials, "downloads_dir", lambda: dl.resolve())
+    monkeypatch.setattr(materials, "_vscode_open", lambda p: True)
+    assert materials.open_file(ok) == "vscode" and materials.open_file(top) == "vscode"
+    for bad in (sibling, deep):  # 이름이 비슷한 옆 폴더, 다운로드의 하위 폴더는 안 됨
+        with pytest.raises(ValueError):
+            materials.open_file(bad)

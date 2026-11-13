@@ -10,6 +10,10 @@
   bin/pa done <키>            완료 표시
   bin/pa ignore <키>          계속 제외 / unignore 로 되돌리기
   bin/pa time <키> <분>       예상 소요 시간 조정
+  bin/pa task <키>            할 일 하나: 마감·주소·Canvas 과제 설명·보고서 파일·연결된 자료 (채팅 작업용)
+  bin/pa notices [--all]      새 공지 (읽지 않은 것; --all 은 최근 2주 전부) — 본문 앞부분과 🤖 요약
+  bin/pa links [키]           연결된 자료 (키 없이: 자료가 연결된 할 일 전부)
+  bin/pa link <키> <파일>...  자료 연결 (config/materials.yaml 범위 안, 최대 max_links) / unlink 로 빼기
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
   bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
   bin/pa google-login         Google Calendar 다시 로그인 (Windows 브라우저가 열림)
@@ -98,6 +102,72 @@ def cmd_status(status):
     return run
 
 
+def cmd_task(conn, args):
+    from pa import jobs, links
+    row = conn.execute("SELECT * FROM tasks WHERE key = ?", (args.key,)).fetchone()
+    if not row:
+        sys.exit("할 일을 찾지 못함 — bin/pa list 의 맨 앞이 키")
+    t = dict(row)
+    print(f"{t['title']}\n  종류 {KIND_LABEL.get(t['kind'], t['kind'])} · 과목 {t['course'] or '-'} · 상태 {t['status']}"
+          f" · 마감 {t['due'] or '없음'}\n  {t['url'] or ''}".rstrip())
+    if t["kind"] in ("assignment", "todo") and t["due"]:
+        path = jobs.report_path(t)
+        print(f"보고서 파일: {path}" + (" (있음)" if path.exists() else " (아직 없음)"))
+    if t["kind"] == "assignment":
+        try:
+            print("\n[Canvas 과제 설명]\n" + (jobs.assignment_text(t) or "(설명 없음)"))
+        except Exception as e:
+            print(f"\n[Canvas 과제 설명] 읽지 못함: {e}")
+    files = links.get(conn, args.key)
+    print("\n[연결된 자료]" + ("" if files else " 없음 — 📄 자료 창에서 고르거나 bin/pa link"))
+    for x in files:
+        print(("  ⚠️ 파일 없음 " if not x["exists"] else "  ") + x["p"])
+
+
+def cmd_notices(conn, args):
+    from datetime import timedelta
+
+    from pa.model import short_course
+    where, params = ("posted_at >= ?", ((plan.now() - timedelta(days=14)).isoformat(),)) if args.all else ("status = 'new'", ())
+    rows = conn.execute(f"SELECT * FROM notices WHERE {where} ORDER BY posted_at DESC", params).fetchall()
+    for n in rows:
+        print(f"[{n['posted_at'][:10]}] {short_course(n['course'])} · {n['title']}" + ("" if n["status"] == "new" else " (읽음)"))
+        if n["summary"]:
+            print(f"  🤖 {n['summary']}")
+        print("  " + " ".join(n["text"].split())[:300])
+    if not rows:
+        print("새 공지 없음" if not args.all else "최근 2주 공지 없음")
+
+
+def cmd_links(conn, args):
+    from pa import links
+    if args.key:
+        rows = links.get(conn, args.key)
+        for x in rows:
+            print(("⚠️ 파일 없음  " if not x["exists"] else "") + x["p"] + ("  (강의 짝)" if x["origin"] == "pair" else ""))
+        if not rows:
+            print("연결된 자료 없음")
+        return
+    titles = {r["key"]: r["title"] for r in conn.execute("SELECT key, title FROM tasks WHERE status = 'open'")}
+    for key, names in sorted(links.summary_map(conn, set(titles)).items()):
+        print(f"{key}  {titles[key]}  📎{len(names)}: {', '.join(names)}")
+
+
+def cmd_link(conn, args):
+    from pathlib import Path
+
+    from pa import links
+    for f in args.files:
+        try:
+            if args.cmd == "link":
+                links.add(conn, args.key, f)
+            else:
+                links.remove(conn, args.key, str(Path(f).resolve()))
+        except ValueError as e:
+            sys.exit(f"{f}: {e}")
+        print(("연결: " if args.cmd == "link" else "뺌: ") + f)
+
+
 def cmd_time(conn, args):
     conn.execute("UPDATE tasks SET minutes_override = ? WHERE key = ?", (args.minutes, args.key))
     conn.commit()
@@ -139,6 +209,20 @@ def main():
     sp.add_argument("minutes", type=int)
     sp.set_defaults(fn=cmd_time)
     sub.add_parser("lectures", help="이번 주 강의 목록·열기")
+    sp = sub.add_parser("notices")
+    sp.add_argument("--all", action="store_true")
+    sp.set_defaults(fn=cmd_notices)
+    sp = sub.add_parser("task")
+    sp.add_argument("key")
+    sp.set_defaults(fn=cmd_task)
+    sp = sub.add_parser("links")
+    sp.add_argument("key", nargs="?")
+    sp.set_defaults(fn=cmd_links)
+    for name in ("link", "unlink"):
+        sp = sub.add_parser(name)
+        sp.add_argument("key")
+        sp.add_argument("files", nargs="+")
+        sp.set_defaults(fn=cmd_link)
 
     args = p.parse_args()
     conn = db.connect()

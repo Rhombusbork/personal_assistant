@@ -33,7 +33,9 @@
 - **현황은 `TODAY.md` 를 읽는다** (감시기가 자동 갱신). 오래됐으면 `bin/pa run` (Canvas 까지면 `--full`).
 - **할 일 추가·완료·제외는 `inbox.md` 를 고친다** (문법은 docs/usage.md). 저장하면 감시기가 반영한다.
   감시기가 꺼져 있을 수 있으니 고친 뒤 `bin/pa run` 을 실행한다.
-- `bin/pa list` 남은 항목과 키 / `bin/pa lectures [과목] [--open N]` 강의 열기
+- `bin/pa list` 남은 항목과 키 / `bin/pa task <키>` 한 항목의 마감·Canvas 설명·보고서 파일·연결된 자료
+- `bin/pa links [키]` 연결된 자료 (`link`/`unlink <키> <파일>` 로 바꾸기) / `bin/pa notices [--all]` 공지
+- `bin/pa lectures [과목] [--open N]` 강의 열기 / `bin/pa google-login` Google 캘린더 다시 로그인 (사용자 요청 때만)
 - 데이터: `data/pa.db` (SQLite, events 표가 자동 기록)
 - 대시보드 http://localhost:8765 — 엔진(`bin/pa watch`) 안의 서버. 보고서 초안·자료 요약·공지 정리는
   대시보드 버튼 → 에이전트 작업(`pa/jobs.py`, `claude -p`). 엔진은 그 밖에는 Claude 를 쓰지 않는다
@@ -41,6 +43,20 @@
   강의·자료 **페이지를 자동으로 열지 않는다** (열람·출석 기록이 남을 수 있음). 교수자가 지운 자료는 받지 않는다.
   **비서가 스스로 다시 로그인하지 않는다** — 비서용 로그인이 평소 브라우저의 강의 콘텐츠 로그인을 끊은 일이 있음.
   다시 로그인은 사용자가 대시보드 버튼이나 `bin/pa browser login` 을 직접 할 때만
+
+## 무엇을 어디서 (작업 지침)
+
+| 요청 | 하는 곳 · 스킬 | 참고 |
+|---|---|---|
+| 오늘 뭐 해 · 할 일 추가/완료/제외 · 시험 날짜 · 공지 | 채팅 `today` | TODAY.md, inbox.md, `bin/pa notices` |
+| 강의 공부 · 질문 · 기록 · 자료 요약 | 채팅 `study` | ~/study_system/CLAUDE.md, 연결된 자료, materials/<과목>/요약/ |
+| 보고서·과제 초안 | 대시보드 ✍ (초안) → 채팅 `assignment` (다듬기) | ~/report/CLAUDE.md, `bin/pa task <키>` |
+| 퀴즈 만들기 | 대시보드 🧩 로 요청 복사 → 채팅 `quiz` | 퀴즈 프로젝트 CLAUDE.md·QUIZ_PLANNING_METHOD.md·과목 PLAN |
+| 자료 고르기 (할 일마다) | 대시보드 📄 자료 창 (Claude 안 씀) | config/materials.yaml, docs/materials-linking-plan.md |
+| 규칙 바꾸기 (요일·시간·알림·범위·과목) | 채팅 `rules` — 확인받고 설정 파일만 고침 | config/*.yaml |
+| 남은 개발 작업 | docs/TODO.md | |
+
+- 프로그램이 스스로 정하지 못한 것(⚠️ 확인 필요)은 사용자에게 물어 정한다. 규칙은 대화로만 바꾼다.
 
 ## git
 
