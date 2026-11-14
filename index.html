@@ -1,0 +1,1303 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비서 대시보드</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#2563eb">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #6b7385; --line: #e3e6ec; --field: #f1f3f6;
+    --lecture: #3b82f6; --quiz: #8b5cf6; --assignment: #f59e0b; --todo: #10b981; --review: #ec4899; --busy: #9aa3b2;
+    --danger: #ef4444; --warn: #f97316; --accent: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171d; --card: #1d2129; --text: #e6e9ef; --muted: #98a0b0; --line: #2c323d; --field: #262b35;
+            --busy: #4b5363; --accent: #60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 16px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 12px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
+  .pill.on { background: color-mix(in srgb, var(--todo) 20%, var(--card)); color: var(--todo); }
+  .sum { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .sum .pill { font-size: 12px; padding: 2px 10px; }
+  .sum .hot { background: color-mix(in srgb, var(--warn) 20%, var(--card)); color: var(--warn); }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; margin-top: 14px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  .warn { background: color-mix(in srgb, var(--warn) 12%, var(--card)); border-color: var(--warn); margin-top: 12px; }
+  .warn ul { margin: 0; padding-left: 18px; }
+
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], input[type=date], input[type=time], select {
+    background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; min-width: 0; }
+  button { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.chip { font-size: 12px; padding: 2px 9px; border-radius: 99px; }
+
+  /* 빠른 입력 */
+  .quick { display: flex; gap: 8px; align-items: center; }
+  .quick input { flex: 1; font-size: 15px; padding: 9px 12px; }
+  .quick kbd { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  details.more { margin-top: 8px; }
+  details.more summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  form.full { display: grid; gap: 8px; margin-top: 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row > label { font-size: 12px; color: var(--muted); min-width: 40px; }
+  .days { display: flex; gap: 4px; }
+  .days input { display: none; }
+  .days span { display: inline-block; width: 28px; text-align: center; padding: 2px 0; border-radius: 6px;
+               border: 1px solid var(--line); background: var(--field); cursor: pointer; font-size: 12px; }
+  .days input:checked + span { background: var(--todo); border-color: var(--todo); color: #fff; }
+  .msg { font-size: 12px; color: var(--muted); }
+  .msg.err { color: var(--danger); }
+  .hint { font-size: 12px; color: var(--muted); font-weight: normal; }
+
+  /* 타이머 */
+  .timer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px;
+           border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--card)); border: 1px solid var(--accent); }
+  .timer b { font-variant-numeric: tabular-nums; font-size: 18px; }
+
+  /* 보기 전환 */
+  .tabs { display: inline-flex; background: var(--field); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+  .tabs button { border: 0; background: none; padding: 3px 12px; font-size: 13px; }
+  .tabs button.on { background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+
+  /* 지금 할 일 */
+  .now-card { border: 2px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .now-card .lbl { font-size: 12px; color: var(--accent); font-weight: 700; }
+  .now-card .ttl { font-size: 17px; font-weight: 700; margin: 2px 0; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .acts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .now-card .acts { margin-top: 8px; }
+  .now-card .acts button { padding: 5px 12px; }
+
+  /* 오늘 타임라인 */
+  .tl { display: grid; gap: 2px; }
+  .tl-row { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px;
+            border-radius: 8px; border-left: 4px solid transparent; }
+  .tl-row:hover { background: var(--field); }
+  .tl-row .t { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+  .tl-row .what { min-width: 0; }
+  .tl-row .what .meta { display: block; }
+  .tl-row.busy .what { color: var(--muted); }
+  .tl-row.past { opacity: .45; }
+  .tl-row.cur { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+  .tl-row .acts { opacity: .5; }
+  .tl-row:hover .acts, .tl-row.cur .acts { opacity: 1; }
+  .gap { font-size: 12px; color: var(--muted); padding: 2px 8px 2px 110px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
+  .tl-foot { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .done-list { margin-top: 6px; }
+  .done-list div { text-decoration: line-through; opacity: .6; font-size: 13px; }
+
+  /* 주간 보드 */
+  .board-wrap { overflow-x: auto; }
+  .board { display: grid; grid-template-columns: 34px repeat(7, minmax(78px, 1fr)); min-width: 600px; }
+  .board .head { text-align: center; font-weight: 600; padding: 4px 0 6px; font-size: 13px; }
+  .board .head.today { color: var(--accent); }
+  .board .head.over { color: var(--warn); }
+  .axis, .day { position: relative; border-top: 1px solid var(--line); }
+  .day { border-left: 1px solid var(--line); }
+  .axis div { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); }
+  .hour { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
+  .blk { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 2px 5px; font-size: 11px; line-height: 1.3;
+         overflow: hidden; color: #fff; border-left: 3px solid rgba(0,0,0,.25); }
+  .blk[data-sel] { cursor: pointer; }
+  .blk.sel { outline: 2px solid var(--text); }
+  .blk.busy { background: var(--busy); }
+  .blk.past { opacity: .45; }
+  .blk small { opacity: .85; display: block; }
+  .nowline { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 2; }
+  .detail { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* 오른쪽 목록 */
+  .due-day { margin: 10px 0 4px; font-weight: 600; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--line); color: var(--text); }
+  .badge.d0 { background: var(--danger); color: #fff; } .badge.d1 { background: var(--warn); color: #fff; }
+  .badge.late { background: var(--text); color: var(--card); }
+  .item { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; }
+  .item .txt { flex: 1; min-width: 0; }
+  .item .acts { opacity: .45; flex: none; }
+  .item:hover .acts { opacity: 1; }
+  .item .acts button { padding: 0 6px; font-size: 12px; line-height: 20px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+  .course { color: var(--muted); }
+  form.inline { display: flex; gap: 6px; margin-top: 10px; }
+  form.inline input { flex: 1; }
+
+  /* 통계 */
+  details.stats { margin-top: 16px; }
+  details.stats > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 110px; position: relative; padding-top: 8px; }
+  .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+  .bar i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--lecture); }
+  .bar span { font-size: 10px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+  .bar.over i { background: var(--danger); }
+  .cap { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--warn); }
+  .prog { margin: 8px 0; }
+  .prog .r { display: flex; justify-content: space-between; font-size: 13px; }
+  .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
+  .prog .fill { height: 100%; background: var(--todo); }
+  .empty { color: var(--muted); font-size: 13px; }
+  a.btnlink { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 4px 10px; color: inherit; text-decoration: none; font-size: 13px; white-space: nowrap; }
+  .wk-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .wk-nav b { font-size: 16px; }
+  .strip { display: flex; gap: 3px; margin-bottom: 10px; flex-wrap: wrap; }
+  .sw { position: relative; min-width: 30px; padding: 3px 0 2px; font-size: 12px; border-radius: 6px;
+        background: color-mix(in srgb, var(--warn) calc(var(--lvl) * 70%), var(--field)); }
+  .sw.past { opacity: .45; }
+  .sw.cur { outline: 2px solid var(--accent); }
+  .sw.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .sw i { display: block; font-style: normal; font-size: 9px; color: var(--danger); line-height: 1; }
+  .sw.sel i { color: #fff; }
+  .head.pastday, .day.pastday { opacity: .55; }
+  .wl-h { font-size: 14px; margin: 14px 0 4px; }
+  .wl-g { font-weight: 600; font-size: 13px; margin: 10px 0 2px; }
+  .wl { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px dashed var(--line); }
+  .wl .txt { min-width: 0; }
+  .wl .meta { display: block; }
+  .wl.done { opacity: .5; }
+  .wl.done .txt { text-decoration: line-through; }
+  @media (max-width: 700px) { .wl { grid-template-columns: 10px 1fr; } .wl .acts { grid-column: 2; } }
+  .term { display: grid; gap: 2px; }
+  .trow { display: grid; grid-template-columns: 74px 70px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 8px; font-size: 12px; }
+  .trow.cur { background: color-mix(in srgb, var(--accent) 10%, var(--card)); outline: 1px solid var(--accent); }
+  .trow.past { opacity: .5; }
+  .tw small { color: var(--muted); }
+  .tbar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .tbar i { display: block; height: 100%; background: var(--warn); }
+  .titems { display: flex; flex-wrap: wrap; gap: 4px; }
+  .titem { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; }
+  .titem.done { opacity: .5; text-decoration: line-through; }
+  .mat { margin-top: 12px; border: 1px solid var(--accent); }
+  .ritual { margin-top: 12px; border: 1px solid var(--todo); background: color-mix(in srgb, var(--todo) 6%, var(--card)); }
+  .ritual h3 { font-size: 13px; margin: 10px 0 4px; color: var(--muted); }
+  .ritual ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .mat .item button { font-size: 12px; }
+  .lchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .lchip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 99px; background: var(--field); font-size: 12px; max-width: 100%; }
+  .lchip button { border: 0; background: none; padding: 2px 7px; font-size: 12px; border-radius: 99px; overflow: hidden; text-overflow: ellipsis; }
+  .lchip button:hover { background: var(--line); }
+  .lchip.miss { border-color: var(--warn); color: var(--warn); padding-left: 8px; }
+  .lchip i { font-style: normal; font-size: 11px; margin-left: 4px; }
+  .msearch { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .msearch input[type=text] { flex: 1 1 260px; font-size: 14px; }
+  .mres { margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; max-height: 340px; overflow: auto; }
+  .mres:empty { display: none; }
+  .mrow { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px dashed var(--line); font-size: 13px; cursor: pointer; }
+  .mrow:last-child { border-bottom: 0; }
+  .mrow.on, .mrow:hover { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+  .mrow .p { min-width: 0; overflow-wrap: anywhere; }
+  .mrow .p b { color: var(--accent); }
+  .mrow small { color: var(--muted); margin-left: 4px; }
+  .mrow .acts { flex: none; }
+  .mrow .acts button { padding: 0 7px; font-size: 12px; line-height: 20px; }
+  .mres > .chip { margin: 6px 8px; }
+  .mbrowse { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; }
+  .crumb { font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+  button.link { border: 0; background: none; padding: 0 2px; color: var(--accent); }
+  button.link:hover { text-decoration: underline; }
+  .rep textarea { width: 100%; min-height: 96px; resize: vertical; font: inherit; background: var(--field); border: 1px solid var(--line);
+                  border-radius: 8px; padding: 8px 10px; color: inherit; }
+  .rep .desc { white-space: pre-wrap; font-size: 12px; color: var(--muted); max-height: 180px; overflow: auto; margin: 4px 0 0; }
+  .rep .ways { display: grid; gap: 6px; margin-top: 8px; }
+  .rep .ways button { text-align: left; white-space: normal; padding: 6px 10px; }
+  .rep .ways small { display: block; color: var(--muted); font-weight: normal; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10; max-width: min(640px, calc(100vw - 32px));
+           background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 24px #0003;
+           display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+  .toast[hidden] { display: none; }
+  .clip { font-size: 11px; color: var(--muted); margin-left: 4px; cursor: pointer; white-space: nowrap; }
+  .clip:hover { color: var(--accent); }
+  .mat kbd, .mat code { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .dl select { font-size: 12px; padding: 1px 4px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="clock">대시보드</h1>
+    <span id="live" class="pill">읽는 중…</span>
+    <span id="status" class="sub"></span>
+    <button id="mobSet" class="chip" style="display:none" title="휴대폰 설정 (비밀번호·GitHub 토큰)">⚙</button>
+    <button id="syncBtn" class="chip" title="Canvas 까지 지금 확인">⟳ 동기화</button>
+    <div class="sum" id="sum"></div>
+  </header>
+
+  <div class="card" id="inputCard">
+    <form class="quick" id="quickForm" autocomplete="off">
+      <input id="quickInput" type="text" placeholder="무엇을 할까요?  예) 린스타트업 발표 @금 18시 ~2h #창업   ·   하고 싶은 일은 날짜 없이">
+      <button class="primary" type="submit">추가</button><kbd>/</kbd>
+    </form>
+    <span id="quickMsg" class="msg"></span>
+    <details class="more"><summary>자세히 입력 (날짜 고르기·반복)</summary>
+      <form class="full" id="addForm" autocomplete="off">
+        <div class="row"><input name="title" type="text" placeholder="제목" required style="flex:1 1 240px"></div>
+        <div class="row">
+          <label>마감</label><input name="date" type="date"><input name="time" type="time" title="몇 시까지 (비우면 23:59)"><span class="hint">까지</span>
+          <button type="button" class="chip" data-day="0">오늘</button><button type="button" class="chip" data-day="1">내일</button>
+          <button type="button" class="chip" data-day="fri">이번 주 금</button><button type="button" class="chip" data-day="clear">기한 없음</button>
+        </div>
+        <div class="row">
+          <label>예상</label>
+          <select name="minutes"><option value="30">30분</option><option value="60" selected>1시간</option><option value="90">1시간 30분</option>
+            <option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option></select>
+          <label>분류</label><input name="course" type="text" list="courses" placeholder="과목·분류 (선택)" style="flex:1 1 140px">
+          <datalist id="courses"></datalist>
+        </div>
+        <div class="row"><label>반복</label><div class="days" id="days"></div><span class="hint">매주 고른 요일에</span></div>
+        <div class="row"><button class="primary" type="submit">추가</button><span id="addMsg" class="msg"></span></div>
+      </form>
+    </details>
+  </div>
+
+  <div id="ritual"></div>
+  <div id="repPanel"></div>
+  <div id="matPanel"></div>
+  <div id="timer"></div>
+  <div id="warn"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">주차별</button></span>
+          <span class="hint" id="viewHint"></span></h2>
+      <div id="view"></div>
+    </div>
+    <div class="stack">
+      <div id="grades"></div>
+      <div id="exams"></div>
+      <div id="notices"></div>
+      <div id="jobs"></div>
+      <div id="downloads"></div>
+      <div class="card"><h2>⏰ 다가오는 마감</h2><div id="dues"></div></div>
+      <div class="card"><h2>💭 하고 싶은 일 <span class="hint">기한 없음</span></h2><div id="someday"></div>
+        <form class="inline" id="somedayForm" autocomplete="off"><input type="text" name="title" placeholder="하고 싶은 일 추가" required><button type="submit">추가</button></form>
+      </div>
+      <div id="excluded"></div>
+    </div>
+  </div>
+
+  <details class="stats" id="statsBox"><summary>📊 통계 (학습량 · 과목별 진행 · 완료 추이 · 실제 걸린 시간)</summary>
+    <div class="stats-grid">
+      <div class="card"><h2>일별 학습량 <span class="hint">계획, 점선 = 하루 한도</span></h2><div id="load"></div></div>
+      <div class="card"><h2>과목별 진행 <span class="hint">추적한 항목 중 완료</span></h2><div id="prog"></div></div>
+      <div class="card"><h2>완료 추이 <span class="hint">14일</span></h2><div id="trend"></div></div>
+      <div class="card"><h2>오늘 실제로 한 시간 <span class="hint">⏱ 기록</span></h2><div id="sessions"></div></div>
+      <div class="card"><h2>예상 시간 보정 <span class="hint">⏱ 기록 3번 이상부터</span></h2><div id="calib"></div></div>
+      <div class="card"><h2>퀴즈 복습 <span class="hint">퀴즈 앱 '기록 내보내기' 기준</span></h2><div id="quizStat"></div></div>
+      <div class="card"><h2>🗓 이번 주 돌아보기 <span class="hint">월요일부터 · 일요일 저녁 마무리에도</span></h2><div id="weekrev"></div></div>
+    </div>
+  </details>
+</main>
+<div id="toast" class="toast" hidden></div>
+<script src="data.js"></script>
+<script>
+// 비서 대시보드. 감시기 서버(localhost:8765)로 열면 30초마다 최신 데이터 + 입력 가능.
+// 파일로 열면 data.js(마지막 결과)로 보기만. '지금'은 항상 이 컴퓨터의 시계.
+const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일", review: "퀴즈 복습" };
+const WD = "일월화수목금토";
+let D = window.PA_DATA || null, LIVE = false, selKey = null;
+let view = "today";
+try { view = localStorage.getItem("pa.view") || "today"; } catch {}
+if (view !== "today") view = "week";  // 예전 '학기' 탭은 주차별로 합쳐짐
+let wkIdx = null;  // 주차별에서 보고 있는 주 번호 (null = 이번 주)
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const color = k => `var(--${k})`;
+const pad = n => String(n).padStart(2, "0");
+const ymdOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const dt = s => new Date(s);
+const ymd = iso => ymdOf(dt(iso));
+const hm = iso => { const d = dt(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const mins = iso => { const d = dt(iso); return d.getHours() * 60 + d.getMinutes(); };
+const addDays = (y, n) => { const d = new Date(y + "T12:00:00"); d.setDate(d.getDate() + n); return ymdOf(d); };
+const label = y => { const d = new Date(y + "T12:00:00"); return `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`; };
+const between = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
+const tick = (d, all) => all.indexOf(d) % 2 ? "&nbsp;" : `${+d.slice(5, 7)}/${+d.slice(8)}`;
+const stamp = iso => iso ? `${label(ymd(iso))} ${hm(iso)}` : "-";
+const dur = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? " " + (m % 60) + "분" : ""}` : `${m}분`;
+const ddayText = (due, today) => { const n = between(today, ymd(due)); return n < 0 ? "지남" : n === 0 ? "오늘" : "D-" + n; };
+const taskOf = k => { k = String(k).split("#")[0]; return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || null; };
+
+// 이 탭의 id — 30초마다 '열려 있음' 신호를 겸한다 (VSCode 를 다시 열 때 대시보드를 중복으로 열지 않게)
+const VIEWER = Math.random().toString(36).slice(2, 10);
+// ---- 휴대폰 모드 (GitHub Pages): 비밀번호로 잠긴 data.enc.json 을 풀어서 보여 주고,
+//      입력은 GitHub 의 phone-inbox 파일에 (잠가서) 적는다 → PC 엔진이 몇 분 안에 가져가 반영.
+const MOB = location.protocol.startsWith("http") && !["localhost", "127.0.0.1"].includes(location.hostname);
+const ls = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+             set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const b64e = u => { let s = ""; for (const x of u) s += String.fromCharCode(x); return btoa(s); };
+const keyCache = {};
+async function aesKey(pw, saltB64, iter) {
+  const id = saltB64 + iter + pw;
+  if (keyCache[id]) return keyCache[id];
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return keyCache[id] = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64d(saltB64), iterations: iter, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function unlock(box, pw) {
+  const key = await aesKey(pw, box.salt, box.iter);
+  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(box.iv) }, key, b64d(box.ct))));
+}
+async function lock(obj, pw) {
+  const salt = b64e(crypto.getRandomValues(new Uint8Array(16))), iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await aesKey(pw, salt, 200000);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(obj))));
+  return { v: 1, iter: 200000, salt, iv: b64e(iv), ct: b64e(ct), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+}
+async function loadMobile() {
+  const pw = ls.get("pa.pw");
+  if (!pw) return askPassword();
+  try {
+    const box = await (await fetch("data.enc.json?t=" + Date.now(), { cache: "no-store" })).json();
+    D = await unlock(box, pw);
+  } catch (e) { ls.set("pa.pw", null); return askPassword("비밀번호가 틀렸거나 데이터를 읽지 못했습니다."); }
+  const pend = JSON.parse(ls.get("pa.pending") || "[]").filter(x => x.at > Date.parse(D.generated));  // 아직 PC 가 반영 안 한 입력
+  ls.set("pa.pending", JSON.stringify(pend));
+}
+function askPassword(msg) {
+  $("view").innerHTML = `<form id="pwForm" class="row" style="padding:20px 0"><b>🔒 비밀번호</b>
+    <input type="password" id="pwIn" autocomplete="current-password" style="flex:1"><button class="primary">열기</button>
+    ${msg ? `<span class="msg err" style="flex-basis:100%">${esc(msg)}</span>` : ""}</form>`;
+  $("pwForm").onsubmit = e => { e.preventDefault(); ls.set("pa.pw", $("pwIn").value); load(); };
+}
+async function phonePost(action, body) {
+  if (action === "open-quiz") { window.open(D.quiz.url, "_blank"); return {}; }
+  const toOp = { quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
+                 ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), keep: b => ({ op: "keep", key: b.key }), "exam-dismiss": b => ({ op: "exam-dismiss", id: b.id }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }) }[action];
+  if (!toOp) throw new Error("이 기능은 PC 대시보드에서만 됩니다");
+  const pw = ls.get("pa.pw");
+  if (!pw) { location.reload(); throw new Error("비밀번호를 먼저 입력해 주세요"); }  // 비밀번호 없이 잠그면 PC 가 못 푼다
+  const tok = ls.get("pa.ghtoken");
+  if (!tok) { mobileSettings(); throw new Error("GitHub 토큰을 먼저 넣어 주세요 (⚙)"); }
+  const m = D.mobile, api = `https://api.github.com/repos/${m.repo}/contents/${m.inboxFile}`;
+  const hdr = { Authorization: "Bearer " + tok, Accept: "application/vnd.github+json" };
+  const box = await lock(toOp(body || {}), pw);
+  await unlock(box, pw);  // 스스로 풀어 보기 — 잠금이 잘못됐으면 여기서 멈춤
+  for (let i = 0; i < 3; i++) {  // 다른 입력과 겹치면 다시 시도
+    const r = await fetch(`${api}?ref=${m.inboxBranch}&t=${Date.now()}`, { headers: hdr, cache: "no-store" });
+    if (!r.ok) throw new Error("GitHub 읽기 실패 (" + r.status + ") — 토큰 권한 확인 (⚙)");
+    const j = await r.json();
+    const list = JSON.parse(new TextDecoder().decode(b64d(j.content.replace(/\n/g, ""))) || "[]");
+    list.push(box);
+    const w = await fetch(api, { method: "PUT", headers: hdr, body: JSON.stringify({ message: "phone input", branch: m.inboxBranch, sha: j.sha,
+      content: b64e(new TextEncoder().encode(JSON.stringify(list))) }) });
+    if (w.ok) {
+      const pend = JSON.parse(ls.get("pa.pending") || "[]"); pend.push({ at: Date.now(), op: toOp(body || {}) });
+      ls.set("pa.pending", JSON.stringify(pend)); render();
+      return { ok: true, message: "휴대폰 입력 저장 — PC 가 켜져 있으면 몇 분 안에 반영됩니다" };
+    }
+    if (w.status !== 409 && w.status !== 422) throw new Error("GitHub 저장 실패 (" + w.status + ")");
+  }
+  throw new Error("저장이 겹쳐 실패했습니다. 다시 눌러 주세요");
+}
+function mobileSettings() {
+  const tok = prompt("GitHub 토큰 (personal_assistant 저장소의 Contents 읽기·쓰기 권한). 비우면 그대로 둡니다.", "");
+  if (tok) ls.set("pa.ghtoken", tok.trim());
+  if (confirm("비밀번호도 다시 입력할까요?")) { ls.set("pa.pw", null); location.reload(); }  // 화면을 비우고 다시
+}
+function mobileActs(t, small) {
+  const k = esc(t.key), b = [];
+  const name = t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업" : t.kind === "review" ? "▶ 퀴즈" : "▶ 열기";
+  if (!small && t.url && t.kind !== "todo") b.push(`<a class="btnlink" href="${esc(t.url)}" target="_blank" rel="noopener">${name}</a>`);
+  b.push(`<button data-act="done" data-key="${k}">✓</button>`);
+  b.push(t.source === "inbox" ? `<button data-act="remove" data-key="${k}" title="삭제">🗑</button>` : `<button data-act="ignore" data-key="${k}" title="계속 제외">✕</button>`);
+  return `<span class="acts" style="opacity:1">${b.join("")}</span>`;
+}
+
+async function load() {
+  if (MOB) { await loadMobile(); if (D) render(); return; }
+  try { const r = await fetch("/api/data?v=" + VIEWER, { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
+  catch { LIVE = false; }
+  render();
+}
+async function api(action, body) {  // 엔진에 요청만 (화면 다시 읽기 없음)
+  const r = await fetch("/api/" + action, { method: "POST", headers: { "Content-Type": "application/json", "X-PA": "1" }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "실패");
+  return j;
+}
+async function post(action, body) {
+  if (MOB) return phonePost(action, body);
+  const j = await api(action, body);
+  await load();
+  setTimeout(load, 8000);  // 계획·캘린더는 뒤에서 몇 초 걸림 → 한 번 더 받기
+  return j;
+}
+
+// 항목 종류별 버튼
+function acts(t, big) {
+  if (!t || !(LIVE || MOB)) return "";
+  if (MOB) return mobileActs(t);
+  const k = esc(t.key), b = [];
+  const isActive = D.active && D.active.key === t.key;
+  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : t.kind === "review" ? "▶ 퀴즈 풀기" : "▶ 열기"}</button>`);
+  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명 보기 → 참고 자료 고르기 → 작성 지침 적기 → 채팅에서 같이 쓰기 / 초안 한 번에 / 빈 파일">✍ 보고서 작성</button>`);
+  if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
+  if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`,
+                                  `<button data-act="workspace" data-key="${k}" title="study_system 을 VSCode 새 창으로 (맞는 노트가 있으면 함께) — 그 창의 Claude 와 공부·기록">🗂</button>`,
+                                  `<button data-act="quizcopy" data-key="${k}" title="이 강의 자료로 퀴즈를 만드는 요청 문장을 복사 — Claude 채팅에 붙여 넣기">🧩</button>`);
+  b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
+                  : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
+  b.push(`<button data-act="done" data-key="${k}">${t.kind === "lecture" ? "✓ 들었음" : "✓ 완료"}</button>`);
+  if (t.source === "inbox") b.push(`<button data-act="remove" data-key="${k}" title="삭제">🗑</button>`);
+  else b.push(`<button data-act="ignore" data-key="${k}" title="계속 제외 (조장만 제출 등)">✕</button>`);
+  return `<span class="acts">${b.join("")}</span>`;
+}
+// 📎 연결된 자료 수 — PC 는 누르면 자료 창, 휴대폰은 이름만 (파일은 PC 에 있음)
+const clip = t => {
+  const n = t && D && (D.links || {})[t.key];
+  if (!n || !n.length) return "";
+  const act = MOB ? "clipnames" : LIVE ? "matshow" : "";
+  return ` <span class="clip" ${act ? `data-act="${act}" data-key="${esc(t.key)}"` : ""} title="연결된 자료: ${esc(n.join(", "))}">📎${n.length}</span>`;
+};
+const smallActs = t => {
+  if (MOB) return mobileActs(t, true);
+  if (!LIVE) return "";
+  const k = esc(t.key);
+  return `<span class="acts"><button data-act="done" data-key="${k}" title="완료">✓</button>${
+    t.source === "inbox" ? `<button data-act="remove" data-key="${k}" title="삭제">🗑</button>` : `<button data-act="ignore" data-key="${k}" title="계속 제외">✕</button>`}</span>`;
+};
+
+function render() {
+  const now = new Date(), today = ymdOf(now), nowMin = now.getHours() * 60 + now.getMinutes();
+  $("clock").textContent = `${label(today)} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  $("live").textContent = LIVE ? "실시간" : "보기 전용";
+  $("live").className = "pill" + (LIVE ? " on" : "");
+  $("live").title = LIVE ? "엔진에 연결됨 — 30초마다 갱신" : "엔진이 꺼져 있음 — 입력하려면 VSCode 에서 '비서: 자동 감시' 실행";
+  $("inputCard").style.display = $("somedayForm").style.display = LIVE || MOB ? "" : "none";
+  $("syncBtn").style.display = LIVE ? "" : "none";
+  $("mobSet").style.display = MOB ? "" : "none";
+  if (MOB) { $("live").textContent = "휴대폰"; $("live").className = "pill on"; $("live").title = "PC 엔진이 올린 데이터 · 입력은 PC 가 몇 분 안에 반영"; }
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
+  if (!D) { $("status").textContent = "데이터 없음 — bin/pa run"; return; }
+  $("status").textContent = MOB ? `데이터 ${stamp(D.generated)} 기준` : `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)}`;
+
+  const open = D.tasks.filter(t => dt(t.due) >= now), late = D.tasks.filter(t => dt(t.due) < now);
+  const soon = open.filter(t => between(today, ymd(t.due)) <= 3);
+  const todayPlan = D.plan.filter(p => ymd(p.start) === today);
+  const leftMin = todayPlan.filter(p => dt(p.end) > now).reduce((s, p) => s + (dt(p.end) - Math.max(dt(p.start), now)) / 6e4, 0);
+  $("sum").innerHTML = `<span class="pill">남은 할 일 ${open.length}</span><span class="pill">오늘 남은 계획 ${dur(Math.round(leftMin))}</span>`
+    + `<span class="pill ${soon.length ? "hot" : ""}">3일 안 마감 ${soon.length}</span>`
+    + (D.slack ? (() => { const d = D.slack.capacity - D.slack.need;
+        return `<span class="pill ${d < 0 ? "hot" : "on"}" title="앞으로 7일: 쓸 수 있는 시간 ${dur(D.slack.capacity)} / 마감 7일 안 할 일 ${dur(D.slack.need)}">이번 주 ${d < 0 ? "부족 " + dur(-d) : "여유 " + dur(d)}</span>`; })() : "");
+  $("courses").innerHTML = (D.courses || []).map(c => `<option value="${esc(c)}">`).join("");
+
+  // 타이머
+  if (D.active) {
+    $("timer").innerHTML = `<div class="timer">⏱ <span>${esc(D.active.title)}</span> <b id="elapsed"></b>
+      ${D.active.estimate ? `<span class="meta">예상 ${dur(D.active.estimate)}</span>` : ""}
+      <span class="acts" style="margin-left:auto"><button class="primary" data-act="stopdone">✓ 끝내고 완료</button><button data-act="stop">■ 멈춤</button></span></div>`;
+    tickTimer();
+  } else $("timer").innerHTML = "";
+
+  // 휴대폰에서 [확인] 누른 알림은 같은 내용이면 다시 안 보여 줌
+  const warns = D.warnings.filter(w => { const m = w.match(/\[ack:(\w+)\]/); return !(MOB && m && ls.get("pa.ack." + m[1]) === w); });
+  if (MOB) { const pend = JSON.parse(ls.get("pa.pending") || "[]"); if (pend.length) warns.unshift(`📱 PC 반영 대기 ${pend.length}건 (PC 가 켜져 있으면 몇 분 안에)`); }
+  else if (!LIVE) warns.unshift("엔진이 꺼져 있어 마지막 데이터를 보여 주는 중입니다. VSCode 에서 'Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시'.");
+  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w.replace(/\s*\[ack:\w+\]/, "").replace(/\s*\[keep=[^\]]+\]/, "")).replace(/`([^`]+)`/g, "<code>$1</code>")}${
+    LIVE && w.includes("로그인 필요") ? ` <button class="chip" data-act="relogin">다시 로그인</button>` : ""}${
+    LIVE && w.includes("Google Calendar 로그인") ? ` <button class="chip" data-act="glogin">Google 다시 로그인</button>` : ""}${
+    (LIVE || MOB) && w.includes("[keep=") ? ` <button class="chip" data-act="keep" data-key="${esc(w.match(/\[keep=([^\]]+)\]/)[1])}" title="이 과제만 규칙의 예외로 — 계속 보이게">보이기</button>` : ""}${
+    (LIVE || MOB) && w.includes("[ack:") ? ` <button class="chip" data-act="ack" data-what="${w.match(/\[ack:(\w+)\]/)[1]}">확인</button>` : ""}</li>`).join("")}</ul></div>` : "";
+
+  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : todayView(now, today);
+  $("viewHint").textContent = view === "week" ? "◀ ▶ 또는 ← → 키로 주 이동 · 숫자 띠를 누르면 그 주로" : "";
+
+  // 오른쪽: 마감
+  const item = t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
+    <span class="txt">${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}${clip(t)}</span>${smallActs(t)}</div>`;
+  let dues = late.length ? `<div class="due-day">지난 마감 <span class="badge late">미완료</span></div>` + late.map(item).join("") : "";
+  for (const d of [...Array(14)].map((_, i) => addDays(today, i))) {
+    const its = open.filter(t => ymd(t.due) === d);
+    if (!its.length) continue;
+    const n = between(today, d);
+    dues += `<div class="due-day">${label(d)} <span class="badge d${Math.min(n, 2)}">${n === 0 ? "오늘" : "D-" + n}</span></div>` + its.map(item).join("");
+  }
+  $("dues").innerHTML = dues || `<p class="empty">2주 안 마감 없음</p>`;
+  $("someday").innerHTML = D.someday.length ? D.someday.map(t => `<div class="item"><span class="dot" style="background:var(--todo)"></span>
+      <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>
+      ${(LIVE || MOB) && t.source === "inbox" ? `<span class="acts"><button data-act="dotoday" data-key="${esc(t.key)}" title="오늘 빈 시간에 넣기">📅 오늘</button></span>` : ""}${smallActs(t)}</div>`).join("")
+    : `<p class="empty">아직 없음</p>`;
+
+  $("ritual").innerHTML = LIVE || MOB ? ritual(now, today) : "";
+
+  const gr = (LIVE || MOB) ? (D.grades || []).filter(g => !(MOB && (ls.get("pa.ack.grades") || "") >= g.graded_at)) : [];
+  $("grades").innerHTML = gr.length ? `<div class="card"><h2>🎓 새 점수 ${gr.length}
+      <button class="chip" data-act="gradeack" style="margin-left:auto" title="봤음 — 다음 새 점수부터 다시 보임">확인</button></h2>${gr.map(g => `
+    <div class="item"><span class="txt"><span class="course">${esc(g.course)}</span> ${esc(g.title)}</span>
+      <span class="meta"><b>${g.score}</b> / ${g.points}</span></div>`).join("")}</div>` : "";
+  const exs = (LIVE || MOB) ? (D.exams || []) : [];
+  $("exams").innerHTML = exs.length ? `<div class="card"><h2>📝 시험 일정 후보 <span class="hint">공지에서 찾음 · 맞으면 추가</span></h2>${exs.map(x => `
+    <div class="item"><span class="txt"><b>${esc(x.title)}</b> ${label(x.date)}${x.time ? " " + x.time : ""}<span class="meta" style="display:block">「${esc(x.line)}」</span></span>
+      <span class="acts" style="opacity:1"><button data-act="examadd" data-x='${esc(JSON.stringify(x))}'>할 일로 추가</button><button data-act="examno" data-id="${esc(x.id)}">아니요</button></span></div>`).join("")}
+    <p class="hint">추가하면 시험 7·4·2일 전에 복습이 잡히고, 마감 캘린더에 알림이 갑니다.</p></div>` : "";
+  const ns = (LIVE && D.notices) || [], sg = (LIVE && D.suggestions) || [];
+  $("notices").innerHTML = (ns.length || sg.length) ? `<div class="card"><h2>📢 새 공지 ${ns.length}</h2>
+    ${ns.map(n => `<div class="item"><span class="txt"><span class="course">${esc(String(n.course).replace(/\s*\d{6}$/, ""))}</span> ${esc(n.title)}
+      ${n.summary ? `<span class="meta" style="display:block">🤖 ${esc(n.summary)}</span>` : ""}</span>
+      <span class="acts" style="opacity:1"><button data-act="nopen" data-id="${esc(n.id)}">열기</button><button data-act="nread" data-id="${esc(n.id)}" title="읽음">✓</button></span></div>`).join("")}
+    ${sg.length ? `<h3 style="font-size:13px;margin:10px 0 4px">🤖 제외 후보 — 공지를 보고 안 해도 될 것 같은 과제</h3>${sg.map(x => `<div class="item"><span class="txt">${esc(x.course)} · ${esc(x.title)}
+      <span class="meta" style="display:block">${esc(x.reason)}</span></span><span class="acts" style="opacity:1">
+      <button data-act="ignore" data-key="${esc(x.key)}">제외</button><button data-act="sgno" data-key="${esc(x.key)}">아니요</button></span></div>`).join("")}` : ""}
+    ${ns.length ? `<div class="acts" style="margin-top:8px"><button data-act="njob" title="Claude 가 새 공지를 읽고 한 줄 요약 + 제외 후보 (구독 사용)">🤖 요약·제외 후보 찾기</button>
+      <button data-act="nreadall">모두 읽음</button></div>` : ""}</div>` : "";
+
+  const ex = D.excluded || [];
+  $("excluded").innerHTML = ex.length ? `<details class="card"><summary><b>🚫 제외한 것 ${ex.length}</b> <span class="hint">눌러서 보기 · 취소하면 다시 나타남</span></summary>
+    ${ex.map(x => `<div class="item"><span class="txt">${esc(x.keep ? "예외(계속 보이기): " + (x.titles[0] || x.text) : x.text)}<span class="meta" style="display:block">${
+      x.keep ? "단어 규칙에 걸려도 보이게 · 취소하면 다시 숨김" : (x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만") + ` · 걸린 과제 ${x.count}개`}${
+      x.titles.length ? " · " + esc(x.titles[0]) : ""}</span></span>${LIVE || MOB ? `<button data-act="unign" data-text="${esc(x.text)}">취소</button>` : ""}</div>`).join("")}</details>` : "";
+
+  const js = (LIVE && D.jobs) || [];
+  const ST = { queued: "⏳ 대기", running: "⚙️ 진행 중", done: "✅ 완료", failed: "⚠️ 실패" };
+  $("jobs").innerHTML = js.length ? `<div class="card"><h2>🤖 작업</h2>${js.map(j => `<div class="item"><span class="txt">
+      <b>${ST[j.status]}</b> ${esc(j.title)}<span class="meta" style="display:block">${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · Claude 사용 " + j.claude + "회" : ""}</span></span>
+      ${j.status === "done" && j.result ? `<button data-act="openfile" data-path="${esc(j.result)}">열기</button>` : ""}</div>`).join("")}</div>` : "";
+  if (js.some(j => j.status === "queued" || j.status === "running")) setTimeout(load, 5000);  // 진행 중이면 자주 갱신
+
+  const dls = (LIVE && D.downloads) || [];
+  $("downloads").innerHTML = dls.length ? `<div class="card dl"><h2>📥 새로 받은 파일 <span class="hint">과목 폴더로 정리</span></h2>${dls.map(f => `
+    <div class="item"><span class="txt">${esc(f.name)}</span><span class="acts" style="opacity:1">
+      <select data-dl="${esc(f.path)}">${["", ...D.courseFolders].map(c => `<option value="${esc(c)}" ${c === f.course ? "selected" : ""}>${c || "과목?"}</option>`).join("")}</select>
+      <button data-act="dlmove" data-path="${esc(f.path)}">옮기기</button><button data-act="dlskip" data-path="${esc(f.path)}" title="무시">✕</button></span></div>`).join("")}</div>` : "";
+
+  if ($("statsBox").open) renderStats(today);
+}
+
+// ---- 아침 브리핑 · 저녁 마무리 (하루에 한 번씩, 닫으면 그날은 다시 안 뜸)
+const seenToday = k => { try { return localStorage.getItem(k) === ymdOf(new Date()); } catch { return false; } };
+function ritual(now, today) {
+  const evening = `${pad(now.getHours())}:${pad(now.getMinutes())}` >= D.eveningReview;
+  const todayPlan = D.plan.filter(p => ymd(p.start) === today);
+  const tomorrow = addDays(today, 1);
+  const firstTomorrow = [...D.busy.filter(b => ymd(b.start) === tomorrow), ...D.plan.filter(p => ymd(p.start) === tomorrow)]
+    .sort((a, b) => dt(a.start) - dt(b.start))[0];
+  if (evening && !seenToday("pa.evening")) {
+    const missed = todayPlan.filter(p => dt(p.end) <= now).map(p => taskOf(p.key)).filter(t => t && t.status === "open");
+    const worked = D.sessionsToday.reduce((s, x) => s + (x.minutes || 0), 0);
+    return `<div class="card ritual"><h2>🌙 하루 마무리 <button class="chip" data-act="ritualclose" data-k="pa.evening" style="margin-left:auto">마무리</button></h2>
+      <h3>오늘 끝낸 일 ${D.todayDone.length}</h3><ul>${D.todayDone.map(t => `<li>${esc(t.title)}</li>`).join("") || "<li>없음</li>"}</ul>
+      ${missed.length ? `<h3>계획했지만 아직 안 끝난 일 — 실제로 했으면 ✓, 아니면 다음 빈 시간으로 자동으로 옮겨집니다</h3>${missed.map(t => `<div class="item"><span class="txt">${esc(t.title)}</span>
+        <button data-act="done" data-key="${esc(t.key)}">✓ 했음</button></div>`).join("")}` : ""}
+      ${worked ? `<h3>⏱ 오늘 기록한 시간 ${dur(worked)}</h3>` : ""}
+      ${now.getDay() === 0 && D.weekReview ? `<h3>🗓 이번 주 돌아보기</h3>${weekReviewHtml(D.weekReview)}` : ""}
+      <h3>내일 ${label(tomorrow)}</h3><ul><li>${firstTomorrow ? `첫 일정 ${hm(firstTomorrow.start)} ${esc(firstTomorrow.label || firstTomorrow.summary)}` : "일정 없음"}</li></ul></div>`;
+  }
+  if (!evening && !seenToday("pa.morning")) {
+    const cls = D.busy.filter(b => ymd(b.start) === today);
+    const mins = todayPlan.reduce((s, p) => s + (dt(p.end) - dt(p.start)) / 6e4, 0);
+    const soon = D.tasks.filter(t => dt(t.due) >= now && between(today, ymd(t.due)) <= 2);
+    return `<div class="card ritual"><h2>☀️ 오늘 브리핑 <button class="chip primary" data-act="ritualclose" data-k="pa.morning" style="margin-left:auto">오늘 시작</button></h2>
+      <ul><li>수업·약속 ${cls.length}개${cls.length ? " (" + cls.map(b => `${hm(b.start)} ${esc(b.label)}`).join(", ") + ")" : ""}</li>
+        <li>계획된 할 일 ${todayPlan.length}개 · ${dur(Math.round(mins))}${todayPlan[0] ? ` · 첫 블록 ${hm(todayPlan[0].start)}` : ""}</li></ul>
+      ${(() => { const rest = D.plan.filter(p => p.why && p.why.includes("다른 요일") && dt(p.end) > now);
+        return rest.length ? `<h3>쉬려던 요일(월수금토·일 밖)에 잡힌 것 ${rest.length}개 — 마감 때문에</h3><ul>${rest.map(p =>
+          `<li>${label(ymd(p.start))} ${hm(p.start)} ${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}</li>`).join("")}</ul>` : ""; })()}
+      ${soon.length ? `<h3>이틀 안 마감</h3><ul>${soon.map(t => `<li>${ddayText(t.due, today)} ${hm(t.due)} ${esc(t.title)}</li>`).join("")}</ul>` : ""}
+      ${D.quiz && D.quiz.stale ? `<h3>📝 퀴즈 복습</h3><ul><li>퀴즈 기록을 ${D.quiz.backupAt ? label(ymd(D.quiz.backupAt)) + " 이후로" : "아직"} 가져오지 않았어요.
+        퀴즈 앱에서 <b>[기록 내보내기]</b>를 누르면 틀린 문제 복습 일정이 생깁니다. <button class="chip" data-act="openquiz">퀴즈 앱 열기</button></li></ul>` : ""}
+      ${D.recent.length ? `<h3>지난 하루 동안 바뀐 것</h3><ul>${D.recent.map(r => `<li>${r.label} · ${esc(r.name)}</li>`).join("")}</ul>` : ""}</div>`;
+  }
+  return "";
+}
+
+// ---- 📄 자료 창: 연결된 자료(칩) · 추천 · 실시간 찾기(/ 경로 + Tab) · 📁 둘러보기 · 📥 최근 다운로드
+// 찾기는 화면 안에서 한다 — 파일 '이름' 목록을 1분에 한 번 받아 두고 글자를 칠 때마다 여기서 거름 (디스크·서버 0).
+// 범위·개수 같은 규칙은 config/materials.yaml (바꾸려면 채팅에서).
+let MP = null;  // 열린 자료 창의 상태
+const FILES = { at: 0, list: [], roots: [] };
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" }), j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "실패");
+  return j;
+}
+async function fileIndex() {
+  if (Date.now() - FILES.at > 60000) { const j = await getJSON("/api/files"); Object.assign(FILES, { at: Date.now(), list: j.files, roots: j.roots }); }
+  return FILES.list;
+}
+const full = f => f.r + "/" + f.rel;
+const fdate = m => { const d = new Date(m * 1000); return `${d.getMonth() + 1}/${d.getDate()}`; };
+function hl(s, words) {  // 맞은 글자 굵게 (escape 하면서)
+  const low = s.toLowerCase(), on = new Array(s.length).fill(false);
+  for (const w of words) for (let i = w ? low.indexOf(w) : -1; i >= 0; i = low.indexOf(w, i + w.length)) on.fill(true, i, i + w.length);
+  let out = "", b = false;
+  for (let i = 0; i < s.length; i++) { if (on[i] !== b) { out += on[i] ? "<b>" : "</b>"; b = on[i]; } out += esc(s[i]); }
+  return out + (b ? "</b>" : "");
+}
+function mpMsg(text) { const el = $("mpMsg"); if (el) { el.className = "msg err"; el.textContent = text || ""; } }
+
+// 단어 찾기: 모든 단어가 경로에 있어야. 파일 이름에서 맞음 > 경로에서만 · 단어 앞부분 · 이 과목 폴더 · 최근 파일 가산
+function mpSearch(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean), nowS = Date.now() / 1000, out = [];
+  for (const f of [...FILES.list, ...(MP.dl || [])]) {
+    const path = full(f).toLowerCase(), name = path.slice(path.lastIndexOf("/") + 1);
+    let sc = 0;
+    for (const w of words) {
+      const i = name.indexOf(w);
+      if (i >= 0) sc += 10 + (i === 0 || /[\s_\-\[(.·]/.test(name[i - 1]) ? 4 : 0);
+      else if (path.includes(w)) sc += 3;
+      else { sc = -1; break; }
+    }
+    if (sc < 0) continue;
+    if (MP.scope.some(s => full(f).startsWith(s + "/"))) sc += 5;
+    sc += Math.max(0, 3 - (nowS - f.m) / 86400 / 7);
+    out.push([sc, f]);
+  }
+  return out.sort((a, b) => b[0] - a[0]).map(x => ({ f: x[1], dir: false, name: full(x[1]) }));
+}
+// 경로 모드 ('/' 가 있으면): 그 폴더 바로 아래의 폴더·파일만
+function mpSplit(q) { q = q.replace(/^\/+/, ""); const cut = q.lastIndexOf("/"); return [cut >= 0 ? q.slice(0, cut) : "", q.slice(cut + 1)]; }
+function mpPath(q) {
+  const [dir, part] = mpSplit(q), low = part.toLowerCase(), list = [...FILES.list, ...(MP.dl || [])], kids = new Map();
+  if (!dir) for (const r of [...FILES.roots, ...(MP.dl ? ["다운로드"] : [])]) kids.set(r, { name: r, dir: true, count: list.filter(f => f.r === r).length });
+  else for (const f of list) {
+    const p = full(f);
+    if (!p.startsWith(dir + "/")) continue;
+    const rest = p.slice(dir.length + 1), i = rest.indexOf("/");
+    if (i < 0) { kids.set(rest, { name: rest, dir: false, f }); continue; }
+    const k = kids.get(rest.slice(0, i)) || { name: rest.slice(0, i), dir: true, count: 0 };
+    k.count++; kids.set(k.name, k);
+  }
+  return [...kids.values()].filter(k => k.name.toLowerCase().includes(low))
+    .sort((a, b) => (b.name.toLowerCase().startsWith(low) - a.name.toLowerCase().startsWith(low)) || (b.dir - a.dir) || a.name.localeCompare(b.name, "ko"))
+    .map(k => ({ ...k, path: (dir ? dir + "/" : "") + k.name }));
+}
+function mpResults() {
+  const inp = $("mpQ"), box = $("mpRes");
+  if (!inp || !MP) return;
+  const q = inp.value;
+  if (!q.trim()) { MP.items = []; box.innerHTML = ""; return; }
+  if (!FILES.at) { box.innerHTML = `<p class="hint">파일 목록 읽는 중…</p>`; return; }
+  const pathMode = q.includes("/"), items = MP.items = pathMode ? mpPath(q) : mpSearch(q);
+  MP.sel = Math.max(0, Math.min(MP.sel, items.length - 1));
+  const words = pathMode ? [mpSplit(q)[1].toLowerCase()] : q.toLowerCase().split(/\s+/).filter(Boolean);
+  const have = new Set(MP.links.map(x => x.p)), shown = items.slice(0, MP.limit);
+  box.innerHTML = items.length ? shown.map((k, i) => {
+    const on = i === MP.sel ? " on" : "";
+    if (k.dir) return `<div class="mrow${on}" data-mi="${i}"><span class="p">📁 ${hl(k.name, words)} <small>${k.count}개</small></span>
+      <span class="acts"><button data-act="mpin" data-i="${i}">들어가기</button></span></div>`;
+    const f = k.f, dl = f.r === "다운로드";
+    return `<div class="mrow${on}" data-mi="${i}"><span class="p">${dl ? "📥" : "📄"} ${hl(k.name, words)} <small>${fdate(f.m)}</small></span>
+      <span class="acts"><button data-act="openfile" data-path="${esc(f.p)}">열어보기</button>${have.has(f.p) ? `<span class="meta">연결됨</span>`
+        : `<button data-act="mplink" data-i="${i}">${dl ? "옮겨서 연결" : "+ 연결"}</button>`}</span></div>`;
+  }).join("") + (items.length > shown.length ? `<button class="chip" data-act="mpmore">외 ${items.length - shown.length}개 더 보기</button>` : "")
+    : `<p class="empty">맞는 파일 없음${MP.dl ? "" : " — 📥 다운로드에서도 찾기를 켜 보거나, 찾기 범위 밖이면 채팅에서 범위 추가를 요청하세요"}</p>`;
+  const cur = box.querySelector(".mrow.on");
+  if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+function mpKey(e) {
+  const inp = e.target, items = MP.items || [];
+  if (e.key === "Escape") { e.preventDefault(); if (inp.value) { inp.value = ""; mpResults(); } else { $("matPanel").innerHTML = ""; MP = null; } return; }
+  if (!items.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    MP.sel = (MP.sel + (e.key === "ArrowDown" ? 1 : -1) + Math.min(items.length, MP.limit)) % Math.min(items.length, MP.limit);
+    return mpResults();
+  }
+  if (e.key === "Tab") {  // 채우기: 경로 모드면 공통 앞부분까지 → 고른 것 (폴더면 '/' 붙여 한 단계 들어감)
+    e.preventDefault();
+    const k = items[MP.sel];
+    if (inp.value.includes("/")) {
+      const [dir, part] = mpSplit(inp.value);
+      let pre = items[0].name;
+      for (const x of items) while (!x.name.startsWith(pre)) pre = pre.slice(0, -1);
+      inp.value = items.length > 1 && pre.length > part.length ? (dir ? dir + "/" : "") + pre : k.path + (k.dir ? "/" : "");
+    } else inp.value = full(k.f);
+    MP.sel = 0;
+    return mpResults();
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const k = items[MP.sel];
+    if (k.dir) { inp.value = k.path + "/"; MP.sel = 0; return mpResults(); }
+    mpLink([k.f]);
+  }
+}
+
+function mpDraw() {
+  const live = MP.links.filter(x => x.exists).length;
+  const chips = MP.links.map(x => x.exists
+    ? `<span class="lchip" title="${esc(full(x))}${x.origin === "pair" ? " · 강의 플랫폼에서 같은 주차의 자료라 자동으로 연결됨" : ""}"><button data-act="openfile" data-path="${esc(x.p)}">${x.origin === "pair" ? "🔗" : "📄"} ${esc(x.name)}</button>${
+        x.pdf ? (x.summary ? `<button data-act="openfile" data-path="${esc(x.summary)}" title="만들어 둔 요약 열기">📝</button>`
+                           : `<button data-act="summarize" data-path="${esc(x.p)}" title="🤖 이 PDF 의 핵심 정리 만들기 (Claude 사용, 몇 분)">🤖</button>`) : ""}<button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`
+    : `<span class="lchip miss" title="${esc(x.p)}">⚠️ ${esc(x.name)} <i>파일 없음</i><button data-act="refind" data-name="${esc(x.name)}" title="같은 이름으로 다시 찾기">다시 찾기</button><button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`).join("");
+  $("mpTop").innerHTML = `<div class="meta">연결된 자료 ${live}/${MP.max}${MP.links.length ? " · 누르면 열림 · ✍ 보고서·🤖 내용정리가 이것만 참고" : " — 아직 없음. 고르면 ✍ 보고서·🤖 내용정리가 이것을 참고 (없으면 제목으로 추측)"}</div>
+    ${MP.links.length ? `<div class="lchips">${chips}</div>` : ""}
+    ${MP.suggest.length ? `<div class="meta">추천 <span class="hint">⭐ 제목 번호가 맞음 · 누르면 연결</span></div><div class="lchips">${MP.suggest.map(s =>
+      `<button class="chip" data-act="mplinkp" data-path="${esc(s.p)}" title="${esc(s.why)}">${s.why.startsWith("번호") ? "⭐ " : ""}+ ${esc(s.name)}</button>`).join("")}</div>` : ""}
+    ${MP.note ? `<p class="msg">${esc(MP.note)}</p>` : ""}`;
+  $("mpDays").textContent = MP.days;
+  $("mpFoot").innerHTML = `${MP.deleted.length ? `<p class="hint" title="${esc(MP.deleted.join("\n"))}">이 과목에서 교수님이 지운 자료 ${MP.deleted.length}개는 받지 않았습니다 (마우스를 올리면 목록).</p>` : ""}
+    <div class="row" style="margin-top:6px"><button class="chip" data-act="quizcopy" data-key="${esc(MP.key)}" title="채팅에 붙여 넣으면 연결된 자료로 퀴즈를 만듭니다 (퀴즈 프로젝트 규칙: 계획서 → 승인 → 제작)">🧩 퀴즈 요청 복사</button>
+      <span class="hint">찾기: 단어 몇 개 · <code>/</code> 로 폴더 (예: 자료/) · <kbd>↑↓</kbd> 고르기 · <kbd>Tab</kbd> 채우기 · <kbd>Enter</kbd> 연결 · <kbd>Esc</kbd> 지우기·닫기</span></div>`;
+  if (MP.browse) mpBrowseList();
+}
+
+async function showMaterials(key, opts = {}) {
+  const j = await getJSON("/api/links?key=" + encodeURIComponent(key));
+  const fresh = !MP || MP.key !== key || !$("mpQ");
+  if (fresh) {
+    MP = { key, sel: 0, limit: 8, dl: null, browse: null, items: [], note: "" };
+    $("matPanel").innerHTML = `<div class="card mat"><h2>📄 <span id="mpTitle"></span>
+        <button class="chip" data-act="matclose" style="margin-left:auto">닫기</button></h2>
+      <div id="mpTop"></div>
+      <div class="msearch"><input id="mpQ" type="text" autocomplete="off" spellcheck="false" placeholder="자료 찾기 — 예) 17강 배포   ·   자료/ 처럼 / 로 폴더 따라가기">
+        <button data-act="mpbrowse" title="폴더를 눌러 다니며 여러 개 고르기">📁 둘러보기</button>
+        <label class="hint" title="Windows 다운로드 폴더에서 최근에 받은 문서도 찾기 — 연결하면 이 할 일의 과목 폴더로 옮겨짐"><input type="checkbox" id="mpDl"> 📥 다운로드에서도 찾기 (최근 <span id="mpDays"></span>일)</label></div>
+      <div id="mpMsg" class="msg"></div><div id="mpRes" class="mres"></div><div id="mpBrowse"></div><div id="mpFoot"></div></div>`;
+    $("mpQ").addEventListener("input", () => { MP.sel = 0; MP.limit = 8; mpResults(); });
+    $("mpQ").addEventListener("keydown", mpKey);
+    $("mpDl").addEventListener("change", async e => {
+      try { MP.dl = e.target.checked ? (await getJSON("/api/downloads")).files : null; } catch (err) { mpMsg(err.message); }
+      mpResults();
+      if (MP.browse) mpBrowseDraw();
+    });
+    $("matPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  Object.assign(MP, j);
+  if (opts.note !== undefined) MP.note = opts.note;
+  $("mpTitle").textContent = j.title;
+  if (opts.openSingle) {  // 연결된 자료가 하나면 바로 연다 (창은 그대로 — 더 넣을 수 있게)
+    const ok = MP.links.filter(x => x.exists);
+    if (ok.length === 1) { MP.note = "연결된 자료를 열었습니다: " + ok[0].name; api("open-file", { path: ok[0].p }).catch(err => mpMsg(err.message)); }
+  }
+  mpDraw();
+  if (fresh) { $("mpQ").focus({ preventScroll: true }); fileIndex().then(mpResults).catch(err => mpMsg("파일 목록을 읽지 못함: " + err.message)); }
+  else mpResults();
+}
+
+// 연결: 일반 파일은 한 번에, 다운로드 파일은 과목 폴더로 옮긴 뒤 하나씩
+async function mpLink(fs) {
+  mpMsg("");
+  try {
+    const plain = fs.filter(f => f.r !== "다운로드").map(f => f.p);
+    if (plain.length) await api("link", { key: MP.key, paths: plain });
+    for (const f of fs.filter(f => f.r === "다운로드")) {
+      let r = await api("link-download", { key: MP.key, path: f.p });
+      if (r.needCourse) {
+        const c = prompt(`이 할 일의 과목을 몰라서, 어느 과목 폴더로 옮길지 정해 주세요.\n과목: ${r.courses.join(", ")}`);
+        if (!c) continue;
+        r = await api("link-download", { key: MP.key, path: f.p, course: c.trim() });
+        if (r.needCourse) throw new Error("그 과목을 찾지 못했습니다: " + c);
+      }
+      MP.note = r.message || "";
+      if (MP.dl) MP.dl = MP.dl.filter(x => x.p !== f.p);
+      FILES.at = 0;
+    }
+    if (MP.browse) MP.browse.checked.clear();
+    $("mpQ").value = "";
+  } catch (err) { mpMsg(err.message); }
+  if (FILES.at === 0) await fileIndex().catch(() => {});
+  await showMaterials(MP.key);
+  if (MP.browse) await mpBrowse(MP.browse.root, MP.browse.path);
+  load();
+}
+
+// 📁 둘러보기: 누른 폴더 하나만 받아 온다. 체크는 폴더를 옮겨 다녀도 유지
+async function mpBrowse(root, path) {
+  const j = await getJSON(`/api/ls?root=${encodeURIComponent(root)}&path=${encodeURIComponent(path || "")}`);
+  const old = MP.browse;
+  MP.browse = { ...j, checked: old ? old.checked : new Map(), sort: old ? old.sort : "name", filter: "" };
+  mpBrowseDraw();
+}
+function mpBrowseDraw() {
+  const B = MP.browse, el = $("mpBrowse");
+  if (!B) { el.innerHTML = ""; return; }
+  const roots = [...(FILES.roots.length ? FILES.roots : ["자료", "노트", "보고서"]), "다운로드"], parts = B.path ? B.path.split("/") : [];
+  const go = (p, label) => `<button class="link" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc(p)}">${esc(label)}</button>`;
+  el.innerHTML = `<div class="mbrowse">
+    <div class="row">${roots.map(r => `<button class="chip ${r === B.root ? "primary" : ""}" data-act="mpls" data-root="${esc(r)}" data-path="">${r === "다운로드" ? `📥 다운로드 (최근 ${MP.days}일)` : esc(r)}</button>`).join("")}
+      <button class="chip" data-act="mpbclose" style="margin-left:auto">접기</button></div>
+    <div class="crumb">${go("", B.root)}${parts.map((p, i) => " / " + go(parts.slice(0, i + 1).join("/"), p)).join("")}
+      ${parts.length ? `<button class="chip" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc(parts.slice(0, -1).join("/"))}" title="한 단계 위로">⬆</button>` : ""}</div>
+    <div class="row"><input id="mpBF" type="text" placeholder="이 폴더에서 거르기" autocomplete="off" style="flex:1 1 160px">
+      <select id="mpBS"><option value="name">이름순</option><option value="m" ${B.sort === "m" ? "selected" : ""}>최근순</option></select></div>
+    <div id="mpBL" class="mres"></div>
+    <div class="row" style="margin-top:6px"><button class="primary" data-act="mpbadd" id="mpBAdd" disabled>선택한 0개 연결</button>
+      ${B.root === "다운로드" ? `<span class="hint">다운로드 파일은 이 할 일의 과목 자료 폴더로 옮긴 뒤 연결합니다</span>` : ""}</div></div>`;
+  $("mpBF").addEventListener("input", e => { B.filter = e.target.value.toLowerCase(); mpBrowseList(); });
+  $("mpBS").addEventListener("change", e => { B.sort = e.target.value; mpBrowseList(); });
+  $("mpBL").addEventListener("change", e => {
+    const p = e.target.dataset.bp;
+    if (p) { e.target.checked ? B.checked.set(p, { p, r: e.target.dataset.br }) : B.checked.delete(p); mpBrowseCount(); }
+  });
+  mpBrowseList();
+}
+function mpBrowseList() {
+  const B = MP.browse, el = $("mpBL");
+  if (!B || !el) return;
+  const have = new Set(MP.links.map(x => x.p)), nm = x => x.name || x.rel;
+  const dirs = B.dirs.filter(d => d.name.toLowerCase().includes(B.filter));
+  const files = B.files.filter(x => nm(x).toLowerCase().includes(B.filter)).sort((a, b) => B.sort === "m" ? b.m - a.m : nm(a).localeCompare(nm(b), "ko"));
+  el.innerHTML = dirs.map(d => `<div class="mrow" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc((B.path ? B.path + "/" : "") + d.name)}">
+      <span class="p">📁 ${esc(d.name)} <small>${d.count}개</small></span><span></span></div>`).join("")
+    + files.map(x => `<div class="mrow"><label class="p"><input type="checkbox" data-bp="${esc(x.p)}" data-br="${esc(x.r)}" ${B.checked.has(x.p) ? "checked" : ""} ${have.has(x.p) ? "disabled" : ""}>
+      ${esc(nm(x))} <small>${fdate(x.m)}${have.has(x.p) ? " · 연결됨" : ""}</small></label>
+      <span class="acts"><button data-act="openfile" data-path="${esc(x.p)}">열어보기</button></span></div>`).join("")
+    || `<p class="empty">${B.root === "다운로드" ? `최근 ${MP.days}일 안에 받은 문서가 없습니다` : "비어 있음"}</p>`;
+  mpBrowseCount();
+}
+function mpBrowseCount() {
+  const n = MP.browse.checked.size, b = $("mpBAdd");
+  if (b) { b.disabled = !n; b.textContent = `선택한 ${n}개 연결`; }
+}
+
+async function copyText(text) {  // 클립보드 → 안 되면 옛 방식 → 그래도 안 되면 보여 주고 직접 복사
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+  if (!ok) {
+    const ta = Object.assign(document.createElement("textarea"), { value: text });
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
+  if (!ok) prompt("복사해서 채팅에 붙여 넣으세요", text);
+  return ok;
+}
+
+// ---- ✍ 보고서 작성 창: 과제 설명 확인 → 자료 고르기(아래 📄 창) → 지침 적기 → 어떻게 쓸지 고르기
+let REP = null;
+async function showReport(key) {
+  const r = await getJSON("/api/report-info?key=" + encodeURIComponent(key));
+  REP = { key, ...r };
+  const due = r.due ? `${label(ymd(r.due))} ${hm(r.due)}` : "기한 없음";
+  $("repPanel").innerHTML = `<div class="card mat rep"><h2>✍ ${esc(r.title)} <span class="hint">마감 ${due}</span>
+      <button class="chip" data-act="repclose" style="margin-left:auto">닫기</button></h2>
+    ${r.desc ? `<details ${r.desc.length < 300 ? "open" : ""}><summary class="meta">Canvas 과제 설명</summary><p class="desc">${esc(r.desc)}</p></details>` : ""}
+    <div class="meta" style="margin-top:6px">파일: <b>${esc(r.name)}</b> ${r.exists ? `— 이미 있음 <button class="chip" data-act="openfile" data-path="${esc(r.path)}">열기</button>
+      <button class="chip" data-act="reveal" data-path="${esc(r.path)}" title="Windows 탐색기에서 파일 위치 보기">📂 위치</button>
+      <button class="chip" data-act="reppdf" title="이 .md 를 A4 PDF 로 (쪽수 알려 줌, Claude 안 씀) → 탐색기에서 보여 줌">📄 PDF 만들기</button>` : "— 아직 없음"}</div>
+    <div class="meta">참고 자료: 아래 📄 창에서 고른 것만 씀 (하나도 없으면 제목으로 자동 추측)</div>
+    <label class="meta" for="repText" style="display:block;margin-top:8px">어떻게 쓸까요? (분량·구성·강조할 내용·내 의견·말투 등 — 비워도 됨)</label>
+    <textarea id="repText" placeholder="예) A4 1쪽. 홉스의 자연 상태와 사회 계약을 중심으로, 마지막 문단에 오늘날 국가 권력과 비교한 내 생각 (내 생각은 비워 둬)">${esc(r.brief.text)}</textarea>
+    <label class="meta"><input type="checkbox" id="repBlank" ${r.brief.blanks ? "checked" : ""}> 내 생각·경험이 들어갈 자리는 비워 두기 (<code>[✍ 내 생각: …]</code> 표시)</label>
+    <div class="ways">
+      <button class="primary" data-act="repchat">💬 채팅에서 같이 쓰기 <small>보고서 파일을 VSCode 에 열고, 과제·자료·지침을 담은 요청을 복사 → 오른쪽 Claude 채팅에 붙여 넣기. 대화하며 한 부분씩</small></button>
+      <button data-act="repdraft">🤖 초안 한 번에 만들기 <small>Claude 가 뒤에서 전체 초안을 씀 (구독 사용, 몇 분)${r.exists ? " — 지금 파일은 _old 로 보관" : ""}</small></button>
+      <button data-act="repwin">🗂 VSCode 작업 창 열기 (report 폴더) <small>report 폴더를 VSCode 새 창으로 + 보고서 파일. 그 창의 Claude 채팅은 report 의 글쓰기 규칙을 따름 — 💬 요청을 붙여 넣어 거기서 작업</small></button>
+      <button data-act="repfile">📝 빈 파일만 만들고 열기 <small>규칙에 맞는 이름·제목·학번 줄만. Claude 안 씀</small></button>
+    </div><p id="repMsg" class="msg"></p></div>`;
+  await showMaterials(key);
+  $("repPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("repText").focus({ preventScroll: true });
+}
+const repBrief = () => ({ key: REP.key, text: $("repText").value, blanks: $("repBlank").checked });
+async function repAction(act) {
+  const msg = $("repMsg");
+  msg.className = "msg"; msg.textContent = "…";
+  try {
+    if (act === "repdraft") {
+      if (REP.exists && !confirm(`이미 있는 ${REP.name} 은 _old 로 보관하고 새로 씁니다 (Claude 사용, 몇 분). 진행할까요?`)) { msg.textContent = ""; return; }
+      await post("job/report", { ...repBrief(), force: REP.exists });
+      msg.textContent = "🤖 초안을 쓰는 중 — 오른쪽 🤖 작업 칸에서 진행 상황, 끝나면 VSCode 에 열립니다";
+    } else if (act === "repfile") {
+      await api("report-file", { key: REP.key });
+      msg.textContent = "VSCode 에 열었습니다"; REP.exists = true;
+    } else if (act === "repchat") {
+      await api("report-brief", repBrief());
+      const f = await api("report-file", { key: REP.key });  // 없으면 빈 파일을 만들어 열어 둠
+      const b = repBrief(), files = (MP && MP.key === REP.key ? MP.links : []).filter(x => x.exists);
+      const text = `/assignment ${REP.key} ${REP.title} — 이 과제 보고서를 채팅에서 같이 쓰자.\n`
+        + `보고서 파일: ${f.path} (VSCode 에 열어 둠${REP.exists ? ", 이미 쓴 내용 있음" : ""})\n`
+        + `내 지침: ${b.text.trim() || "(없음 — 과제 설명대로, 먼저 구성을 제안해 줘)"}\n`
+        + (files.length ? "참고 자료 (이것만):\n" + files.map(x => "- " + x.p).join("\n") + "\n" : "참고 자료: 연결 없음 — 맞는 자료를 찾아 먼저 보여 줘\n")
+        + (b.blanks ? "내 생각·경험이 들어갈 자리는 지어내지 말고 나에게 물어봐 줘." : "");
+      REP.exists = true;
+      if (await copyText(text)) msg.textContent = "📋 요청을 복사했습니다 — 오른쪽 Claude 채팅에 붙여 넣으세요 (Ctrl+V)";
+      else msg.textContent = "";
+    }
+  } catch (err) { msg.className = "msg err"; msg.textContent = err.message; }
+}
+
+// 🧩 퀴즈 요청: 채팅에 붙여 넣을 문장 (퀴즈 제작은 판단이 필요해서 채팅에서 — 엔진은 Claude 안 씀)
+async function quizCopy(key) {
+  const t = taskOf(key);
+  let files = MP && MP.key === key ? MP.links : null;
+  if (!files) { try { files = (await getJSON("/api/links?key=" + encodeURIComponent(key))).links; } catch { files = []; } }
+  files = files.filter(x => x.exists);
+  const text = `/quiz ${t && t.course ? t.course + " " : ""}${t ? t.title : key} — 이 자료로 퀴즈 만들어줘 (할 일 키 ${key})\n`
+    + (files.length ? "연결된 자료:\n" + files.map(x => "- " + x.p).join("\n") : "연결된 자료 없음 — study_system 의 이 강의 자료·노트에서 찾아서");
+  if (!await copyText(text)) return;
+  if (MP && MP.key === key) { MP.note = "🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요"; mpDraw(); }
+  else alert("🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요\n\n" + text);
+}
+
+function todayView(now, today) {
+  const rows = [
+    ...D.busy.filter(b => ymd(b.start) === today).map(b => ({ busy: true, start: b.start, end: b.end, title: b.label })),
+    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: taskOf(p.key), summary: p.summary, kind: p.kind, why: p.why,
+                                                          part: (p.summary.match(/\((\d+\/\d+)\)$/) || [])[1] })),
+  ].sort((a, b) => dt(a.start) - dt(b.start));
+
+  // 지금 할 일: 진행 중인 블록 → 오늘 다음 블록 → 가장 급한 마감
+  const cur = rows.find(r => !r.busy && dt(r.start) <= now && now < dt(r.end));
+  const next = rows.find(r => !r.busy && dt(r.start) > now);
+  const pick = cur || next;
+  let html = "";
+  if (pick && pick.t) {
+    const t = pick.t;
+    html += `<div class="now-card"><div class="lbl">${cur ? "▶ 지금 할 일" : `다음 · ${hm(pick.start)} 시작`}</div>
+      <div class="ttl">${esc(t.title)}${pick.part ? ` <span class="hint">(${pick.part})</span>` : ""}${clip(t)}</div>
+      <div class="meta">${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · ${hm(pick.start)}–${hm(pick.end)} · 마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})</div>
+      ${pick.why ? `<div class="meta">왜 지금? ${esc(pick.why)}</div>` : ""}
+      ${acts(t, true)}</div>`;
+  } else {
+    const urgent = D.tasks.filter(t => dt(t.due) >= now)[0];
+    html += `<div class="now-card"><div class="lbl">오늘 남은 계획 없음</div>${urgent
+      ? `<div class="meta">가장 급한 일: ${esc(urgent.title)} (${ddayText(urgent.due, today)})</div>${acts(urgent, true)}` : `<div class="meta">쉬어도 됩니다 🙂</div>`}</div>`;
+  }
+
+  // 타임라인 + 빈 시간
+  const [ds, de] = [D.dayStart, D.dayEnd];
+  let cursor = Math.max(dt(`${today}T${ds}:00`), now);
+  const dayEnd = dt(`${today}T${de}:00`);
+  const gap = (a, b) => (b - a) >= 30 * 6e4 ? `<div class="gap">빈 시간 ${hm(new Date(a).toISOString())}–${hm(new Date(b).toISOString())} (${dur(Math.round((b - a) / 6e4))})</div>` : "";
+  html += `<div class="tl">`;
+  for (const r of rows) {
+    const s = dt(r.start), e = dt(r.end);
+    if (s > cursor) html += gap(cursor, s);
+    if (e > cursor) cursor = e;
+    const past = e <= now ? " past" : "", curC = s <= now && now < e ? " cur" : "";
+    if (r.busy) {
+      html += `<div class="tl-row busy${past}${curC}" style="border-left-color:var(--busy)"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
+        <span class="what">🏫 ${esc(r.title)}</span><span></span></div>`;
+    } else {
+      const t = r.t;
+      html += `<div class="tl-row${past}${curC}" style="border-left-color:${color(r.kind)}"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
+        <span class="what" title="${esc(r.why || "")}">${t ? esc(t.title) + (r.part ? ` (${r.part})` : "") + clip(t) : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
+        ${t && !past ? acts(t) : "<span></span>"}</div>`;
+    }
+  }
+  if (dayEnd > cursor) html += gap(cursor, dayEnd);
+  html += `</div>`;
+  if (!rows.length) html += `<p class="empty">오늘은 수업도 계획도 없습니다.</p>`;
+
+  const tomorrow = addDays(today, 1);
+  const tb = D.busy.filter(b => ymd(b.start) === tomorrow).length, tp = D.plan.filter(p => ymd(p.start) === tomorrow).length;
+  html += `<div class="tl-foot">내일 ${label(tomorrow)}: 수업·약속 ${tb} · 할 일 ${tp}</div>`;
+  if (D.todayDone.length) html += `<div class="tl-foot">✓ 오늘 완료 ${D.todayDone.length}<div class="done-list">${D.todayDone.map(t => `<div>${esc(t.title)}</div>`).join("")}</div></div>`;
+  return html;
+}
+
+function curWeekIdx(today) {
+  const ws = D.semester || [];
+  const i = ws.findIndex(w => w.start <= today && today <= addDays(w.start, 6));
+  return i >= 0 ? i : (ws.length && today < ws[0].start ? 0 : ws.length - 1);
+}
+
+// 주차별: 주 이동 + 학기 띠 + 그 주의 캘린더 + 그 주에 할 것 (버튼 항상 보임)
+function weekView(now, today, nowMin) {
+  const ws = D.semester || [];
+  if (!ws.length) return `<p class="empty">학기 정보가 없습니다.</p>`;
+  const cur = curWeekIdx(today);
+  const i = wkIdx === null ? cur : Math.max(0, Math.min(ws.length - 1, wkIdx));
+  const w = ws[i], days = [...Array(7)].map((_, k) => addDays(w.start, k)), end = days[6];
+  const maxMin = Math.max(60, ...ws.map(x => x.minutes));
+
+  let h = `<div class="wk-nav"><button data-wk="${i - 1}" ${i === 0 ? "disabled" : ""}>◀</button>
+    <b>${i + 1}주차</b><span class="meta">${label(w.start)} ~ ${label(end)}</span>
+    <button data-wk="${i + 1}" ${i === ws.length - 1 ? "disabled" : ""}>▶</button>
+    ${i !== cur ? `<button class="chip" data-wk="${cur}">이번 주로</button>` : `<span class="pill on">이번 주</span>`}</div>`;
+  h += `<div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""}"
+      data-wk="${j}" style="--lvl:${(x.minutes / maxMin).toFixed(2)}" title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}">
+      ${j + 1}${x.items.some(y => y.exam) ? "<i>시험</i>" : ""}</button>`).join("")}</div>`;
+
+  // 캘린더: 계획·수업 데이터가 있는 주만 (계획은 2주 앞까지)
+  const hasData = days.some(d => D.plan.some(p => ymd(p.start) === d) || D.busy.some(b => ymd(b.start) === d));
+  if (hasData) h += calendar(days, now, today, nowMin);
+  else h += `<p class="empty">${end < today ? "지난 주입니다" : "계획은 2주 앞까지만 짭니다"} — 아래 목록으로 보세요.</p>`;
+
+  // 그 주에 할 것 (마감 기준), 종류별
+  const groups = [["lecture", "📘 강의"], ["assignment", "📝 과제"], ["quiz", "❓ 퀴즈"], ["review", "🔁 퀴즈 복습"], ["todo", "✅ 할 일"]];
+  const its = w.items;
+  h += `<h3 class="wl-h">이 주에 마감인 것 ${its.filter(x => x.status === "open").length}개 남음 / 전체 ${its.length}개</h3>`;
+  for (const [kind, name] of groups) {
+    const g = its.filter(x => x.kind === kind).sort((a, b) => (a.status === "done") - (b.status === "done") || dt(a.due) - dt(b.due));
+    if (!g.length) continue;
+    h += `<div class="wl-g">${name} <span class="meta">${g.filter(x => x.status === "open").length}/${g.length}</span></div>` + g.map(x => {
+      const done = x.status === "done", late = !done && dt(x.due) < now;
+      return `<div class="wl ${done ? "done" : ""}"><span class="dot" style="background:${color(x.kind)}"></span>
+        <span class="txt">${x.exam ? "📝 " : ""}${esc(x.title)}${clip(x)}<span class="meta">${x.course ? esc(x.course) + " · " : ""}마감 ${label(ymd(x.due))} ${hm(x.due)}
+          ${done ? "· 완료" : late ? "· <b style='color:var(--danger)'>지남</b>" : "· " + ddayText(x.due, today)}${x.minutes ? " · 예상 " + dur(x.minutes) : ""}</span></span>
+        ${done ? "" : acts(x)}</div>`;
+    }).join("");
+  }
+  if (!its.length) h += `<p class="empty">이 주에 마감인 것이 없습니다.</p>`;
+
+  const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
+  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b>${clip(sel)}<div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
+    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div>
+    ${sp && sp.why ? `<div class="meta">왜 여기? ${esc(sp.why)}</div>` : ""}<div style="margin-top:6px">${acts(sel)}</div></div>`;
+  return h;
+}
+
+function calendar(days, now, today, nowMin) {
+  const [ds, de] = [D.dayStart, D.dayEnd].map(t => +t.slice(0, 2));
+  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
+  const PX = 34, H = (de - ds) * PX, y = m => (m - ds * 60) / 60 * PX;
+  let h = `<div class="board-wrap"><div class="board"><div></div>` +
+    days.map(d => `<div class="head ${d === today ? "today" : ""} ${d < today ? "pastday" : ""} ${planMin(d) > D.cap ? "over" : ""}">${label(d)}</div>`).join("") +
+    `<div class="axis" style="height:${H}px">` + [...Array(de - ds)].map((_, i) => `<div style="top:${i * PX}px">${ds + i}</div>`).join("") + `</div>`;
+  for (const d of days) {
+    let col = [...Array(de - ds)].map((_, i) => `<div class="hour" style="top:${i * PX}px"></div>`).join("");
+    for (const b of D.busy.filter(b => ymd(b.start) === d)) {
+      const top = Math.max(0, y(mins(b.start))), hh = Math.min(H, y(mins(b.end))) - top;
+      if (hh > 0) col += `<div class="blk busy${dt(b.end) <= now ? " past" : ""}" style="top:${top}px;height:${hh}px">${esc(b.label)}<small>${hm(b.start)}–${hm(b.end)}</small></div>`;
+    }
+    for (const p of D.plan.filter(p => ymd(p.start) === d)) {
+      const top = y(mins(p.start)), hh = y(mins(p.end)) - top;
+      col += `<div class="blk${dt(p.end) <= now ? " past" : ""}${selKey === p.key ? " sel" : ""}" data-sel="${esc(p.key)}" style="top:${top}px;height:${hh}px;background:${color(p.kind)}"
+        title="${esc(p.summary)} — 누르면 버튼">${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}<small>${hm(p.start)}–${hm(p.end)}</small></div>`;
+    }
+    if (d === today && nowMin >= ds * 60 && nowMin <= de * 60) col += `<div class="nowline" style="top:${y(nowMin)}px"></div>`;
+    h += `<div class="day ${d < today ? "pastday" : ""}" style="height:${H}px">${col}</div>`;
+  }
+  return h + `</div></div><div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
+}
+
+function renderStats(today) {
+  const days14 = [...Array(14)].map((_, i) => addDays(today, i));
+  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
+  const maxLoad = Math.max(D.cap, ...days14.map(planMin));
+  $("load").innerHTML = `<div class="bars"><div class="cap" style="bottom:${D.cap / maxLoad * 100}%"></div>` + days14.map(d => { const m = planMin(d);
+    return `<div class="bar ${m > D.cap ? "over" : ""}" title="${label(d)} ${dur(m)}"><i style="height:${m / maxLoad * 100}%"></i><span>${tick(d, days14)}</span></div>`; }).join("") + `</div>`;
+  $("prog").innerHTML = D.progress.map(p => `<div class="prog"><div class="r"><span>${esc(p.course)}</span><span>${p.done}/${p.total}</span></div>
+    <div class="track"><div class="fill" style="width:${p.total ? p.done / p.total * 100 : 0}%"></div></div></div>`).join("") || `<p class="empty">아직 없음</p>`;
+  const past14 = [...Array(14)].map((_, i) => addDays(today, i - 13));
+  const maxDone = Math.max(1, ...past14.map(d => D.doneByDay[d] || 0));
+  $("trend").innerHTML = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
+    <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
+  renderCalib();
+  $("weekrev").innerHTML = weekReviewHtml(D.weekReview) || `<p class="empty">아직 없음</p>`;
+  const q = D.quiz || {};
+  $("quizStat").innerHTML = `<div class="meta">마지막으로 가져온 기록: ${q.backupAt ? stamp(q.backupAt) : "없음"}${q.stale ? " (오래됨 — 복습 일정을 만들지 않음)" : ""}</div>
+    ${Object.entries(q.dueBySubject || {}).map(([sub, n]) => `<div class="item"><span class="txt">${esc(sub)}</span><span class="meta">복습할 문제 ${n}</span></div>`).join("")}
+    ${LIVE ? `<button class="chip" data-act="openquiz" style="margin-top:6px">퀴즈 앱 열기</button>` : ""}
+    <p class="hint">퀴즈 앱 첫 화면의 [기록 내보내기] → 다운로드 폴더에 저장되면 비서가 자동으로 읽습니다.</p>`;
+  $("sessions").innerHTML = D.sessionsToday.length ? D.sessionsToday.map(s => { const t = taskOf(s.key);
+    return `<div class="item"><span class="txt">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span>
+      <span class="meta">${s.minutes ? dur(s.minutes) : ""}${t && s.minutes ? ` / 예상 ${dur(t.minutes)}` : ""}</span></div>`; }).join("")
+    : `<p class="empty">⏱ 시작 버튼으로 기록하면 여기에 쌓이고, 쌓인 기록으로 예상 시간을 고칩니다.</p>`;
+}
+
+// 이번 주 돌아보기: 코드로 숫자만 (끝낸 일 · ⏱ 기록 · 놓친 마감 · 다음 주)
+function weekReviewHtml(W) {
+  if (!W) return "";
+  return `<ul style="margin:0;padding-left:18px;font-size:13px">
+    <li>끝낸 일 <b>${W.doneTotal}</b>${W.doneTotal ? " (" + Object.entries(W.done).map(([k, n]) => `${KIND[k] || k} ${n}`).join(", ") + ")" : ""}</li>
+    <li>⏱ 기록 ${W.trackedCount ? `${W.trackedCount}번 · 실제 ${dur(W.trackedMinutes)} / 예상 ${dur(W.trackedEstimate)}` : "없음 — ⏱ 로 재면 예상 시간이 정확해집니다"}</li>
+    <li>${W.missed.length ? `마감이 지났는데 안 끝난 것 ${W.missed.length}: ${W.missed.map(m => esc(m.title)).join(", ")}` : "놓친 마감 없음 👍"}</li>
+    <li>다음 주 마감 ${W.nextCount}개 · 예상 ${dur(W.nextMinutes)}${W.nextExams.length ? " · 📝 " + W.nextExams.map(esc).join(", ") : ""}</li></ul>`;
+}
+
+// 알림 띠 (잠깐 보였다 사라짐)
+function toast(html, ms = 15000) {
+  const el = $("toast");
+  el.innerHTML = html + ` <button class="chip" data-act="toastclose" style="margin-left:auto">✕</button>`;
+  el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
+}
+// 강의를 들은 뒤: 그 강의의 내 노트가 있으면 바로 열 수 있게 (기록은 study_system 규칙대로 내 말로)
+async function noteAfter(key, title) {
+  try {
+    const r = await getJSON("/api/note-for?key=" + encodeURIComponent(key));
+    toast(r.path ? `✓ 들었음 — 기억할 것을 적어 둘까요? <button data-act="openfile" data-path="${esc(r.path)}">📝 ${esc(r.name)} 열기</button>`
+                 : `✓ 들었음 — 기록하려면 Claude 채팅에서 "공부하자 ${esc(title)}" (내 노트 ${esc(r.folder || "")})`);
+  } catch {}
+}
+
+function renderCalib() {
+  $("calib").innerHTML = (D.calibration || []).length ? D.calibration.map(c => `<div class="item"><span class="txt">${esc(c.what)}</span>
+    <span class="meta">예상의 ×${c.factor} (${c.n}번)</span></div>`).join("")
+    : `<p class="empty">아직 기록이 부족합니다. 할 일을 ⏱ 시작 → ✓ 끝내고 완료 로 마치면, 같은 종류가 3번 쌓였을 때부터 계획에 반영됩니다.</p>`;
+}
+
+function tickTimer() {
+  const el = $("elapsed");
+  if (!el || !D || !D.active) return;
+  const s = Math.max(0, Math.floor((Date.now() - dt(D.active.start)) / 1000));
+  el.textContent = `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ":" : ""}${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+}
+
+// ---- 입력·버튼
+$("days").innerHTML = ["월", "화", "수", "목", "금", "토", "일"].map((d, i) => `<label><input type="checkbox" name="every" value="${i}"><span>${d}</span></label>`).join("");
+document.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => {
+  const f = $("addForm"), v = b.dataset.day, d = new Date();
+  if (v === "clear") { f.date.value = ""; f.time.value = ""; return; }
+  if (v === "fri") d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7)); else d.setDate(d.getDate() + +v);
+  f.date.value = ymdOf(d);
+}));
+async function submitWith(msgEl, fn) {
+  msgEl.className = "msg"; msgEl.textContent = "반영 중…";
+  try { const r = await fn(); msgEl.textContent = "추가됨: " + (r.message || "").replace(/^- \[ \] /, ""); return true; }
+  catch (err) { msgEl.className = "msg err"; msgEl.textContent = err.message; return false; }
+}
+$("quickForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = $("quickInput").value.trim();
+  if (text && await submitWith($("quickMsg"), () => post("quick", { text }))) $("quickInput").value = "";
+});
+$("addForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target;
+  const body = { title: f.title.value, date: f.date.value, time: f.time.value, minutes: f.minutes.value, course: f.course.value,
+                 every: [...f.querySelectorAll("[name=every]:checked")].map(x => x.value) };
+  if (await submitWith($("addMsg"), () => post("add", body))) f.reset();
+});
+$("somedayForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { await post("add", { title: e.target.title.value }); e.target.reset(); } catch (err) { alert(err.message); }
+});
+$("mobSet").addEventListener("click", mobileSettings);
+$("syncBtn").addEventListener("click", async () => { try { const r = await post("sync"); $("status").textContent = r.message; } catch (err) { alert(err.message); } });
+$("statsBox").addEventListener("toggle", () => D && $("statsBox").open && renderStats(ymdOf(new Date())));
+
+document.addEventListener("click", async e => {
+  const tab = e.target.closest("[data-view]");
+  if (tab) { view = tab.dataset.view; try { localStorage.setItem("pa.view", view); } catch {} render(); return; }
+  const wkb = e.target.closest("[data-wk]");
+  if (wkb) { wkIdx = +wkb.dataset.wk; selKey = null; render(); return; }
+  const blk = e.target.closest("[data-sel]");
+  if (blk) { selKey = selKey === blk.dataset.sel ? null : blk.dataset.sel; render(); return; }
+  const mrow = e.target.closest("[data-mi]");  // 자료 찾기 결과 줄: 고르기 (폴더면 들어가기)
+  if (mrow && MP && !e.target.closest("[data-act]")) {
+    MP.sel = +mrow.dataset.mi;
+    const k = MP.items[MP.sel];
+    if (k && k.dir) { $("mpQ").value = k.path + "/"; MP.sel = 0; }
+    mpResults(); $("mpQ").focus(); return;
+  }
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const act = b.dataset.act, key = b.dataset.key;
+  if (act === "ignore") {  // 이것만 / 앞으로도 / 취소
+    b.parentElement.innerHTML = `<span class="meta">제외:</span><button data-act="ign-one" data-key="${esc(key)}">이것만</button>
+      <button data-act="ign-all" data-key="${esc(key)}" title="같은 과목·같은 이름의 과제가 앞으로 또 생겨도 계속 제외">앞으로도</button><button data-act="ign-cancel">취소</button>`;
+    return;
+  }
+  if (act === "ign-cancel") { render(); return; }
+  if (act === "ign-one" || act === "ign-all" || act === "unign") {
+    b.disabled = true;
+    try {
+      const r = act === "unign" ? await post("unignore", { text: b.dataset.text }) : await post("ignore", { key, pattern: act === "ign-all" });
+      if (act === "ign-all" && r.message) $("quickMsg").textContent = r.message;
+    } catch (err) { alert(err.message); b.disabled = false; }
+    return;
+  }
+  if (act === "toastclose") { $("toast").hidden = true; return; }
+  if (act === "gradeack") {
+    if (MOB) { ls.set("pa.ack.grades", (D.grades || []).reduce((m, g) => g.graded_at > m ? g.graded_at : m, "")); render(); return; }
+    try { await post("ack", { what: "grades" }); } catch (err) { alert(err.message); } return;
+  }
+  if (act === "done" && !MOB) {  // 강의면 들은 뒤 노트 열기 제안
+    const t = taskOf(key);
+    b.disabled = true;
+    try { await post("done", { key }); } catch (err) { alert(err.message); b.disabled = false; return; }
+    if (t && t.kind === "lecture") noteAfter(key, t.title);
+    return;
+  }
+  if (act === "matclose") { $("matPanel").innerHTML = ""; MP = null; return; }
+  if (act === "ritualclose") { try { localStorage.setItem(b.dataset.k, ymdOf(new Date())); } catch {} render(); return; }
+  if (act === "mat") { try { await showMaterials(key, { openSingle: true }); } catch (err) { alert(err.message); } return; }
+  if (act === "matshow") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }
+  if (act === "clipnames") { alert("연결된 자료 (파일은 PC 에 있음)\n\n" + ((D.links || {})[key] || []).join("\n")); return; }
+  if (act === "quizcopy") { await quizCopy(key); return; }
+  if (act === "unlink") { try { await api("unlink", { key: MP.key, path: b.dataset.path }); await showMaterials(MP.key); load(); } catch (err) { mpMsg(err.message); } return; }
+  if (act === "refind") { const q = $("mpQ"); q.value = b.dataset.name.replace(/\.[^.]+$/, ""); MP.sel = 0; mpResults(); q.focus(); return; }
+  if (act === "mplinkp") { await mpLink([{ p: b.dataset.path, r: "" }]); return; }
+  if (act === "mplink") { await mpLink([MP.items[+b.dataset.i].f]); return; }
+  if (act === "mpin") { const q = $("mpQ"); q.value = MP.items[+b.dataset.i].path + "/"; MP.sel = 0; mpResults(); q.focus(); return; }
+  if (act === "mpmore") { MP.limit += 20; mpResults(); return; }
+  if (act === "mpbrowse") { try { if (MP.browse) { MP.browse = null; mpBrowseDraw(); } else await mpBrowse(MP.start.root, MP.start.path); } catch (err) { mpMsg(err.message); } return; }
+  if (act === "mpls") { try { await mpBrowse(b.dataset.root, b.dataset.path); } catch (err) { mpMsg(err.message); } return; }
+  if (act === "mpbclose") { MP.browse = null; mpBrowseDraw(); return; }
+  if (act === "mpbadd") { b.disabled = true; await mpLink([...MP.browse.checked.values()]); return; }
+  if (act === "openfile") { try { await api("open-file", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
+  if (act === "dlmove") {
+    const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
+    if (!course) { alert("과목을 골라 주세요"); return; }
+    try { await post("move-download", { path: b.dataset.path, course }); } catch (err) { alert(err.message); } return;
+  }
+  if (act === "summarize") {
+    if (!confirm("이 자료의 요약을 Claude 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
+    try { await post("job/summary", { path: b.dataset.path }); $("matPanel").innerHTML = ""; MP = null; } catch (err) { alert(err.message); } return;
+  }
+  if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
+  if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
+  if (act === "glogin") { try { const r = await post("google-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
+  if (act === "examadd") {
+    const x = JSON.parse(b.dataset.x); b.disabled = true;
+    try { await post(MOB ? "add" : "exam-add", MOB ? { title: x.title, date: x.date, time: x.time || "09:00", minutes: "", course: x.course, every: [] } : x); }
+    catch (err) { alert(err.message); b.disabled = false; } return;
+  }
+  if (act === "examno") { try { await post("exam-dismiss", { id: b.dataset.id }); } catch (err) { alert(err.message); } return; }
+  if (act === "keep") { try { await post("keep", { key }); } catch (err) { alert(err.message); } return; }
+  if (act === "ack") {
+    if (MOB) { ls.set("pa.ack." + b.dataset.what, D.warnings.find(w => w.includes("[ack:" + b.dataset.what)) || ""); render(); return; }
+    try { await post("ack", { what: b.dataset.what }); } catch (err) { alert(err.message); } return;
+  }
+  if (act === "relogin") {
+    if (!confirm("비서용 로그인 창을 엽니다.\n\n주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다.\n그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.\n\n계속할까요?")) return;
+    try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
+  if (act === "sumfor") {
+    b.disabled = true;
+    try {
+      const r = await post("job/summary-for", { key });
+      if (r.choose) await showMaterials(key, { note: "연결된 PDF 가 여러 개입니다 — 정리할 자료 칩의 🤖 를 누르세요 (이미 만든 정리는 📝 로 열림)" });
+      else if (r.message) alert(r.message);
+    }
+    catch (err) { alert(err.message); } b.disabled = false; return;
+  }
+  if (act === "openquiz") { try { await post("open-quiz"); } catch (err) { alert(err.message); } return; }
+  if (act === "dotoday") { try { await post("today", { key }); } catch (err) { alert(err.message); } return; }
+  const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
+                 nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
+  if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
+  if (act === "report") { try { await showReport(key); } catch (err) { alert(err.message); } return; }
+  if (act === "repwin") { b.disabled = true; try { await api("report-brief", repBrief()); const r = await api("workspace", { key: REP.key }); $("repMsg").textContent = r.message; REP.exists = true; } catch (err) { $("repMsg").className = "msg err"; $("repMsg").textContent = err.message; } b.disabled = false; return; }
+  if (act === "reveal") { try { await api("reveal", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
+  if (act === "reppdf") { b.disabled = true; try { const r = await api("report-pdf", { key: REP.key }); $("repMsg").className = "msg"; $("repMsg").textContent = r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : ""); } catch (err) { $("repMsg").className = "msg err"; $("repMsg").textContent = err.message; } b.disabled = false; return; }
+  if (act === "workspace") { try { const r = await api("workspace", { key }); toast(esc(r.message), 6000); } catch (err) { alert(err.message); } return; }
+  if (act === "repdraft" || act === "repfile" || act === "repchat") { b.disabled = true; await repAction(act); b.disabled = false; return; }
+  if (act === "repclose") { $("repPanel").innerHTML = $("matPanel").innerHTML = ""; REP = MP = null; return; }
+  const call = { report: ["job/report", { key }], done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
+                 start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];
+  b.disabled = true;
+  try { await post(...call); } catch (err) { alert(err.message); b.disabled = false; }
+});
+// '/' 또는 Ctrl+K → 빠른 입력, t/w → 보기 전환 (입력 중이 아닐 때)
+document.addEventListener("keydown", e => {
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)) { e.preventDefault(); $("quickInput").focus(); return; }
+  if (typing) return;
+  if (e.key === "t" || e.key === "w") { view = e.key === "t" ? "today" : "week"; try { localStorage.setItem("pa.view", view); } catch {} render(); }
+  if (view === "week" && (e.key === "ArrowLeft" || e.key === "ArrowRight") && D) {
+    const base = wkIdx === null ? curWeekIdx(ymdOf(new Date())) : wkIdx;
+    wkIdx = Math.max(0, Math.min((D.semester || []).length - 1, base + (e.key === "ArrowLeft" ? -1 : 1))); render();
+  }
+});
+
+load();
+setInterval(load, (MOB ? 300 : 30) * 1000);
+setInterval(tickTimer, 1000);
+</script>
+</body>
+</html>
