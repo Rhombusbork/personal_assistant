@@ -14,6 +14,7 @@ POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열�
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
 GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일 이름·있는지 · 저장한 작성 지침
+POST /api/workspace  🗂 VSCode 새 창: 과제 → ~/report + 보고서 파일 / 강의 → ~/study_system + 맞는 노트
 POST /api/report-brief, /api/report-file   작성 지침 저장 / Claude 없이 규칙 이름의 빈 파일 만들고 열기
 GET  /api/note-for?key=…  강의를 들은 뒤 열 내 노트 (번호가 맞는 notes/<과목>/ 파일)
 GET  /api/files       찾기 범위의 파일 이름 목록 (1분 보관 — 실시간 찾기는 화면이 이 목록으로)
@@ -185,7 +186,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
-                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file"):
+                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -264,6 +265,18 @@ class Handler(SimpleHTTPRequestHandler):
             if action == "/api/report-brief":
                 jobs.save_brief(conn, body["key"], body.get("text", ""), body.get("blanks", True))
                 return {"ok": True}
+            if action == "/api/workspace":  # 🗂 VSCode 작업 창: 과제 → ~/report (+ 보고서 파일), 강의 → ~/study_system (+ 맞는 노트)
+                row = conn.execute("SELECT kind, course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+                if not row:
+                    raise ValueError("할 일을 찾지 못함")
+                if row["kind"] == "lecture":
+                    dirs = materials.course_dirs(row["course"])
+                    note = next((f for sc, f in materials.scan(dirs[1], row["title"]) if sc >= 10), None) if dirs else None
+                    materials.open_window(materials._cfg()["root"], note)
+                    return {"ok": True, "message": "study_system 을 VSCode 새 창으로 열었습니다"}
+                path = jobs.blank_report(conn, body["key"])
+                materials.open_window(jobs.REPORT_DIR, path)
+                return {"ok": True, "message": f"report 폴더를 VSCode 새 창으로 열었습니다 ({path.name})"}
             if action == "/api/report-file":
                 path = jobs.blank_report(conn, body["key"])
                 return {"ok": True, "path": str(path), "where": materials.open_file(path)}

@@ -44,6 +44,7 @@ TEMPLATE = """# 📥 inbox — 할 일 입력 (저장하면 자동 반영)
 DAY_MAP = {**{d: i for i, d in enumerate("월화수목금토일")},
            **{d: i for i, d in enumerate(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])}}
 RE_DUE = re.compile(r"@(?:(\d{4})-)?(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?")
+RE_START = re.compile(r"(?<!\S)>(?:(\d{4})-)?(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?")  # >11-15 09:00 = 이때부터 하기
 RE_MIN = re.compile(r"~(\d+(?:\.\d+)?)\s*(h|m|시간|분)")
 RE_COURSE = re.compile(r"#(\S+)")
 RE_EVERY = re.compile(r"(?:매주|every):(\S+)")
@@ -71,7 +72,15 @@ def exam_reviews(key, base, exam, cfg, t_now):
 
 def parse_line(text, today, default_minutes):
     """할 일 한 줄 → dict. 잘못된 부분이 있으면 ValueError."""
-    item = {"due": None, "minutes": default_minutes, "course": "", "every": None}
+    item = {"due": None, "minutes": default_minutes, "course": "", "every": None, "earliest": None}
+    m = RE_START.search(text)
+    if m:
+        y, mo, d, hh, mm = m.groups()
+        try:
+            item["earliest"] = datetime(int(y) if y else today.year, int(mo), int(d), int(hh or 0), int(mm or 0), tzinfo=KST)
+        except ValueError:
+            raise ValueError(f"시작 날짜가 올바르지 않음: {m.group(0)}")
+        text = text.replace(m.group(0), " ")
     m = RE_DUE.search(text)
     if m:
         y, mo, d, hh, mm = m.groups()
@@ -344,7 +353,8 @@ def sync(conn):
                 d += timedelta(days=1)
             continue
         key = f"i:{it['title']}"
-        items.append({**base, "key": key, "due": it["due"].isoformat() if it["due"] else None, "earliest": None})
+        items.append({**base, "key": key, "due": it["due"].isoformat() if it["due"] else None,
+                      "earliest": it["earliest"].isoformat() if it["earliest"] else None})
         if it["due"] and RE_EXAM.search(it["title"]) and not is_checked:
             items += exam_reviews(key, base, it["due"], cfg, now())
         if is_checked:

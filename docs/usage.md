@@ -108,6 +108,8 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
   4. 고르기: **💬 채팅에서 같이 쓰기** (파일을 VSCode 에 열고, 과제·자료·지침을 담은 `/assignment …` 요청을 복사 →
      오른쪽 Claude 채팅에 붙여 넣어 대화하며 씀) / **🤖 초안 한 번에** (Claude 가 뒤에서 전체 초안, 있던 파일은 `_old1` 로 보관) /
      **📝 빈 파일만** (규칙 이름·제목·학번 줄만, Claude 안 씀)
+     / **🗂 VSCode 작업 창** (report 폴더를 VSCode 새 창으로 + 보고서 파일 — 그 창의 Claude 는 report 글쓰기 규칙을 따름)
+  - 강의 줄의 **🗂**: study_system 을 VSCode 새 창으로 (번호가 맞는 내 노트가 있으면 함께)
 - Claude 는 위 버튼을 눌렀을 때만 쓴다. 🤖 작업 칸에 몇 번 썼는지 표시
 
 ## 휴대폰에서 보기·입력 (GitHub Pages)
@@ -193,6 +195,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 - [ ] 리바이어던 발표자료 제출 @11-20 ~2h        마감 11/20 23:59, 예상 2시간
 - [ ] 린스타트업 발표 @11-13 18:00 ~90m #창업     마감 시각, 과목
 - [ ] 생화학 공부 ~1h 매주:화,목                  매주 그 요일 안에
+- [ ] 피드백 루프 설계 >11-15 09:00 @11-15 12:00   11/15 09:00 부터 12:00 까지 (그 전에는 배치 안 함)
 - [ ] 논문 읽기                                    기한 없음 (장기 할 일)
 - [x] 린스타트업 텍스트 제출 @11-11                체크 = 완료, 체크 풀면 다시 열림
 

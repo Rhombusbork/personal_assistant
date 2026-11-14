@@ -87,7 +87,7 @@ def scan(folder, title):
     return scored
 
 
-def _vscode_open(path):
+def _vscode_open(path, *, args=None):
     """VSCode 편집기 탭으로 연다. 엔진이 켜진 뒤 VSCode 창을 다시 열었으면 연결 통로(소켓)가 바뀌므로,
     환경 변수의 것 → 가장 최근 것 순서로 시도한다. 실패하면 False."""
     import glob
@@ -100,13 +100,23 @@ def _vscode_open(path):
         if not sock or not os.path.exists(sock):
             continue
         try:
-            r = subprocess.run([code, "--reuse-window", str(path)], env={**os.environ, "VSCODE_IPC_HOOK_CLI": sock},
+            r = subprocess.run([code, *(args or ["--reuse-window", str(path)])], env={**os.environ, "VSCODE_IPC_HOOK_CLI": sock},
                                capture_output=True, timeout=8)
         except (subprocess.TimeoutExpired, OSError):
             continue
         if r.returncode == 0:
             return True
     return False
+
+
+def open_window(folder, file=None):
+    """VSCode 새 창으로 작업 폴더를 연다 (그 창의 Claude 채팅은 그 폴더의 CLAUDE.md 규칙을 따름). 파일이 있으면 함께."""
+    folder = Path(folder).resolve()
+    if not any(r == folder or r in folder.parents for r in allowed_roots()) or not folder.is_dir():
+        raise ValueError("열 수 없는 위치")
+    if not _vscode_open(folder, args=["--new-window", str(folder)] + ([str(file)] if file else [])):
+        raise ValueError("VSCode 를 찾지 못했습니다 — VSCode 창이 하나라도 열려 있어야 합니다")
+    return "vscode"
 
 
 def open_file(path):
