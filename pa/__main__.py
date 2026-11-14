@@ -12,6 +12,8 @@
   bin/pa time <키> <분>       예상 소요 시간 조정
   bin/pa task <키>            할 일 하나: 마감·주소·Canvas 과제 설명·보고서 파일·연결된 자료 (채팅 작업용)
   bin/pa notices [--all]      새 공지 (읽지 않은 것; --all 은 최근 2주 전부) — 본문 앞부분과 🤖 요약
+  bin/pa pdf <보고서.md>       제출용 A4 PDF 만들기 (쪽수 출력) → 탐색기에서 위치 보여 주기
+  bin/pa reveal <파일>         탐색기에서 파일 위치 보기
   bin/pa links [키]           연결된 자료 (키 없이: 자료가 연결된 할 일 전부)
   bin/pa link <키> <파일>...  자료 연결 (config/materials.yaml 범위 안, 최대 max_links) / unlink 로 빼기
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
@@ -181,6 +183,13 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "google-login":
         from pa import gcal
         return gcal.login()
+    if len(sys.argv) > 2 and sys.argv[1] in ("pdf", "reveal"):
+        from pa import materials, pdf
+        path = sys.argv[2]
+        if sys.argv[1] == "pdf":
+            path, pages = pdf.make(path)
+            print(f"{path} ({pages}쪽)")
+        return materials.reveal(path)
     if len(sys.argv) > 1 and sys.argv[1] == "browser":
         from pa import browser
         return browser.main(sys.argv[2:])

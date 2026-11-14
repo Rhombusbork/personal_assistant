@@ -110,6 +110,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
      **📝 빈 파일만** (규칙 이름·제목·학번 줄만, Claude 안 씀)
      / **🗂 VSCode 작업 창** (report 폴더를 VSCode 새 창으로 + 보고서 파일 — 그 창의 Claude 는 report 글쓰기 규칙을 따름)
   - 강의 줄의 **🗂**: study_system 을 VSCode 새 창으로 (번호가 맞는 내 노트가 있으면 함께)
+  - 보고서 파일이 생기면 **Windows 탐색기가 그 파일을 선택한 채 열린다**. ✍ 창의 **📄 PDF 만들기** (A4, 쪽수 알려 줌) · **📂 위치**
 - Claude 는 위 버튼을 눌렀을 때만 쓴다. 🤖 작업 칸에 몇 번 썼는지 표시
 
 ## 휴대폰에서 보기·입력 (GitHub Pages)

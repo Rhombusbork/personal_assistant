@@ -883,7 +883,9 @@ async function showReport(key) {
   $("repPanel").innerHTML = `<div class="card mat rep"><h2>✍ ${esc(r.title)} <span class="hint">마감 ${due}</span>
       <button class="chip" data-act="repclose" style="margin-left:auto">닫기</button></h2>
     ${r.desc ? `<details ${r.desc.length < 300 ? "open" : ""}><summary class="meta">Canvas 과제 설명</summary><p class="desc">${esc(r.desc)}</p></details>` : ""}
-    <div class="meta" style="margin-top:6px">파일: <b>${esc(r.name)}</b> ${r.exists ? `— 이미 있음 <button class="chip" data-act="openfile" data-path="${esc(r.path)}">열기</button>` : "— 아직 없음"}</div>
+    <div class="meta" style="margin-top:6px">파일: <b>${esc(r.name)}</b> ${r.exists ? `— 이미 있음 <button class="chip" data-act="openfile" data-path="${esc(r.path)}">열기</button>
+      <button class="chip" data-act="reveal" data-path="${esc(r.path)}" title="Windows 탐색기에서 파일 위치 보기">📂 위치</button>
+      <button class="chip" data-act="reppdf" title="이 .md 를 A4 PDF 로 (쪽수 알려 줌, Claude 안 씀) → 탐색기에서 보여 줌">📄 PDF 만들기</button>` : "— 아직 없음"}</div>
     <div class="meta">참고 자료: 아래 📄 창에서 고른 것만 씀 (하나도 없으면 제목으로 자동 추측)</div>
     <label class="meta" for="repText" style="display:block;margin-top:8px">어떻게 쓸까요? (분량·구성·강조할 내용·내 의견·말투 등 — 비워도 됨)</label>
     <textarea id="repText" placeholder="예) A4 1쪽. 홉스의 자연 상태와 사회 계약을 중심으로, 마지막 문단에 오늘날 국가 권력과 비교한 내 생각 (내 생각은 비워 둬)">${esc(r.brief.text)}</textarea>
@@ -1271,6 +1273,8 @@ document.addEventListener("click", async e => {
   if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
   if (act === "report") { try { await showReport(key); } catch (err) { alert(err.message); } return; }
   if (act === "repwin") { b.disabled = true; try { await api("report-brief", repBrief()); const r = await api("workspace", { key: REP.key }); $("repMsg").textContent = r.message; REP.exists = true; } catch (err) { $("repMsg").className = "msg err"; $("repMsg").textContent = err.message; } b.disabled = false; return; }
+  if (act === "reveal") { try { await api("reveal", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
+  if (act === "reppdf") { b.disabled = true; try { const r = await api("report-pdf", { key: REP.key }); $("repMsg").className = "msg"; $("repMsg").textContent = r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : ""); } catch (err) { $("repMsg").className = "msg err"; $("repMsg").textContent = err.message; } b.disabled = false; return; }
   if (act === "workspace") { try { const r = await api("workspace", { key }); toast(esc(r.message), 6000); } catch (err) { alert(err.message); } return; }
   if (act === "repdraft" || act === "repfile" || act === "repchat") { b.disabled = true; await repAction(act); b.disabled = false; return; }
   if (act === "repclose") { $("repPanel").innerHTML = $("matPanel").innerHTML = ""; REP = MP = null; return; }

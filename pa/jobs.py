@@ -167,6 +167,7 @@ def blank_report(conn, key):
     if not path.exists():
         path.write_text(_template(task))
         db.set_meta(conn, "report_file:" + key, str(path))
+        materials.reveal(path)  # 새 보고서 파일 → 탐색기에서 위치 보여 주기
         db.log(conn, "report_file_created", key, path=path.name)
         conn.commit()
     return path
@@ -252,6 +253,7 @@ def report_job(conn, job, force=False):
         materials.open_file(path)
     except Exception:
         pass
+    materials.reveal(path)
     return path
 
 

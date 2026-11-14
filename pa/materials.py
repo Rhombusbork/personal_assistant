@@ -109,6 +109,16 @@ def _vscode_open(path, *, args=None):
     return False
 
 
+def reveal(path):
+    """Windows 탐색기를 열어 그 파일을 선택해 보여 준다 (제출할 때 끌어다 놓기 쉽게). 실패해도 조용히."""
+    try:
+        win = subprocess.run(["wslpath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
+        subprocess.Popen(["explorer.exe", "/select," + win])
+        return True
+    except OSError:
+        return False
+
+
 def open_window(folder, file=None):
     """VSCode 새 창으로 작업 폴더를 연다 (그 창의 Claude 채팅은 그 폴더의 CLAUDE.md 규칙을 따름). 파일이 있으면 함께."""
     folder = Path(folder).resolve()

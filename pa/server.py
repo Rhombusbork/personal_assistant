@@ -14,6 +14,7 @@ POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열�
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
 GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일 이름·있는지 · 저장한 작성 지침
+POST /api/report-pdf  보고서 .md → A4 PDF (쪽수 알려 줌) → 탐색기에서 선택해 보여 줌 / POST /api/reveal 탐색기에서 위치 보기
 POST /api/workspace  🗂 VSCode 새 창: 과제 → ~/report + 보고서 파일 / 강의 → ~/study_system + 맞는 노트
 POST /api/report-brief, /api/report-file   작성 지침 저장 / Claude 없이 규칙 이름의 빈 파일 만들고 열기
 GET  /api/note-for?key=…  강의를 들은 뒤 열 내 노트 (번호가 맞는 notes/<과목>/ 파일)
@@ -186,7 +187,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
-                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace"):
+                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -277,6 +278,22 @@ class Handler(SimpleHTTPRequestHandler):
                 path = jobs.blank_report(conn, body["key"])
                 materials.open_window(jobs.REPORT_DIR, path)
                 return {"ok": True, "message": f"report 폴더를 VSCode 새 창으로 열었습니다 ({path.name})"}
+            if action == "/api/report-pdf":  # .md → 제출용 PDF (Claude 안 씀) → 탐색기에서 보여 줌
+                from pa import pdf
+                row = conn.execute("SELECT * FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+                md = jobs.report_path(dict(row), conn) if row else None
+                if not md or not md.exists():
+                    raise ValueError("아직 보고서 파일이 없습니다")
+                out, pages = pdf.make(md)
+                materials.reveal(out)
+                return {"ok": True, "path": str(out), "pages": pages,
+                        "message": f"PDF {pages}쪽: {out.name} — 탐색기에서 열었습니다"}
+            if action == "/api/reveal":  # 탐색기에서 파일 위치 보기
+                path = Path(body["path"]).resolve()
+                if not any(r == path or r in path.parents for r in materials.allowed_roots()) or not path.exists():
+                    raise ValueError("열 수 없는 위치")
+                materials.reveal(path)
+                return {"ok": True}
             if action == "/api/report-file":
                 path = jobs.blank_report(conn, body["key"])
                 return {"ok": True, "path": str(path), "where": materials.open_file(path)}
