@@ -9,7 +9,7 @@
 선택: [Claude Code](https://claude.com/claude-code) (보고서 초안·자료 요약·채팅 비서), VSCode.
 
 ```bash
-git clone https://github.com/Rhombusbork/personal_assistant.git ~/personal_assistant
+git clone https://github.com/Rhombusbork/personal_assistant_release.git ~/personal_assistant
 cd ~/personal_assistant
 bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남은 일을 알려 줌
 ```
