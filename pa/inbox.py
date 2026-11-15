@@ -238,6 +238,29 @@ def mark_done(key):
     _insert("done", f"- {key}")
 
 
+def undone(conn, key):
+    """완료 되돌리기 (대시보드 [되돌리기]): inbox 할 일이면 체크를 풀고, 그 밖은 ## 완료 의 그 줄을 지운 뒤 다시 '열림'으로."""
+    lines = PATH.read_text().splitlines()
+    if key.startswith("i:") and "@" not in key:
+        i = _todo_line_index(lines, key[2:])
+        if i is not None and "[x]" in lines[i].lower():
+            lines[i] = re.sub(r"\[[xX]\]", "[ ]", lines[i], count=1)
+            PATH.write_text("\n".join(lines) + "\n")
+    else:
+        section = "todo"
+        for i, line in enumerate(lines):
+            if line.startswith("#"):
+                section = "done" if "완료" in line else "ignore" if "제외" in line else "todo"
+                continue
+            m = RE_BULLET.match(line)
+            if section == "done" and m and m.group(1).strip().strip("`") == key:
+                del lines[i]
+                PATH.write_text("\n".join(lines) + "\n")
+                break
+    db.set_status(conn, key, "open", "user")
+    conn.commit()
+
+
 def ignore(key):
     _insert("ignore", f"- {key}")
 

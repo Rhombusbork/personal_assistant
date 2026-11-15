@@ -143,3 +143,19 @@ def test_unignore_single_key(conn):
     inbox.unignore("a1")
     inbox.sync(conn)
     assert status(conn, "a1") == "open"
+
+
+def test_undone_reopens(tmp_path, monkeypatch):
+    from pa import db, inbox
+    monkeypatch.setattr(db, "PATH", tmp_path / "pa.db")
+    monkeypatch.setattr(inbox, "PATH", tmp_path / "inbox.md")
+    inbox.PATH.write_text("## 할 일\n- [ ] 발표 @2099-01-01\n\n## 완료\n\n## 제외\n")
+    conn = db.connect()
+    db.sync_source(conn, "canvas", [{"key": "a1", "kind": "assignment", "course": "", "title": "과제",
+                                     "due": "2099-01-01T23:59:00+09:00", "earliest": None, "minutes": 60, "url": ""}])
+    inbox.mark_done("a1"); inbox.mark_done("i:발표")
+    assert "- a1" in inbox.PATH.read_text() and "[x] 발표" in inbox.PATH.read_text()
+    inbox.undone(conn, "a1"); inbox.undone(conn, "i:발표")
+    text = inbox.PATH.read_text()
+    assert "- a1" not in text and "[ ] 발표" in text
+    assert conn.execute("SELECT status FROM tasks WHERE key = 'a1'").fetchone()[0] == "open"

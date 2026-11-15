@@ -4,7 +4,7 @@ GET  /               대시보드 (dashboard/index.html)
 GET  /api/data       지금 시각 기준 대시보드 데이터 (요청마다 새로 계산). ?v=<id> 로 '열려 있음' 신호
 GET  /api/viewers    최근 45초 안에 신호를 보낸 대시보드 탭 수 (VSCode 가 중복으로 열지 않게)
 POST /api/add        할 일 추가 → inbox.md 에 한 줄
-POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료)
+POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료) / POST /api/undone 되돌리기
 POST /api/ignore     계속 제외 (## 제외). pattern=true 면 같은 이름의 앞으로 생길 과제도
 POST /api/unignore   제외 취소 (## 제외 의 그 줄을 지움)
 POST /api/remove     inbox 할 일 삭제
@@ -169,6 +169,12 @@ class Handler(SimpleHTTPRequestHandler):
                     conn.close()
             elif action == "/api/ignore":
                 inbox.ignore(body["key"]); msg = "제외"
+            elif action == "/api/undone":  # 완료 되돌리기
+                conn = db.connect()
+                try:
+                    inbox.undone(conn, body["key"]); msg = "되돌림"
+                finally:
+                    conn.close()
             elif action == "/api/exam-add":  # 시험 일정 후보 → inbox (시험 모드가 복습을 배치)
                 when = datetime.fromisoformat(f"{body['date']}T{body.get('time') or '09:00'}").replace(tzinfo=KST)
                 msg = inbox.add_task(title=body["title"], due=when, minutes=None, course=body.get("course", ""), every=None)

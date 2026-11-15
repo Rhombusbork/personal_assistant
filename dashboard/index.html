@@ -7,322 +7,445 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#0066cc">
+<meta name="color-scheme" content="light dark">
 <style>
+  /* 시안 A "차분한 집중" — 색은 의미(종류 점 + 강조 하나)에만, 구분은 상자 대신 글자 크기·굵기·회색 단계로.
+     간격은 8의 배수만 쓴다 (4 는 글자 사이 미세 조정에만). */
+  /* A-1: 회색 3단계는 그대로 두되 모두 4.5:1 이상 (text3 2.57 → 5.07). 강조색(파랑)은 '누를 수 있음·지금'에만,
+     종류 색은 파랑을 피한 4색 + 회색(할 일). 원형 테두리는 비텍스트 대비 3:1 이상 (WCAG 1.4.11). */
   :root {
-    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #6b7385; --line: #e3e6ec; --field: #f1f3f6;
-    --lecture: #3b82f6; --quiz: #8b5cf6; --assignment: #f59e0b; --todo: #10b981; --review: #ec4899; --busy: #9aa3b2;
-    --danger: #ef4444; --warn: #f97316; --accent: #2563eb;
+    --bg: #ffffff; --elev: #ffffff; --text: #1d1d1f; --text2: #545458; --text3: #6e6e73;
+    --line: rgba(0, 0, 0, .09); --fill: rgba(0, 0, 0, .035); --fill2: rgba(0, 0, 0, .065);
+    --accent: #0066cc; --accent-fill: #0066cc; --on-accent: #ffffff; --danger: #d70015; --warn: #b45309; --shadow: 0 8px 32px rgba(0, 0, 0, .14), 0 1px 3px rgba(0, 0, 0, .08);
+    --lecture: #0f8a7e; --quiz: #7c3aed; --assignment: #d97706; --todo: #8e8e93; --review: #db2777; --busy: #c7c7cc;
+    --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s5: 40px; --s6: 48px;
+    --hit: 44px;  /* Apple HIG 44pt · WCAG 2.5.5 */
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #14171d; --card: #1d2129; --text: #e6e9ef; --muted: #98a0b0; --line: #2c323d; --field: #262b35;
-            --busy: #4b5363; --accent: #60a5fa; }
+    :root:not([data-theme="light"]) {
+      --bg: #161617; --elev: #232325; --text: #f5f5f7; --text2: #a1a1a6; --text3: #8a8a8f;
+      --line: rgba(255, 255, 255, .1); --fill: rgba(255, 255, 255, .05); --fill2: rgba(255, 255, 255, .09);
+      --accent: #2997ff; --accent-fill: #0a6cd6; --danger: #ff6961; --warn: #fbbf24; --busy: #48484a; --shadow: 0 8px 32px rgba(0, 0, 0, .5);
+      --lecture: #2dd4bf; --quiz: #a78bfa; --assignment: #fbbf24; --todo: #8e8e93; --review: #f472b6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161617; --elev: #232325; --text: #f5f5f7; --text2: #a1a1a6; --text3: #8a8a8f;
+    --line: rgba(255, 255, 255, .1); --fill: rgba(255, 255, 255, .05); --fill2: rgba(255, 255, 255, .09);
+    --accent: #2997ff; --accent-fill: #0a6cd6; --danger: #ff6961; --warn: #fbbf24; --busy: #48484a; --shadow: 0 8px 32px rgba(0, 0, 0, .5);
+    --lecture: #2dd4bf; --quiz: #a78bfa; --assignment: #fbbf24; --todo: #8e8e93; --review: #f472b6;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
-  main { max-width: 1240px; margin: 0 auto; padding: 16px 16px 40px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 12px; }
-  h1 { font-size: 22px; margin: 0; }
-  .sub { color: var(--muted); font-size: 12px; }
-  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
-  .pill.on { background: color-mix(in srgb, var(--todo) 20%, var(--card)); color: var(--todo); }
-  .sum { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-  .sum .pill { font-size: 12px; padding: 2px 10px; }
-  .sum .hot { background: color-mix(in srgb, var(--warn) 20%, var(--card)); color: var(--warn); }
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "NanumBarunGothic", "NanumGothic", system-ui, sans-serif;
+         -webkit-font-smoothing: antialiased; }
+  main { max-width: 720px; margin: 0 auto; padding: var(--s5) var(--s3) 96px; }
+  @media (max-width: 600px) { main { padding: var(--s3) var(--s2) 96px; } }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
 
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
-  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; margin-top: 14px; }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-  .stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
-  .stack > div:empty { display: none; }  /* 비어 있는 칸이 간격만 차지해 오른쪽이 밀려 내려가지 않게 */
-  .warn { background: color-mix(in srgb, var(--warn) 12%, var(--card)); border-color: var(--warn); margin-top: 12px; }
-  .warn ul { margin: 0; padding-left: 18px; }
+  /* ---- 머리 */
+  header { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: var(--s1) var(--s2); }
+  .eyebrow { font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+  .live { width: 8px; height: 8px; border-radius: 50%; background: #1f9d55; display: inline-block; flex: none; }
+  .live.stale { background: var(--warn); }
+  .live.off { background: var(--danger); }
+  .status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+  .status .sep { color: var(--text3); }
+  .status .st-bad { color: var(--danger); font-weight: 600; }
+  .status .st-warn { color: var(--warn); font-weight: 600; }
+  .status .job, .status .tmr { color: var(--text); font-weight: 500; border: 0; background: none; padding: 0; font-size: 13px; display: inline-flex; gap: 4px; align-items: center; }
+  .status .tmr { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .spin { width: 10px; height: 10px; border: 2px solid var(--fill2); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.02em; margin: 0; font-weight: 700; }
+  .hdr-tools { display: flex; gap: var(--s1); align-items: center; }
+  .seg { display: inline-flex; background: var(--fill2); border-radius: 9px; padding: 2px; }
+  .seg button { border: 0; background: none; padding: 4px 14px; min-height: 32px; border-radius: 7px; font-size: 13px; color: var(--text2); }
+  .seg button.on { background: var(--elev); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+  .hdr-eye { grid-column: 1 / -1; margin-bottom: -8px; }
+  .summary { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--text2); }
+  .summary b { color: var(--text); font-weight: 600; }
+  .summary .bad { color: var(--danger); font-weight: 700; text-decoration: none; }
+  .summary a.bad:hover { text-decoration: underline; }
+  html { scroll-padding-top: 24px; }
 
-  input, select, button { font: inherit; color: inherit; }
-  input[type=text], input[type=date], input[type=time], select {
-    background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; min-width: 0; }
-  button { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
-  button:hover { border-color: var(--accent); }
-  button:disabled { opacity: .5; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  button.chip { font-size: 12px; padding: 2px 9px; border-radius: 99px; }
+  .icon-btn { width: 40px; height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--text2);
+              display: inline-grid; place-items: center; font-size: 17px; line-height: 1; padding: 0; flex: none; }
+  .icon-btn:hover { background: var(--fill2); color: var(--text); }
 
-  /* 빠른 입력 */
-  .quick { display: flex; gap: 8px; align-items: center; }
-  .quick input { flex: 1; font-size: 15px; padding: 9px 12px; }
-  .quick kbd { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-  details.more { margin-top: 8px; }
-  details.more summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-  form.full { display: grid; gap: 8px; margin-top: 8px; }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .row > label { font-size: 12px; color: var(--muted); min-width: 40px; }
+  /* ---- 빠른 입력 */
+  .quick { margin-top: var(--s3); display: flex; align-items: center; gap: var(--s1); border-bottom: 1px solid var(--line); padding-bottom: var(--s1); }
+  .quick .plus { color: var(--accent); font-size: 20px; width: 24px; text-align: center; line-height: 1; }
+  .quick input { flex: 1; min-width: 0; border: 0; background: none; padding: 8px 0; font-size: 15px; outline: none; }
+  .quick input::placeholder { color: var(--text3); }
+  .link { border: 0; background: none; color: var(--accent); padding: 4px 0; min-height: 32px; font-size: 13px; }
+  .link:hover { text-decoration: underline; }
+  .link.muted { color: var(--text2); }
+  kbd { font: 11px/1 inherit; color: var(--text3); border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; }
+  .full { display: grid; gap: var(--s1); padding: var(--s2) 0 var(--s1) 32px; }
+  .full[hidden] { display: none; }
+  .frow { display: flex; flex-wrap: wrap; gap: var(--s1); align-items: center; }
+  .frow > .lbl { font-size: 13px; color: var(--text2); width: 40px; }
+  .field { background: var(--fill); border: 1px solid transparent; border-radius: 8px; padding: 6px 10px; min-width: 0; }
+  .field:focus { border-color: var(--accent); outline: none; }
+  .chip { border: 0; background: var(--fill2); border-radius: 99px; padding: 4px 12px; font-size: 13px; }
+  .chip:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .days { display: flex; gap: 4px; }
-  .days input { display: none; }
-  .days span { display: inline-block; width: 28px; text-align: center; padding: 2px 0; border-radius: 6px;
-               border: 1px solid var(--line); background: var(--field); cursor: pointer; font-size: 12px; }
-  .days input:checked + span { background: var(--todo); border-color: var(--todo); color: #fff; }
-  .msg { font-size: 12px; color: var(--muted); }
-  .msg.err { color: var(--danger); }
-  .hint { font-size: 12px; color: var(--muted); font-weight: normal; }
+  .days input { position: absolute; opacity: 0; pointer-events: none; }
+  .days span { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--fill); font-size: 13px; cursor: pointer; }
+  .days input:checked + span { background: var(--accent-fill); color: var(--on-accent); }
 
-  /* 타이머 */
-  .timer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px;
-           border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--card)); border: 1px solid var(--accent); }
-  .timer b { font-variant-numeric: tabular-nums; font-size: 18px; }
+  /* ---- 버튼 */
+  .btn { height: var(--hit); padding: 0 var(--s2); border: 0; border-radius: 10px; background: var(--fill2); font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .btn:hover { filter: brightness(.97); }
+  .btn.primary { background: var(--accent-fill); color: var(--on-accent); }
+  .btn.plain { background: transparent; color: var(--accent); padding: 0 12px; }
+  .btn.plain:hover { background: var(--fill); }
+  .tbtn { border: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 600; padding: 4px 8px; min-height: 32px; border-radius: 6px; white-space: nowrap; }
+  .tbtn:hover { background: var(--fill2); }
+  .tbtn.gray { color: var(--text2); font-weight: 500; }
 
-  /* 보기 전환 */
-  .tabs { display: inline-flex; background: var(--field); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
-  .tabs button { border: 0; background: none; padding: 3px 12px; font-size: 13px; }
-  .tabs button.on { background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+  /* ---- 지금 할 일 (주인공) */
+  .hero { margin-top: var(--s5); }
+  .hero .eyebrow { color: var(--accent); font-weight: 600; }
+  .hero .eyebrow .sep { color: var(--text3); font-weight: 400; }
+  .hero-head { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; margin-top: var(--s1); }
+  .hero-title { font-size: 24px; line-height: 1.3; letter-spacing: -.015em; margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+  .hero .ck i { width: 26px; height: 26px; }
+  .hero .ck { margin-top: -6px; }
+  .hero-meta { font-size: 14px; color: var(--text2); margin-top: 4px; }
+  .hero-body { min-width: 0; }
+  .bar { height: 4px; border-radius: 99px; background: var(--fill2); margin-top: var(--s2); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+  .hero-acts { display: flex; flex-wrap: wrap; gap: var(--s1); margin-top: var(--s2); align-items: center; }
+  .why { font-size: 13px; color: var(--text3); margin: var(--s1) 0 0; }
+  .timer-num { font-size: 40px; font-weight: 300; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: var(--s1); }
 
-  /* 지금 할 일 */
-  .now-card { border: 2px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
-  .now-card .lbl { font-size: 12px; color: var(--accent); font-weight: 700; }
-  .now-card .ttl { font-size: 17px; font-weight: 700; margin: 2px 0; }
-  .meta { font-size: 12px; color: var(--muted); }
-  .acts { display: flex; flex-wrap: wrap; gap: 4px; }
-  .now-card .acts { margin-top: 8px; }
-  .now-card .acts button { padding: 5px 12px; }
+  /* ---- 확인할 것 (하나로 접음) */
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  .chev { display: inline-block; color: var(--text3); transition: transform .15s; font-size: 13px; }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  .check { margin-top: var(--s4); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .check > summary { display: flex; align-items: center; gap: 12px; padding: 12px 0; min-height: 48px; }
+  .check > summary:hover .ttl { color: var(--accent); }
+  .cnt { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 12px; background: var(--fill2); font-size: 13px; font-weight: 600;
+         display: inline-grid; place-items: center; }
+  .cnt.hot { background: var(--accent-fill); color: var(--on-accent); }
+  .check > summary .chev { margin-left: auto; }
+  .check .ttl { font-weight: 600; }
+  .check .hint { flex: 1; min-width: 0; color: var(--text2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .check-body { padding: 0 0 var(--s2) 36px; }
+  @media (max-width: 600px) { .check-body { padding-left: 0; } }
+  .cgrp { margin-top: var(--s2); }
+  .cgrp:first-child { margin-top: 0; }
+  .cgrp-h { font-size: 13px; font-weight: 600; color: var(--text2); margin: 0 0 4px; display: flex; gap: var(--s1); align-items: baseline; }
+  .cgrp-h .tbtn { margin-left: auto; }
+  .citem { display: flex; gap: var(--s1); align-items: baseline; padding: 6px 0; font-size: 14px; }
+  .citem .tx { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .citem .tx small { display: block; color: var(--text2); font-size: 13px; }
+  .citem .ac { display: flex; gap: 2px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+  .citem code { font-size: 12px; background: var(--fill2); border-radius: 4px; padding: 0 4px; }
+  .dl-sel { font-size: 12px; padding: 2px 4px; border-radius: 6px; border: 0; background: var(--fill2); max-width: 96px; }
+  .clist { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text); }
+  .clist li { margin: 2px 0; }
+  .clist li::marker { color: var(--text3); }
 
-  /* 오늘 타임라인 */
-  .tl { display: grid; gap: 2px; }
-  .tl-row { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px;
-            border-radius: 8px; border-left: 4px solid transparent; }
-  .tl-row:hover { background: var(--field); }
-  .tl-row .t { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
-  .tl-row .what { min-width: 0; }
-  .tl-row .what .meta { display: block; }
-  .tl-row.busy .what { color: var(--muted); }
-  .tl-row.past { opacity: .45; }
-  .tl-row.cur { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
-  .tl-row .acts { opacity: .5; }
-  .tl-row:hover .acts, .tl-row.cur .acts { opacity: 1; }
-  .gap { font-size: 12px; color: var(--muted); padding: 2px 8px 2px 110px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
-  .tl-foot { margin-top: 12px; font-size: 13px; color: var(--muted); }
-  .done-list { margin-top: 6px; }
-  .done-list div { text-decoration: line-through; opacity: .6; font-size: 13px; }
+  /* ---- 심각도 위로 꺼내기: 행동이 필요한 경고만 '확인할 것' 위에 한 줄씩 (상자 없이, 빨간 표시 하나) */
+  .crit { margin-top: var(--s4); display: grid; }
+  .crit + .check { margin-top: 0; }
+  .cline { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 0 12px; align-items: center; padding: 8px 0; min-height: 48px;
+           border-top: 1px solid var(--line); font-size: 14px; }
+  .cline .ic { width: 20px; height: 20px; border-radius: 50%; background: var(--danger); color: var(--bg); font-size: 13px; font-weight: 800;
+               display: grid; place-items: center; line-height: 1; }
+  .cline.warn .ic { background: var(--warn); }
+  .cline .tx b { font-weight: 600; }
+  .cline .tx small { display: block; color: var(--text2); font-size: 13px; }
+  .cline .tbtn { min-height: var(--hit); padding: 0 12px; }
 
-  /* 주간 보드 */
-  .board-wrap { overflow-x: auto; }
-  .board { display: grid; grid-template-columns: 34px repeat(7, minmax(78px, 1fr)); min-width: 600px; }
-  .board .head { text-align: center; font-weight: 600; padding: 4px 0 6px; font-size: 13px; }
-  .board .head.today { color: var(--accent); }
-  .board .head.over { color: var(--warn); }
-  .axis, .day { position: relative; border-top: 1px solid var(--line); }
-  .day { border-left: 1px solid var(--line); }
-  .axis div { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); }
-  .hour { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
-  .blk { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 2px 5px; font-size: 11px; line-height: 1.3;
-         overflow: hidden; color: #fff; border-left: 3px solid rgba(0,0,0,.25); }
-  .blk[data-sel] { cursor: pointer; }
-  .blk.sel { outline: 2px solid var(--text); }
-  .blk.busy { background: var(--busy); }
-  .blk.past { opacity: .45; }
-  .blk small { opacity: .85; display: block; }
-  .nowline { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 2; }
-  .detail { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  /* ---- 섹션 */
+  .sec { margin-top: var(--s5); }
+  .sec-h { display: flex; align-items: baseline; gap: var(--s1); margin: 0 0 var(--s1); }
+  .sec-h h2 { font-size: 20px; letter-spacing: -.01em; margin: 0; font-weight: 700; }
+  .sec-h .aside { color: var(--text2); font-size: 13px; }
+  .sec-h .link { margin-left: auto; }
 
-  /* 오른쪽 목록 */
-  .due-day { margin: 10px 0 4px; font-weight: 600; font-size: 13px; display: flex; gap: 8px; align-items: center; }
-  .badge { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--line); color: var(--text); }
-  .badge.d0 { background: var(--danger); color: #fff; } .badge.d1 { background: var(--warn); color: #fff; }
-  .badge.late { background: var(--text); color: var(--card); }
-  .item { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; }
-  .item .txt { flex: 1; min-width: 0; }
-  .item .acts { opacity: .45; flex: none; }
-  .item:hover .acts { opacity: 1; }
-  .item .acts button { padding: 0 6px; font-size: 12px; line-height: 20px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
-  .course { color: var(--muted); }
-  form.inline { display: flex; gap: 6px; margin-top: 10px; }
-  form.inline input { flex: 1; }
+  /* ---- 줄 (타임라인·마감 공통) */
+  .rows { display: grid; }
+  .row { display: grid; grid-template-columns: 56px 20px minmax(0, 1fr) auto; gap: 0 12px; align-items: start; padding: 8px; margin: 0 -8px; border-radius: 10px; }
+  .row.nt { grid-template-columns: 20px minmax(0, 1fr) auto; }
+  .row:hover { background: var(--fill); }
+  .row .t { font-size: 14px; color: var(--text2); padding-top: 1px; line-height: 1.35; }
+  .row .t small { display: block; color: var(--text3); font-size: 12px; }
+  .row .body { min-width: 0; }
+  .row .ttl { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; line-height: 1.4; }
+  .row .meta { font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .row { position: relative; }
+  .row[tabindex]:focus-visible { outline-offset: 0; border-radius: 10px; }
+  .row .ra { display: flex; align-items: center; gap: 2px; margin-top: -8px; }
+  /* 인식 > 회상: 주 행동을 마우스 없이도 항상 보인다 — 평소엔 회색, 줄에 올리거나 포커스면 강조색 */
+  .row .ra .tbtn { color: var(--text2); font-weight: 500; }
+  .row:hover .ra .tbtn, .row:focus-within .ra .tbtn, .row.sel .ra .tbtn { color: var(--accent); font-weight: 600; }
+  .row .ra .icon-btn { width: 36px; height: 36px; color: var(--text2); }
+  .row .ra .pico { display: none; }
+  .row.sel { background: var(--fill); }
+  /* 지난 줄: 투명도 .4 는 대비 2:1 미만 → 글자는 text3(5.07:1)로만 물린다 */
+  .row.past .ttl, .row.past .t, .row.past .t small, .row.past .meta { color: var(--text3); font-weight: 400; }
+  .row.past .ck, .row.past .bmark { opacity: .5; }
+  .row.cur .t { color: var(--accent); font-weight: 600; }
+  .row.cur .t small { color: var(--accent); font-weight: 400; }
+  .row.busy .ttl { color: var(--text2); font-weight: 400; }
+  .bmark { width: 4px; height: 20px; border-radius: 2px; background: var(--busy); margin: 1px auto 0; }
+  /* 터치 기기·폰: 줄 전체를 누르면 행동 시트, 오른쪽에 44px 주 행동 아이콘 하나 (⋯ 없이 닿는다) */
+  @media (max-width: 600px), (pointer: coarse) {
+    .row .ra .tbtn, .row .ra [data-menu] { display: none; }
+    .row .ra .pico { display: inline-grid; width: auto; min-width: var(--hit); height: var(--hit); padding: 0 6px; color: var(--accent); font-size: 14px; font-weight: 600; margin: -4px -6px 0 0; }
+    .row .ra .pico:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .icon-btn { width: var(--hit); height: var(--hit); }
+    .seg button { min-height: 40px; }
+    .row { cursor: pointer; }
+  }
+  @media (max-width: 600px) {
+    .row { grid-template-columns: 44px 20px minmax(0, 1fr) auto; gap: 0 10px; }
+    .row.nt { grid-template-columns: 20px minmax(0, 1fr) auto; }
+    .gap { padding-left: 62px !important; }
+    .quick kbd, .kbhint { display: none; }
+  }
+  .gap { padding: 4px 0 4px 76px; font-size: 12px; color: var(--text3); }
+  .late { color: var(--danger); font-weight: 700; }
+  .soon { color: var(--text); font-weight: 600; }
+  .plan-tag { color: var(--accent); }
+  /* 같은 일을 두 번 그리지 않는다: 주인공 블록 자리는 타임라인에서 얇은 한 줄 */
+  .ptr { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 0 12px; padding: 4px 8px; margin: 0 -8px; font-size: 13px; color: var(--accent); align-items: baseline; }
+  .ptr .t { font-weight: 600; }
+  .ptr span:last-child { color: var(--text2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ptr span:last-child b { color: var(--accent); font-weight: 600; }
+  @media (max-width: 600px) { .ptr { grid-template-columns: 44px minmax(0, 1fr); gap: 0 10px; } }
+  .clip { color: var(--text3); font-size: 12px; margin-left: 4px; white-space: nowrap; }
 
-  /* 통계 */
-  details.stats { margin-top: 16px; }
-  details.stats > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
-  .bars { display: flex; align-items: flex-end; gap: 4px; height: 110px; position: relative; padding-top: 8px; }
-  .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
-  .bar i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--lecture); }
-  .bar span { font-size: 10px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
-  .bar.over i { background: var(--danger); }
-  .cap { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--warn); }
-  .prog { margin: 8px 0; }
-  .prog .r { display: flex; justify-content: space-between; font-size: 13px; }
-  .prog .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 3px; }
-  .prog .fill { height: 100%; background: var(--todo); }
-  .empty { color: var(--muted); font-size: 13px; }
-  a.btnlink { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 4px 10px; color: inherit; text-decoration: none; font-size: 13px; white-space: nowrap; }
-  .wk-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-  .wk-nav b { font-size: 16px; }
-  .strip { display: flex; gap: 3px; margin-bottom: 10px; flex-wrap: wrap; }
-  .sw { position: relative; min-width: 30px; padding: 3px 0 2px; font-size: 12px; border-radius: 6px;
-        background: color-mix(in srgb, var(--warn) calc(var(--lvl) * 70%), var(--field)); }
-  .sw.past { opacity: .45; }
-  .sw.cur { outline: 2px solid var(--accent); }
-  .sw.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .sw i { display: block; font-style: normal; font-size: 9px; color: var(--danger); line-height: 1; }
-  .sw.sel i { color: #fff; }
-  .head.pastday, .day.pastday { opacity: .55; }
-  .wl-h { font-size: 14px; margin: 14px 0 4px; }
-  .wl-g { font-weight: 600; font-size: 13px; margin: 10px 0 2px; }
-  .wl { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px dashed var(--line); }
-  .wl .txt { min-width: 0; }
-  .wl .meta { display: block; }
-  .wl.done { opacity: .5; }
-  .wl.done .txt { text-decoration: line-through; }
-  @media (max-width: 700px) { .wl { grid-template-columns: 10px 1fr; } .wl .acts { grid-column: 2; } }
-  .term { display: grid; gap: 2px; }
-  .trow { display: grid; grid-template-columns: 74px 70px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 8px; font-size: 12px; }
-  .trow.cur { background: color-mix(in srgb, var(--accent) 10%, var(--card)); outline: 1px solid var(--accent); }
-  .trow.past { opacity: .5; }
-  .tw small { color: var(--muted); }
-  .tbar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
-  .tbar i { display: block; height: 100%; background: var(--warn); }
-  .titems { display: flex; flex-wrap: wrap; gap: 4px; }
-  .titem { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; }
-  .titem.done { opacity: .5; text-decoration: line-through; }
-  .mat { margin-top: 12px; border: 1px solid var(--accent); }
-  .ritual { margin-top: 12px; border: 1px solid var(--todo); background: color-mix(in srgb, var(--todo) 6%, var(--card)); }
-  .ritual h3 { font-size: 13px; margin: 10px 0 4px; color: var(--muted); }
-  .ritual ul { margin: 0; padding-left: 18px; font-size: 13px; }
-  .mat .item button { font-size: 12px; }
+  /* 원형 체크 — 종류 색이 곧 테두리 (색 = 의미) */
+  /* 피츠의 법칙: 보이는 원은 20px 그대로, 누르는 영역은 44×44 (바깥 여백을 음수로 겹쳐 줄 높이는 그대로) */
+  .ck { width: var(--hit); height: var(--hit); margin: -11px -12px; padding: 0; border: 0; background: none; border-radius: 50%;
+        display: grid; place-items: center; position: relative; z-index: 1; }
+  .ck i { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--k, var(--text3)); display: grid; place-items: center;
+          color: transparent; font-size: 12px; font-style: normal; line-height: 1; transition: background .12s; }
+  .ck:hover i { background: color-mix(in srgb, var(--k) 16%, transparent); color: var(--k); }
+  .ck.on i { background: var(--k); color: #fff; }
+  .ck.overdue i { border-width: 2.5px; }
+
+  .day-h { font-size: 13px; font-weight: 600; color: var(--text2); margin: var(--s2) 0 0; display: flex; gap: var(--s1); align-items: baseline; }
+  .day-h:first-child { margin-top: 0; }
+  .day-h .d { color: var(--text3); font-weight: 400; }
+  .day-h.today { color: var(--accent); }
+  .day-h.danger { color: var(--danger); font-size: 14px; }
+  .day-h.danger .d { color: var(--text2); font-weight: 400; }
+  .empty { color: var(--text3); font-size: 14px; margin: var(--s1) 0; }
+  .foot { margin-top: var(--s2); font-size: 13px; color: var(--text2); }
+  .done-l { margin-top: 4px; }
+  .done-l div { text-decoration: line-through; color: var(--text3); font-size: 14px; }
+
+  /* ---- 주차별 */
+  .wk-nav { display: flex; align-items: center; gap: var(--s1); flex-wrap: wrap; }
+  .wk-nav b { font-size: 17px; }
+  .wk-nav .r { color: var(--text2); font-size: 13px; }
+  .wk-nav .push { margin-left: auto; }
+  .strip { display: flex; gap: 3px; margin: var(--s2) 0 var(--s1); align-items: flex-end; }
+  .sw { flex: 1; min-width: 0; border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .sw i { display: block; width: 100%; max-width: 20px; border-radius: 3px; background: var(--fill2); }
+  .sw span { font-size: 11px; color: var(--text3); line-height: 1; }
+  .sw.past i { opacity: .5; }
+  .sw.cur span { color: var(--text); font-weight: 600; }
+  .sw.sel i { background: var(--accent); }
+  .sw.sel span { color: var(--accent); font-weight: 700; }
+  .sw em { font-style: normal; width: 4px; height: 4px; border-radius: 50%; background: var(--danger); }
+  .sw:not(.ex) em { visibility: hidden; }
+  .strip-note { font-size: 12px; color: var(--text3); margin: 0; }
+  .kind-h { font-size: 13px; color: var(--text2); margin: var(--s2) 0 0; }
+
+  /* ---- 아래 접힌 것들 */
+  .more { margin-top: var(--s6); border-top: 1px solid var(--line); }
+  .more > details { border-bottom: 1px solid var(--line); }
+  .more > details > summary { display: flex; align-items: center; gap: 12px; padding: 12px 0; min-height: 48px; }
+  .more > details > summary .ttl { font-weight: 500; }
+  .more > details > summary .hint { color: var(--text3); font-size: 13px; flex: 1; }
+  .more .inner { padding: 0 0 var(--s2); }
+  .inline { display: flex; gap: var(--s1); margin-top: var(--s1); }
+  .inline input { flex: 1; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--s3) var(--s4); }
+  .stat h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin: 0 0 var(--s1); }
+  .stat h3 small { font-weight: 400; color: var(--text3); }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 88px; position: relative; }
+  .bars .b { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; }
+  .bars .b i { display: block; width: 100%; border-radius: 3px 3px 0 0; background: var(--text3); min-height: 1px; }
+  .bars .b.over i { background: var(--danger); }
+  .bars .b span { font-size: 10px; color: var(--text3); margin-top: 4px; white-space: nowrap; }
+  .bars .cap { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--text2); }
+  .prog { margin: 6px 0; font-size: 13px; }
+  .prog .r { display: flex; justify-content: space-between; gap: var(--s1); }
+  .prog .r span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prog .tr { height: 4px; background: var(--fill2); border-radius: 99px; margin-top: 4px; overflow: hidden; }
+  .prog .tr i { display: block; height: 100%; background: var(--text2); }
+  .small { font-size: 13px; color: var(--text2); }
+  .page-foot { margin-top: var(--s4); font-size: 12px; color: var(--text3); }
+
+  /* ---- ⋯ 메뉴 · 시트 · 토스트 */
+  .menu { position: fixed; z-index: 30; min-width: 232px; max-width: calc(100vw - 32px); background: var(--elev); border-radius: 12px; box-shadow: var(--shadow);
+          padding: 6px; border: 1px solid var(--line); }
+  .menu[hidden] { display: none; }
+  .menu .mh { font-size: 12px; color: var(--text3); padding: 6px 10px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+  .menu button { display: flex; width: 100%; align-items: baseline; gap: var(--s1); border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 8px; font-size: 14px; }
+  .menu button:hover, .menu button:focus-visible { background: var(--fill2); outline: none; }
+  .menu button small { margin-left: auto; color: var(--text3); font-size: 12px; padding-left: var(--s2); white-space: nowrap; }
+  .menu button.strong { font-weight: 600; color: var(--accent); }
+  @media (pointer: coarse) { .menu button { min-height: var(--hit); align-items: center; } }
+  .menu button.danger { color: var(--danger); }
+  .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 6px; }
+  .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .28); display: grid; place-items: center; padding: var(--s2); }
+  .scrim[hidden] { display: none; }
+  .sheet { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--elev); border-radius: 16px; box-shadow: var(--shadow); padding: var(--s3); }
+  @media (max-width: 600px) { .scrim { place-items: end center; padding: 0; } .sheet { border-radius: 16px 16px 0 0; max-height: 88vh; } }
+  .sheet h3 { font-size: 20px; margin: 0; letter-spacing: -.01em; overflow-wrap: anywhere; }
+  .sheet .sh-top { display: flex; gap: var(--s1); align-items: start; }
+  .sheet .sh-top h3 { flex: 1; min-width: 0; }
+  .sheet .ways { display: grid; gap: var(--s1); margin-top: var(--s2); }
+  .sheet .ways button { text-align: left; border: 0; background: var(--fill); border-radius: 10px; padding: 12px var(--s2); font-weight: 600; font-size: 15px; }
+  .sheet .ways button.primary { background: var(--accent-fill); color: var(--on-accent); }
+  .sheet .ways button small { display: block; font-weight: 400; font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .sheet .ways button.primary small { color: var(--on-accent); }
+  .sheet textarea { width: 100%; min-height: 96px; resize: vertical; background: var(--fill); border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; margin-top: var(--s1); }
+  .sheet label.small { display: flex; gap: var(--s1); align-items: center; margin-top: var(--s1); }
+  .toast { position: fixed; left: 50%; bottom: var(--s3); transform: translateX(-50%); z-index: 50; max-width: calc(100vw - 32px);
+           background: var(--text); color: var(--bg); border-radius: 12px; padding: 10px var(--s2); font-size: 14px; box-shadow: var(--shadow); }
+  .toast[hidden] { display: none; }
+  .toast { display: flex; gap: var(--s2); align-items: center; }
+  .toast button { border: 0; background: none; color: inherit; font-weight: 700; text-decoration: underline; padding: 0 4px; min-height: 32px; font-size: 14px; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: var(--s2) 0 0; font-size: 14px; }
+  .keys dt { white-space: nowrap; }
+  .keys dd { margin: 0; color: var(--text2); }
+  .keys kbd { font-size: 12px; color: var(--text); padding: 2px 6px; }
+  .kbhint { border: 0; background: none; color: var(--text2); font-size: 12px; padding: 0; min-height: 24px; text-decoration: underline; }
+  .confirm-x { margin: var(--s2) 0 0; font-size: 14px; color: var(--text2); }
+  .confirm-acts { display: flex; gap: var(--s1); margin-top: var(--s3); justify-content: flex-end; flex-wrap: wrap; }
+  .btn.danger { background: var(--danger); color: #fff; }
+  .asheet-meta { font-size: 13px; color: var(--text2); margin: 4px 0 0; }
+  .alist { display: grid; margin-top: var(--s1); }
+  .alist button { display: flex; align-items: center; gap: var(--s1); min-height: 48px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; padding: 0 4px; font-size: 15px; }
+  .alist button small { margin-left: auto; color: var(--text2); font-size: 13px; }
+  .alist button.danger { color: var(--danger); }
+
+  /* ---- 자료 창 · 보고서 창 (시트 안) — 예전 기능 그대로, 모양만 A-1 에 맞춤 */
+  .sheet.wide { width: min(760px, 100%); }
+  .panel { display: grid; gap: var(--s2); }
+  .panel h2 { font-size: 18px; margin: 0 0 var(--s1); display: flex; align-items: center; gap: var(--s1); overflow-wrap: anywhere; }
+  .panel .hint, .panel .meta { font-size: 13px; color: var(--text2); font-weight: 400; }
+  .panel .msg { font-size: 13px; color: var(--text2); margin: 4px 0; }
+  .panel .msg.err, .msg.err { color: var(--danger); }
+  .panel button:not(.icon-btn):not(.ck) { border: 0; background: var(--fill2); border-radius: 8px; padding: 6px 12px; font-size: 13px; min-height: 32px; }
+  .panel button:not(.icon-btn):hover { filter: brightness(.96); }
+  .panel button.primary { background: var(--accent-fill); color: var(--on-accent); font-weight: 600; }
+  .panel button.chip { border-radius: 99px; }
+  .panel button.link { background: none; color: var(--accent); padding: 0 2px; min-height: 0; }
+  .panel .acts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .panel .empty { margin: 4px 0; }
+  .panel code, .panel kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .panel details summary { cursor: pointer; }
   .lchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
-  .lchip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 99px; background: var(--field); font-size: 12px; max-width: 100%; }
-  .lchip button { border: 0; background: none; padding: 2px 7px; font-size: 12px; border-radius: 99px; overflow: hidden; text-overflow: ellipsis; }
-  .lchip button:hover { background: var(--line); }
-  .lchip.miss { border-color: var(--warn); color: var(--warn); padding-left: 8px; }
-  .lchip i { font-style: normal; font-size: 11px; margin-left: 4px; }
-  .msearch { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
-  .msearch input[type=text] { flex: 1 1 260px; font-size: 14px; }
-  .mres { margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; max-height: 340px; overflow: auto; }
+  .lchip { display: inline-flex; align-items: center; border-radius: 99px; background: var(--fill2); font-size: 13px; max-width: 100%; }
+  .panel .lchip button { background: none; padding: 4px 10px; border-radius: 99px; overflow: hidden; text-overflow: ellipsis; }
+  .lchip.miss { color: var(--warn); padding-left: 10px; }
+  .lchip i { font-style: normal; font-size: 12px; margin-left: 4px; }
+  .msearch { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .msearch input[type=text] { flex: 1 1 260px; background: var(--fill); border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+  .msearch input[type=text]:focus { border-color: var(--accent); outline: none; }
+  .mres { margin-top: 6px; border-top: 1px solid var(--line); max-height: 320px; overflow: auto; }
   .mres:empty { display: none; }
-  .mrow { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px dashed var(--line); font-size: 13px; cursor: pointer; }
-  .mrow:last-child { border-bottom: 0; }
-  .mrow.on, .mrow:hover { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+  .mrow { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 14px; cursor: pointer; border-radius: 6px; }
+  .mrow.on, .mrow:hover { background: var(--fill); }
   .mrow .p { min-width: 0; overflow-wrap: anywhere; }
   .mrow .p b { color: var(--accent); }
-  .mrow small { color: var(--muted); margin-left: 4px; }
+  .mrow small { color: var(--text2); margin-left: 4px; }
   .mrow .acts { flex: none; }
-  .mrow .acts button { padding: 0 7px; font-size: 12px; line-height: 20px; }
-  .mres > .chip { margin: 6px 8px; }
-  .mbrowse { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; }
-  .crumb { font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
-  button.link { border: 0; background: none; padding: 0 2px; color: var(--accent); }
-  button.link:hover { text-decoration: underline; }
-  .rep textarea { width: 100%; min-height: 96px; resize: vertical; font: inherit; background: var(--field); border: 1px solid var(--line);
-                  border-radius: 8px; padding: 8px 10px; color: inherit; }
-  .rep .desc { white-space: pre-wrap; font-size: 12px; color: var(--muted); max-height: 180px; overflow: auto; margin: 4px 0 0; }
-  .rep .ways { display: grid; gap: 6px; margin-top: 8px; }
-  .rep .ways button { text-align: left; white-space: normal; padding: 6px 10px; }
-  .rep .ways small { display: block; color: var(--muted); font-weight: normal; }
-  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10; max-width: min(640px, calc(100vw - 32px));
-           background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 24px #0003;
-           display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
-  .toast[hidden] { display: none; }
-  .clip { font-size: 11px; color: var(--muted); margin-left: 4px; cursor: pointer; white-space: nowrap; }
-  .clip:hover { color: var(--accent); }
-  .mat kbd, .mat code { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-  .dl select { font-size: 12px; padding: 1px 4px; max-width: 96px; }
-  .item .txt { overflow-wrap: anywhere; }
+  .mres > .chip { margin: 6px 4px; }
+  .mbrowse { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 8px; }
+  .crumb { font-size: 14px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+  .rep textarea { width: 100%; min-height: 96px; resize: vertical; background: var(--fill); border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; }
+  .rep textarea:focus { border-color: var(--accent); outline: none; }
+  .rep .desc { white-space: pre-wrap; font-size: 13px; color: var(--text2); max-height: 180px; overflow: auto; margin: 4px 0 0; }
+  .rep .ways { display: grid; gap: var(--s1); margin-top: var(--s1); }
+  .panel .rep .ways button { text-align: left; white-space: normal; padding: 10px 14px; font-size: 15px; font-weight: 600; border-radius: 10px; }
+  .rep .ways small { display: block; font-weight: 400; font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .rep .ways button.primary small { color: var(--on-accent); }
+  .clip[data-act] { cursor: pointer; }
+  .clip[data-act]:hover { color: var(--accent); }
+  .pw { display: flex; gap: var(--s1); align-items: center; padding: var(--s4) 0; flex-wrap: wrap; }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1 id="clock">대시보드</h1>
-    <span id="live" class="pill">읽는 중…</span>
-    <span id="status" class="sub"></span>
-    <button id="mobSet" class="chip" style="display:none" title="휴대폰 설정 (비밀번호·GitHub 토큰)">⚙</button>
-    <button id="syncBtn" class="chip" title="Canvas 까지 지금 확인">⟳ 동기화</button>
-    <div class="sum" id="sum"></div>
+    <div class="eyebrow hdr-eye status" id="status"><span id="liveDot" class="live off" aria-hidden="true"></span><span id="eyebrow">불러오는 중…</span></div>
+    <h1 id="title">오늘</h1>
+    <div class="hdr-tools">
+      <div class="seg" role="tablist" aria-label="보기"><button data-view="today" role="tab" aria-keyshortcuts="t">오늘</button><button data-view="week" role="tab" aria-keyshortcuts="w">주차별</button></div>
+      <button class="icon-btn" id="mobSet" hidden data-act="mobset" aria-label="휴대폰 설정 (비밀번호·GitHub 토큰)" title="휴대폰 설정">⚙</button>
+      <button class="icon-btn" id="syncBtn" data-act="sync" data-label="동기화 (Canvas 까지 지금 확인)" title="동기화 — Canvas 까지 지금 확인" aria-label="동기화">⟳</button>
+    </div>
+    <p class="summary" id="summary"></p>
   </header>
 
-  <div class="card" id="inputCard">
-    <form class="quick" id="quickForm" autocomplete="off">
-      <input id="quickInput" type="text" placeholder="무엇을 할까요?  예) 린스타트업 발표 @금 18시 ~2h #창업   ·   하고 싶은 일은 날짜 없이">
-      <button class="primary" type="submit">추가</button><kbd>/</kbd>
-    </form>
-    <span id="quickMsg" class="msg"></span>
-    <details class="more"><summary>자세히 입력 (날짜 고르기·반복)</summary>
-      <form class="full" id="addForm" autocomplete="off">
-        <div class="row"><input name="title" type="text" placeholder="제목" required style="flex:1 1 240px"></div>
-        <div class="row">
-          <label>마감</label><input name="date" type="date"><input name="time" type="time" title="몇 시까지 (비우면 23:59)"><span class="hint">까지</span>
-          <button type="button" class="chip" data-day="0">오늘</button><button type="button" class="chip" data-day="1">내일</button>
-          <button type="button" class="chip" data-day="fri">이번 주 금</button><button type="button" class="chip" data-day="clear">기한 없음</button>
-        </div>
-        <div class="row">
-          <label>예상</label>
-          <select name="minutes"><option value="30">30분</option><option value="60" selected>1시간</option><option value="90">1시간 30분</option>
-            <option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option></select>
-          <label>분류</label><input name="course" type="text" list="courses" placeholder="과목·분류 (선택)" style="flex:1 1 140px">
-          <datalist id="courses"></datalist>
-        </div>
-        <div class="row"><label>반복</label><div class="days" id="days"></div><span class="hint">매주 고른 요일에</span></div>
-        <div class="row"><button class="primary" type="submit">추가</button><span id="addMsg" class="msg"></span></div>
-      </form>
-    </details>
-  </div>
+  <form class="quick" id="quickForm" autocomplete="off">
+    <span class="plus" aria-hidden="true">+</span>
+    <input id="quickInput" type="text" placeholder="새 할 일 — 예) 린스타트업 발표 @금 18시 ~2h #창업" aria-label="새 할 일">
+    <button type="button" class="link muted" id="fullToggle">자세히</button>
+    <kbd title="/ 또는 Ctrl+K 로 바로 입력" aria-hidden="true">/</kbd>
+  </form>
+  <form class="full" id="addForm" hidden autocomplete="off">
+    <div class="frow"><input class="field" name="title" type="text" placeholder="제목" style="flex:1 1 240px"></div>
+    <div class="frow"><span class="lbl">마감</span><input class="field" name="date" type="date"><input class="field" name="time" type="time" title="비우면 23:59">
+      <button type="button" class="chip" data-day="0">오늘</button><button type="button" class="chip" data-day="1">내일</button>
+      <button type="button" class="chip" data-day="fri">이번 주 금</button><button type="button" class="chip" data-day="clear">기한 없음</button></div>
+    <div class="frow"><span class="lbl">예상</span>
+      <select class="field" name="minutes"><option value="30">30분</option><option value="60" selected>1시간</option><option value="90">1시간 30분</option>
+        <option value="120">2시간</option><option value="180">3시간</option><option value="240">4시간</option></select>
+      <span class="lbl">분류</span><input class="field" name="course" type="text" list="courses" placeholder="과목·분류 (선택)" style="flex:1 1 140px"><datalist id="courses"></datalist></div>
+    <div class="frow"><span class="lbl">반복</span><div class="days" id="days"></div></div>
+    <div class="frow"><button class="btn primary" type="submit">추가</button></div>
+  </form>
 
-  <div id="ritual"></div>
-  <div id="repPanel"></div>
-  <div id="matPanel"></div>
-  <div id="timer"></div>
-  <div id="warn"></div>
-
-  <div class="grid">
-    <div class="card">
-      <h2><span class="tabs" id="tabs"><button data-view="today">오늘</button><button data-view="week">주차별</button></span>
-          <span class="hint" id="viewHint"></span></h2>
-      <div id="view"></div>
-    </div>
-    <div class="stack">
-      <div id="grades"></div>
-      <div id="exams"></div>
-      <div id="notices"></div>
-      <div id="jobs"></div>
-      <div id="downloads"></div>
-      <div class="card"><h2>⏰ 다가오는 마감</h2><div id="dues"></div></div>
-      <div class="card"><h2>💭 하고 싶은 일 <span class="hint">기한 없음</span></h2><div id="someday"></div>
-        <form class="inline" id="somedayForm" autocomplete="off"><input type="text" name="title" placeholder="하고 싶은 일 추가" required><button type="submit">추가</button></form>
-      </div>
-      <div id="excluded"></div>
-    </div>
-  </div>
-
-  <details class="stats" id="statsBox"><summary>📊 통계 (학습량 · 과목별 진행 · 완료 추이 · 실제 걸린 시간)</summary>
-    <div class="stats-grid">
-      <div class="card"><h2>일별 학습량 <span class="hint">계획, 점선 = 하루 한도</span></h2><div id="load"></div></div>
-      <div class="card"><h2>과목별 진행 <span class="hint">추적한 항목 중 완료</span></h2><div id="prog"></div></div>
-      <div class="card"><h2>완료 추이 <span class="hint">14일</span></h2><div id="trend"></div></div>
-      <div class="card"><h2>오늘 실제로 한 시간 <span class="hint">⏱ 기록</span></h2><div id="sessions"></div></div>
-      <div class="card"><h2>예상 시간 보정 <span class="hint">⏱ 기록 3번 이상부터</span></h2><div id="calib"></div></div>
-      <div class="card"><h2>퀴즈 복습 <span class="hint">퀴즈 앱 '기록 내보내기' 기준</span></h2><div id="quizStat"></div></div>
-      <div class="card"><h2>🗓 이번 주 돌아보기 <span class="hint">월요일부터 · 일요일 저녁 마무리에도</span></h2><div id="weekrev"></div></div>
-    </div>
-  </details>
+  <div id="view"></div>
+  <div id="more" class="more"></div>
+  <p class="page-foot" id="pageFoot"></p>
 </main>
-<div id="toast" class="toast" hidden></div>
+
+<div class="menu" id="menu" hidden role="menu"></div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
 <script src="data.js"></script>
 <script>
-// 비서 대시보드. 감시기 서버(localhost:8765)로 열면 30초마다 최신 데이터 + 입력 가능.
-// 파일로 열면 data.js(마지막 결과)로 보기만. '지금'은 항상 이 컴퓨터의 시계.
+// 비서 대시보드 (디자인: 시안 A-1 '차분한 집중 + 사용성 평가', docs/design-research.md · dashboard/designs/a1-usability.md).
+// 엔진(localhost:8765)으로 열면 30초마다 최신 데이터 + 입력. 파일로 열면 data.js 로 보기만. 휴대폰(GitHub Pages)은 잠긴 데이터를 풀어서.
+// 예전 화면: legacy.html
 const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일", review: "퀴즈 복습" };
 const WD = "일월화수목금토";
-let D = window.PA_DATA || null, LIVE = false, selKey = null;
-let view = "today";
-try { view = localStorage.getItem("pa.view") || "today"; } catch {}
-if (view !== "today") view = "week";  // 예전 '학기' 탭은 주차별로 합쳐짐
-let wkIdx = null;  // 주차별에서 보고 있는 주 번호 (null = 이번 주)
+let D = null, LIVE = false, view = "today", wkIdx = null;
+try { view = localStorage.getItem("pa.view") === "week" ? "week" : "today"; } catch {}
+const UI = { open: new Set(), allDues: false, allDl: false, menuKey: null, menuFrom: null, sheetFrom: null, sel: null };  // 다시 그려도 펼친 상태 유지
+let HERO_KEY = null;  // 주인공 영역에 크게 나온 일 — 아래 목록에서는 다시 그리지 않는다 (DRY)
+const COARSE = matchMedia("(max-width: 600px), (pointer: coarse)");
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const color = k => `var(--${k})`;
 const pad = n => String(n).padStart(2, "0");
 const ymdOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const dt = s => new Date(s);
@@ -332,12 +455,62 @@ const mins = iso => { const d = dt(iso); return d.getHours() * 60 + d.getMinutes
 const addDays = (y, n) => { const d = new Date(y + "T12:00:00"); d.setDate(d.getDate() + n); return ymdOf(d); };
 const label = y => { const d = new Date(y + "T12:00:00"); return `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`; };
 const between = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
-const tick = (d, all) => all.indexOf(d) % 2 ? "&nbsp;" : `${+d.slice(5, 7)}/${+d.slice(8)}`;
 const stamp = iso => iso ? `${label(ymd(iso))} ${hm(iso)}` : "-";
 const dur = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? " " + (m % 60) + "분" : ""}` : `${m}분`;
-const ddayText = (due, today) => { const n = between(today, ymd(due)); return n < 0 ? "지남" : n === 0 ? "오늘" : "D-" + n; };
-const taskOf = k => { k = String(k).split("#")[0]; return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || null; };
+const ddayText = (due, today) => { const n = between(today, ymd(due)); return n < 0 ? "지남" : n === 0 ? "오늘" : n === 1 ? "내일" : "D-" + n; };
+const relDay = (d, today) => { const n = between(today, d); return n === 0 ? "오늘" : n === 1 ? "내일" : n === 2 ? "모레" : ""; };
+const kc = k => `var(--${k || "todo"})`;
+const clean = s => String(s || "").replace(/^\[[^\]]+\]\s*/, "");
+function findTask(k) {
+  if (!k || !D) return null;
+  k = String(k).split("#")[0];
+  return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k)
+    || (D.semester || []).flatMap(w => w.items).find(t => t.key === k) || null;
+}
+const links = t => (t && D.links && D.links[t.key]) || [];
+const clip = t => { const n = links(t).length;
+  return n ? `<span class="clip" ${LIVE ? `data-act="matshow" data-key="${esc(t.key)}"` : MOB ? `data-act="clipnames" data-key="${esc(t.key)}"` : ""} title="연결된 자료: ${esc(links(t).join(", "))}">자료 ${n}</span>` : ""; };
+const taskOf = findTask;
 
+// ---- 행동 정의: 종류마다 '주 행동' 하나, 나머지는 ⋯ 안으로
+const MOB_OK = new Set(["open", "done", "ignore", "remove"]);
+function primaryOf(t) {
+  if (!t) return null;
+  if (MOB) return t.url && t.kind !== "todo" ? { act: "open", label: t.kind === "assignment" ? "Canvas" : "▶ 열기", icon: "열기", name: "열기" }
+                                             : { act: "done", label: "✓ 완료", icon: "✓", name: "완료" };
+  if (t.kind === "lecture" && t.url) return { act: "open", label: "▶ 수업 듣기", icon: "듣기", name: "수업 듣기" };
+  if (t.kind === "assignment") return { act: "report", label: "✍ 보고서 작성", icon: "작성", name: "보고서 작성" };
+  if ((t.kind === "quiz" || t.kind === "review") && t.url) return { act: "open", label: "▶ 퀴즈 풀기", icon: "풀기", name: "퀴즈 풀기" };
+  if (t.kind === "todo" && t.due) return { act: "report", label: "✍ 작성", icon: "작성", name: "작성" };
+  return { act: "start", label: "⏱ 시작", icon: "시작", name: "시간 재기 시작" };
+}
+function menuItems(t) {
+  const P = primaryOf(t), isActive = D.active && D.active.key === t.key, g = [[], [], [], []];
+  const openName = t.kind === "assignment" ? "Canvas 에서 열기" : t.kind === "lecture" ? "수업 접속" : t.kind === "review" || t.kind === "quiz" ? "퀴즈 풀기" : "열기";
+  if (t.url && t.kind !== "todo") g[0].push({ act: "open", label: openName, strong: P.act === "open" });
+  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) g[0].push({ act: "report", label: "보고서 작성", hint: "설명·자료·지침", strong: P.act === "report" });
+  if (t.course) g[1].push({ act: "mat", label: "자료", hint: links(t).length ? `연결 ${links(t).length}` : "고르기" });
+  if (t.kind === "lecture") g[1].push({ act: "sumfor", label: "내용정리", hint: "Claude 사용" },
+    { act: "workspace", label: "VSCode 작업 창", hint: "study_system" }, { act: "quizcopy", label: "퀴즈 요청 복사", hint: "채팅에 붙여 넣기" });
+  g[2].push(isActive ? { act: "stop", label: "기록 멈춤" } : { act: "start", label: "시간 재기 시작", hint: "⏱" });
+  g[2].push({ act: "done", label: t.kind === "lecture" ? "들었음" : "완료", hint: "✓" });
+  g[3].push(t.source === "inbox" ? { act: "remove", label: "삭제…", hint: "확인 후", danger: true } : { act: "ignore", label: "제외…", hint: "조장만 제출 등", danger: true });
+  return MOB ? g.map(x => x.filter(y => MOB_OK.has(y.act))).filter(x => x.length) : g.filter(x => x.length);
+}
+const doneWord = t => t.kind === "lecture" ? "들었음" : "완료";
+const isLate = t => t && t.due && dt(t.due) < new Date() && t.status !== "done";
+// 원형 체크: 44px 누르는 영역 + 20px 보이는 원. 이름까지 읽어 주도록 aria-label 에 제목을 넣는다.
+const ck = (t, extra = "") => `<button class="ck${extra}${isLate(t) ? " overdue" : ""}" style="--k:${isLate(t) ? "var(--danger)" : kc(t.kind)}" data-act="done" data-key="${esc(t.key)}" data-label="${doneWord(t)}"
+  title="${doneWord(t)} (x)" aria-label="${doneWord(t)}: ${esc(t.title)}"><i aria-hidden="true">✓</i></button>`;
+const dots = t => `<button class="icon-btn" data-menu="${esc(t.key)}" title="더 보기 (.)" aria-label="더 보기: ${esc(t.title)}" aria-haspopup="menu" aria-expanded="false">⋯</button>`;
+const rowActs = (t, withPrimary = true) => {
+  const P = primaryOf(t);
+  return `<span class="ra">${withPrimary && P ? `<button class="tbtn" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}" title="${esc(P.name)} (Enter)">${esc(P.label)}</button>
+    <button class="icon-btn pico" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}" aria-label="${esc(P.name)}: ${esc(t.title)}">${P.icon}</button>` : ""}${dots(t)}</span>`;
+};
+const rowAttr = t => t ? ` tabindex="0" data-row="${esc(t.key)}"` : "";
+
+// ---- 데이터
 // 이 탭의 id — 30초마다 '열려 있음' 신호를 겸한다 (VSCode 를 다시 열 때 대시보드를 중복으로 열지 않게)
 const VIEWER = Math.random().toString(36).slice(2, 10);
 // ---- 휴대폰 모드 (GitHub Pages): 비밀번호로 잠긴 data.enc.json 을 풀어서 보여 주고,
@@ -376,8 +549,8 @@ async function loadMobile() {
   ls.set("pa.pending", JSON.stringify(pend));
 }
 function askPassword(msg) {
-  $("view").innerHTML = `<form id="pwForm" class="row" style="padding:20px 0"><b>🔒 비밀번호</b>
-    <input type="password" id="pwIn" autocomplete="current-password" style="flex:1"><button class="primary">열기</button>
+  $("view").innerHTML = `<form id="pwForm" class="pw"><b>비밀번호</b>
+    <input class="field" type="password" id="pwIn" autocomplete="current-password" style="flex:1"><button class="btn primary">열기</button>
     ${msg ? `<span class="msg err" style="flex-basis:100%">${esc(msg)}</span>` : ""}</form>`;
   $("pwForm").onsubmit = e => { e.preventDefault(); ls.set("pa.pw", $("pwIn").value); load(); };
 }
@@ -416,20 +589,13 @@ function mobileSettings() {
   if (tok) ls.set("pa.ghtoken", tok.trim());
   if (confirm("비밀번호도 다시 입력할까요?")) { ls.set("pa.pw", null); location.reload(); }  // 화면을 비우고 다시
 }
-function mobileActs(t, small) {
-  const k = esc(t.key), b = [];
-  const name = t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업" : t.kind === "review" ? "▶ 퀴즈" : "▶ 열기";
-  if (!small && t.url && t.kind !== "todo") b.push(`<a class="btnlink" href="${esc(t.url)}" target="_blank" rel="noopener">${name}</a>`);
-  b.push(`<button data-act="done" data-key="${k}">✓</button>`);
-  b.push(t.source === "inbox" ? `<button data-act="remove" data-key="${k}" title="삭제">🗑</button>` : `<button data-act="ignore" data-key="${k}" title="계속 제외">✕</button>`);
-  return `<span class="acts" style="opacity:1">${b.join("")}</span>`;
-}
-
+let WARN = [];  // 보여 줄 알림 (휴대폰에서 [확인] 한 것은 뺌)
 async function load() {
   if (MOB) { await loadMobile(); if (D) render(); return; }
   try { const r = await fetch("/api/data?v=" + VIEWER, { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
-  catch { LIVE = false; }
+  catch { LIVE = false; D = D || window.PA_DATA || null; }
   render();
+  if ((D?.jobs || []).some(j => j.status === "queued" || j.status === "running")) { clearTimeout(load.t); load.t = setTimeout(load, 5000); }  // 진행 중이면 자주
 }
 async function api(action, body) {  // 엔진에 요청만 (화면 다시 읽기 없음)
   const r = await fetch("/api/" + action, { method: "POST", headers: { "Content-Type": "application/json", "X-PA": "1" }, body: JSON.stringify(body || {}) });
@@ -437,191 +603,447 @@ async function api(action, body) {  // 엔진에 요청만 (화면 다시 읽기
   if (!r.ok) throw new Error(j.error || "실패");
   return j;
 }
-async function post(action, body) {
+async function post(action, body) {  // 요청 + 화면 다시 읽기 (계획·캘린더는 뒤에서 몇 초 → 한 번 더)
   if (MOB) return phonePost(action, body);
   const j = await api(action, body);
   await load();
-  setTimeout(load, 8000);  // 계획·캘린더는 뒤에서 몇 초 걸림 → 한 번 더 받기
+  setTimeout(load, 8000);
   return j;
 }
-
-// 항목 종류별 버튼
-function acts(t, big) {
-  if (!t || !(LIVE || MOB)) return "";
-  if (MOB) return mobileActs(t);
-  const k = esc(t.key), b = [];
-  const isActive = D.active && D.active.key === t.key;
-  if (t.url && t.kind !== "todo") b.push(`<button data-act="open" data-key="${k}">${t.kind === "assignment" ? "Canvas" : t.kind === "lecture" ? "▶ 수업 접속" : t.kind === "review" ? "▶ 퀴즈 풀기" : "▶ 열기"}</button>`);
-  if (t.kind === "assignment" || (t.kind === "todo" && t.due)) b.push(`<button data-act="report" data-key="${k}" title="과제 설명 보기 → 참고 자료 고르기 → 작성 지침 적기 → 채팅에서 같이 쓰기 / 초안 한 번에 / 빈 파일">✍ 보고서 작성</button>`);
-  if (t.course) b.push(`<button data-act="mat" data-key="${k}" title="이 강의·과제의 자료 열기">📄 자료</button>`);
-  if (t.kind === "lecture") b.push(`<button data-act="sumfor" data-key="${k}" title="이 강의 자료(PDF)의 핵심 정리를 만들거나, 이미 있으면 엽니다 (만들 때 Claude 사용)">🤖 내용정리</button>`,
-                                  `<button data-act="workspace" data-key="${k}" title="study_system 을 VSCode 새 창으로 (맞는 노트가 있으면 함께) — 그 창의 Claude 와 공부·기록">🗂</button>`,
-                                  `<button data-act="quizcopy" data-key="${k}" title="이 강의 자료로 퀴즈를 만드는 요청 문장을 복사 — Claude 채팅에 붙여 넣기">🧩</button>`);
-  b.push(isActive ? `<button data-act="stop" data-key="${k}">■ 멈춤</button>`
-                  : `<button data-act="start" data-key="${k}" title="실제로 걸린 시간을 잽니다">⏱ 시작</button>`);
-  b.push(`<button data-act="done" data-key="${k}">${t.kind === "lecture" ? "✓ 들었음" : "✓ 완료"}</button>`);
-  if (t.source === "inbox") b.push(`<button data-act="remove" data-key="${k}" title="삭제">🗑</button>`);
-  else b.push(`<button data-act="ignore" data-key="${k}" title="계속 제외 (조장만 제출 등)">✕</button>`);
-  return `<span class="acts">${b.join("")}</span>`;
+const ago = iso => { if (!iso) return "없음"; const m = Math.round((Date.now() - dt(iso)) / 6e4);
+  return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 24 * 60 ? `${Math.floor(m / 60)}시간 전` : stamp(iso); };
+const STALE_MIN = 10;  // 엔진은 30초마다 데이터를 새로 만든다 — 10분 넘게 그대로면 멈춘 것
+function engineState() {
+  if (MOB) return "mobile";
+  const age = D && D.generated ? (Date.now() - dt(D.generated)) / 6e4 : Infinity;
+  return !LIVE ? "off" : age > STALE_MIN ? "stale" : "live";
 }
-// 📎 연결된 자료 수 — PC 는 누르면 자료 창, 휴대폰은 이름만 (파일은 PC 에 있음)
-const clip = t => {
-  const n = t && D && (D.links || {})[t.key];
-  if (!n || !n.length) return "";
-  const act = MOB ? "clipnames" : LIVE ? "matshow" : "";
-  return ` <span class="clip" ${act ? `data-act="${act}" data-key="${esc(t.key)}"` : ""} title="연결된 자료: ${esc(n.join(", "))}">📎${n.length}</span>`;
-};
-const smallActs = t => {
-  if (MOB) return mobileActs(t, true);
-  if (!LIVE) return "";
-  const k = esc(t.key);
-  return `<span class="acts"><button data-act="done" data-key="${k}" title="완료">✓</button>${
-    t.source === "inbox" ? `<button data-act="remove" data-key="${k}" title="삭제">🗑</button>` : `<button data-act="ignore" data-key="${k}" title="계속 제외">✕</button>`}</span>`;
-};
+// 시스템 상태 보이기 (닐슨 1): 엔진 · 데이터 나이 · Canvas 확인 시각 · 돌고 있는 작업 · ⏱ 를 늘 보이는 한 줄에
+function statusHtml(now) {
+  const st = engineState(), d = new Date(ymdOf(now) + "T12:00:00");
+  const p = [`<span>${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 ${pad(now.getHours())}:${pad(now.getMinutes())}</span>`];
+  p.push(`<span class="live ${st === "live" || st === "mobile" ? "" : st}" aria-hidden="true"></span>` + (
+    st === "mobile" ? `<span title="PC 엔진이 올린 데이터 · 입력은 PC 가 몇 분 안에 반영">휴대폰 · ${stamp(D.generated)} 데이터</span>`
+    : st === "live" ? `<span title="엔진에 연결됨 · 30초마다 새로 읽음">실시간 · ${hm(D.generated)} 갱신</span>`
+    : st === "stale" ? `<span class="st-warn" title="엔진이 데이터를 새로 만들지 않고 있음">엔진 응답 없음 · ${ago(D.generated)} 데이터</span>`
+    : `<span class="st-bad" title="엔진이 꺼져 있음 — 아래 빨간 줄 참고">엔진 꺼짐 · ${ago(D.generated)} 데이터</span>`));
+  p.push(`<span title="Canvas 마지막 확인 ${stamp(D.canvasSynced)} · 계획 ${stamp(D.plannedAt)}">Canvas ${ago(D.canvasSynced)}</span>`);
+  const run = (D.jobs || []).filter(j => j.status === "running" || j.status === "queued");
+  if (run.length) p.push(`<button class="job" data-ui="jobs" title="${esc(run.map(j => j.title + " — " + (j.step || "")).join("\n"))}"><span class="spin" aria-hidden="true"></span>작업 ${run.length} 진행 중</button>`);
+  if (D.active) p.push(`<button class="tmr" data-ui="tohero" aria-label="기록 중인 일로 가기">⏱ <span id="elapsed2">0:00:00</span> 기록 중</button>`);
+  return p.join(`<span class="sep" aria-hidden="true">·</span>`);
+}
 
 function render() {
-  const now = new Date(), today = ymdOf(now), nowMin = now.getHours() * 60 + now.getMinutes();
-  $("clock").textContent = `${label(today)} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  $("live").textContent = LIVE ? "실시간" : "보기 전용";
-  $("live").className = "pill" + (LIVE ? " on" : "");
-  $("live").title = LIVE ? "엔진에 연결됨 — 30초마다 갱신" : "엔진이 꺼져 있음 — 입력하려면 VSCode 에서 '비서: 자동 감시' 실행";
-  $("inputCard").style.display = $("somedayForm").style.display = LIVE || MOB ? "" : "none";
-  $("syncBtn").style.display = LIVE ? "" : "none";
-  $("mobSet").style.display = MOB ? "" : "none";
-  if (MOB) { $("live").textContent = "휴대폰"; $("live").className = "pill on"; $("live").title = "PC 엔진이 올린 데이터 · 입력은 PC 가 몇 분 안에 반영"; }
-  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
-  if (!D) { $("status").textContent = "데이터 없음 — bin/pa run"; return; }
-  $("status").textContent = MOB ? `데이터 ${stamp(D.generated)} 기준` : `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)}`;
-
-  const open = D.tasks.filter(t => dt(t.due) >= now), late = D.tasks.filter(t => dt(t.due) < now);
-  const soon = open.filter(t => between(today, ymd(t.due)) <= 3);
-  const todayPlan = D.plan.filter(p => ymd(p.start) === today);
-  const leftMin = todayPlan.filter(p => dt(p.end) > now).reduce((s, p) => s + (dt(p.end) - Math.max(dt(p.start), now)) / 6e4, 0);
-  $("sum").innerHTML = `<span class="pill">남은 할 일 ${open.length}</span><span class="pill">오늘 남은 계획 ${dur(Math.round(leftMin))}</span>`
-    + `<span class="pill ${soon.length ? "hot" : ""}">3일 안 마감 ${soon.length}</span>`
-    + (D.slack ? (() => { const d = D.slack.capacity - D.slack.need;
-        return `<span class="pill ${d < 0 ? "hot" : "on"}" title="앞으로 7일: 쓸 수 있는 시간 ${dur(D.slack.capacity)} / 마감 7일 안 할 일 ${dur(D.slack.need)}">이번 주 ${d < 0 ? "부족 " + dur(-d) : "여유 " + dur(d)}</span>`; })() : "");
+  if (!D) { $("eyebrow").textContent = "데이터 없음 — bin/pa run"; return; }
+  const now = new Date(), today = ymdOf(now);
+  document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
+  WARN = D.warnings.filter(w => { const m = w.match(/\[ack:(\w+)\]/); return !(MOB && m && ls.get("pa.ack." + m[1]) === w); });
+  if (MOB) { const pend = JSON.parse(ls.get("pa.pending") || "[]"); if (pend.length) WARN.unshift(`휴대폰 입력 ${pend.length}건이 PC 반영을 기다리는 중 (PC 가 켜져 있으면 몇 분 안에)`); }
+  $("syncBtn").hidden = !LIVE; $("mobSet").hidden = !MOB;
+  $("quickForm").hidden = !(LIVE || MOB);
+  $("status").innerHTML = statusHtml(now);
   $("courses").innerHTML = (D.courses || []).map(c => `<option value="${esc(c)}">`).join("");
 
-  // 타이머
-  if (D.active) {
-    $("timer").innerHTML = `<div class="timer">⏱ <span>${esc(D.active.title)}</span> <b id="elapsed"></b>
-      ${D.active.estimate ? `<span class="meta">예상 ${dur(D.active.estimate)}</span>` : ""}
-      <span class="acts" style="margin-left:auto"><button class="primary" data-act="stopdone">✓ 끝내고 완료</button><button data-act="stop">■ 멈춤</button></span></div>`;
-    tickTimer();
-  } else $("timer").innerHTML = "";
+  // 한 줄 요약 — 상자(pill) 대신 글자로
+  const open = D.tasks.filter(t => dt(t.due) >= now);
+  const soon = open.filter(t => between(today, ymd(t.due)) <= 3);
+  const leftMin = D.plan.filter(p => ymd(p.start) === today && dt(p.end) > now).reduce((s, p) => s + (dt(p.end) - Math.max(dt(p.start), now)) / 6e4, 0);
+  const sl = D.slack ? D.slack.capacity - D.slack.need : null, lateN = D.tasks.filter(t => dt(t.due) < now).length;
+  $("summary").innerHTML = [lateN ? `<a class="bad" href="#late" data-ui="tolate">마감 지남 <span class="num">${lateN}</span></a>` : "", `남은 할 일 <b class="num">${open.length}</b>`, `오늘 남은 계획 <b class="num">${dur(Math.round(leftMin))}</b>`,
+    `3일 안 마감 <b class="num">${soon.length}</b>`,
+    sl === null ? "" : `<span title="앞으로 7일: 쓸 수 있는 시간 ${dur(D.slack.capacity)} / 마감 7일 안 할 일 ${dur(D.slack.need)}">이번 주 ${sl < 0 ? `<b class="bad">부족 ${dur(-sl)}</b>` : `여유 <b>${dur(sl)}</b>`}</span>`]
+    .filter(Boolean).join(" · ");
 
-  // 휴대폰에서 [확인] 누른 알림은 같은 내용이면 다시 안 보여 줌
-  const warns = D.warnings.filter(w => { const m = w.match(/\[ack:(\w+)\]/); return !(MOB && m && ls.get("pa.ack." + m[1]) === w); });
-  if (MOB) { const pend = JSON.parse(ls.get("pa.pending") || "[]"); if (pend.length) warns.unshift(`📱 PC 반영 대기 ${pend.length}건 (PC 가 켜져 있으면 몇 분 안에)`); }
-  else if (!LIVE) warns.unshift("엔진이 꺼져 있어 마지막 데이터를 보여 주는 중입니다. VSCode 에서 'Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시'.");
-  $("warn").innerHTML = warns.length ? `<div class="card warn"><ul>${warns.map(w => `<li>${esc(w.replace(/\s*\[ack:\w+\]/, "").replace(/\s*\[keep=[^\]]+\]/, "")).replace(/`([^`]+)`/g, "<code>$1</code>")}${
-    LIVE && w.includes("로그인 필요") ? ` <button class="chip" data-act="relogin">다시 로그인</button>` : ""}${
-    LIVE && w.includes("Google Calendar 로그인") ? ` <button class="chip" data-act="glogin">Google 다시 로그인</button>` : ""}${
-    (LIVE || MOB) && w.includes("[keep=") ? ` <button class="chip" data-act="keep" data-key="${esc(w.match(/\[keep=([^\]]+)\]/)[1])}" title="이 과제만 규칙의 예외로 — 계속 보이게">보이기</button>` : ""}${
-    (LIVE || MOB) && w.includes("[ack:") ? ` <button class="chip" data-act="ack" data-what="${w.match(/\[ack:(\w+)\]/)[1]}">확인</button>` : ""}</li>`).join("")}</ul></div>` : "";
+  const keep = document.activeElement?.closest?.("[data-row]")?.dataset.row;  // 30초 새로 고침에도 키보드 위치를 잃지 않게
+  $("view").innerHTML = view === "week" ? weekView(now, today) : todayView(now, today);
+  $("title").textContent = view === "week" ? "주차별" : "오늘";
+  $("more").innerHTML = moreHtml(now, today);
+  $("pageFoot").innerHTML = `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)} · <a href="legacy.html" style="color:inherit">예전 화면</a> <button class="kbhint" data-ui="keys">단축키 ?</button>`;
+  if (keep) [...document.querySelectorAll("[data-row]")].find(r => r.dataset.row === keep)?.focus({ preventScroll: true });
+  tickTimer();
+  document.querySelectorAll("details[data-k]").forEach(el => el.addEventListener("toggle", () => {
+    el.open ? UI.open.add(el.dataset.k) : UI.open.delete(el.dataset.k);
+  }));
+}
+const det = k => UI.open.has(k) ? "open" : "";
 
-  $("view").innerHTML = view === "week" ? weekView(now, today, nowMin) : todayView(now, today);
-  $("viewHint").textContent = view === "week" ? "◀ ▶ 또는 ← → 키로 주 이동 · 숫자 띠를 누르면 그 주로" : "";
+// ---- 오늘 보기
+function todayView(now, today) {
+  const rows = [
+    ...D.busy.filter(b => ymd(b.start) === today).map(b => ({ busy: true, start: b.start, end: b.end, title: b.label })),
+    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: findTask(p.key), summary: p.summary, kind: p.kind, why: p.why,
+      part: (p.summary.match(/\((\d+\/\d+)\)$/) || [])[1] })),
+  ].sort((a, b) => dt(a.start) - dt(b.start));
+  const H = hero(rows, now, today);
+  HERO_KEY = H.key;
+  let h = H.html + critHtml(now) + checkHtml(now, today);
 
-  // 오른쪽: 마감
-  const item = t => `<div class="item"><span class="dot" style="background:${color(t.kind)}"></span>
-    <span class="txt">${hm(t.due)} <span class="course">${esc(t.course)}</span> ${esc(t.title)}${clip(t)}</span>${smallActs(t)}</div>`;
-  let dues = late.length ? `<div class="due-day">지난 마감 <span class="badge late">미완료</span></div>` + late.map(item).join("") : "";
-  for (const d of [...Array(14)].map((_, i) => addDays(today, i))) {
-    const its = open.filter(t => ymd(t.due) === d);
-    if (!its.length) continue;
-    const n = between(today, d);
-    dues += `<div class="due-day">${label(d)} <span class="badge d${Math.min(n, 2)}">${n === 0 ? "오늘" : "D-" + n}</span></div>` + its.map(item).join("");
+  // 타임라인 — 주인공 블록은 얇은 한 줄(↑)로만: 시간 흐름은 끊지 않고 같은 일을 두 번 그리지 않는다
+  h += `<section class="sec"><div class="sec-h"><h2>오늘 일정</h2><span class="aside">${D.dayStart}–${D.dayEnd}</span></div><div class="rows">`;
+  let cursor = Math.max(dt(`${today}T${D.dayStart}:00`), now);
+  const dayEnd = dt(`${today}T${D.dayEnd}:00`);
+  const gap = (a, b) => (b - a) >= 30 * 6e4 ? `<div class="gap">빈 시간 ${hm(new Date(a).toISOString())}–${hm(new Date(b).toISOString())} · ${dur(Math.round((b - a) / 6e4))}</div>` : "";
+  for (const r of rows) {
+    const s = dt(r.start), e = dt(r.end);
+    if (s > cursor) h += gap(cursor, s);
+    if (e > cursor) cursor = e;
+    const past = e <= now ? " past" : "", cur = s <= now && now < e ? " cur" : "";
+    const tcol = `<span class="t num">${hm(r.start)}<small>${hm(r.end)}</small></span>`;
+    if (r.busy) { h += `<div class="row busy${past}${cur}">${tcol}<span class="bmark"></span><div class="body"><div class="ttl">${esc(r.title)}</div><div class="meta">수업·약속</div></div><span></span></div>`; continue; }
+    const t = r.t;
+    if (r === H.row || (t && t.key === HERO_KEY && !past)) {
+      h += `<div class="ptr"><span class="t num">${hm(r.start)}</span><span><b>${r === H.row && cur ? "지금" : "위"} ↑</b> ${esc(t ? t.title : clean(r.summary))}</span></div>`; continue;
+    }
+    h += `<div class="row${past}${cur}"${past ? "" : rowAttr(t)}>${tcol}${t ? ck(t) : `<span></span>`}<div class="body" title="${esc(r.why || "")}">
+        <div class="ttl">${t ? esc(t.title) : esc(clean(r.summary))}${r.part ? ` <span class="clip">(${r.part})</span>` : ""}${clip(t)}</div>
+        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}</div>` : ""}</div>
+      ${t && !past ? rowActs(t) : "<span></span>"}</div>`;
   }
-  $("dues").innerHTML = dues || `<p class="empty">2주 안 마감 없음</p>`;
-  $("someday").innerHTML = D.someday.length ? D.someday.map(t => `<div class="item"><span class="dot" style="background:var(--todo)"></span>
-      <span class="txt">${t.course ? `<span class="course">${esc(t.course)}</span> ` : ""}${esc(t.title)}</span>
-      ${(LIVE || MOB) && t.source === "inbox" ? `<span class="acts"><button data-act="dotoday" data-key="${esc(t.key)}" title="오늘 빈 시간에 넣기">📅 오늘</button></span>` : ""}${smallActs(t)}</div>`).join("")
-    : `<p class="empty">아직 없음</p>`;
-
-  $("ritual").innerHTML = LIVE || MOB ? ritual(now, today) : "";
-
-  const gr = (LIVE || MOB) ? (D.grades || []).filter(g => !(MOB && (ls.get("pa.ack.grades") || "") >= g.graded_at)) : [];
-  $("grades").innerHTML = gr.length ? `<div class="card"><h2>🎓 새 점수 ${gr.length}
-      <button class="chip" data-act="gradeack" style="margin-left:auto" title="봤음 — 다음 새 점수부터 다시 보임">확인</button></h2>${gr.map(g => `
-    <div class="item"><span class="txt"><span class="course">${esc(g.course)}</span> ${esc(g.title)}</span>
-      <span class="meta"><b>${g.score}</b> / ${g.points}</span></div>`).join("")}</div>` : "";
-  const exs = (LIVE || MOB) ? (D.exams || []) : [];
-  $("exams").innerHTML = exs.length ? `<div class="card"><h2>📝 시험 일정 후보 <span class="hint">공지에서 찾음 · 맞으면 추가</span></h2>${exs.map(x => `
-    <div class="item"><span class="txt"><b>${esc(x.title)}</b> ${label(x.date)}${x.time ? " " + x.time : ""}<span class="meta" style="display:block">「${esc(x.line)}」</span></span>
-      <span class="acts" style="opacity:1"><button data-act="examadd" data-x='${esc(JSON.stringify(x))}'>할 일로 추가</button><button data-act="examno" data-id="${esc(x.id)}">아니요</button></span></div>`).join("")}
-    <p class="hint">추가하면 시험 7·4·2일 전에 복습이 잡히고, 마감 캘린더에 알림이 갑니다.</p></div>` : "";
-  const ns = (LIVE && D.notices) || [], sg = (LIVE && D.suggestions) || [];
-  $("notices").innerHTML = (ns.length || sg.length) ? `<div class="card"><h2>📢 새 공지 ${ns.length}</h2>
-    ${ns.map(n => `<div class="item"><span class="txt"><span class="course">${esc(String(n.course).replace(/\s*\d{6}$/, ""))}</span> ${esc(n.title)}
-      ${n.summary ? `<span class="meta" style="display:block">🤖 ${esc(n.summary)}</span>` : ""}</span>
-      <span class="acts" style="opacity:1"><button data-act="nopen" data-id="${esc(n.id)}">열기</button><button data-act="nread" data-id="${esc(n.id)}" title="읽음">✓</button></span></div>`).join("")}
-    ${sg.length ? `<h3 style="font-size:13px;margin:10px 0 4px">🤖 제외 후보 — 공지를 보고 안 해도 될 것 같은 과제</h3>${sg.map(x => `<div class="item"><span class="txt">${esc(x.course)} · ${esc(x.title)}
-      <span class="meta" style="display:block">${esc(x.reason)}</span></span><span class="acts" style="opacity:1">
-      <button data-act="ignore" data-key="${esc(x.key)}">제외</button><button data-act="sgno" data-key="${esc(x.key)}">아니요</button></span></div>`).join("")}` : ""}
-    ${ns.length ? `<div class="acts" style="margin-top:8px"><button data-act="njob" title="Claude 가 새 공지를 읽고 한 줄 요약 + 제외 후보 (구독 사용)">🤖 요약·제외 후보 찾기</button>
-      <button data-act="nreadall">모두 읽음</button></div>` : ""}</div>` : "";
-
-  const ex = D.excluded || [];
-  $("excluded").innerHTML = ex.length ? `<details class="card"><summary><b>🚫 제외한 것 ${ex.length}</b> <span class="hint">눌러서 보기 · 취소하면 다시 나타남</span></summary>
-    ${ex.map(x => `<div class="item"><span class="txt">${esc(x.keep ? "예외(계속 보이기): " + (x.titles[0] || x.text) : x.text)}<span class="meta" style="display:block">${
-      x.keep ? "단어 규칙에 걸려도 보이게 · 취소하면 다시 숨김" : (x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만") + ` · 걸린 과제 ${x.count}개`}${
-      x.titles.length ? " · " + esc(x.titles[0]) : ""}</span></span>${LIVE || MOB ? `<button data-act="unign" data-text="${esc(x.text)}">취소</button>` : ""}</div>`).join("")}</details>` : "";
-
-  const js = (LIVE && D.jobs) || [];
-  const ST = { queued: "⏳ 대기", running: "⚙️ 진행 중", done: "✅ 완료", failed: "⚠️ 실패" };
-  $("jobs").innerHTML = js.length ? `<div class="card"><h2>🤖 작업</h2>${js.map(j => `<div class="item"><span class="txt">
-      <b>${ST[j.status]}</b> ${esc(j.title)}<span class="meta" style="display:block">${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · Claude 사용 " + j.claude + "회" : ""}</span></span>
-      ${j.status === "done" && j.result ? `<button data-act="openfile" data-path="${esc(j.result)}">열기</button>` : ""}</div>`).join("")}</div>` : "";
-  if (js.some(j => j.status === "queued" || j.status === "running")) setTimeout(load, 5000);  // 진행 중이면 자주 갱신
-
-  const dls = (LIVE && D.downloads) || [];
-  $("downloads").innerHTML = dls.length ? `<div class="card dl"><h2>📥 새로 받은 파일 <span class="hint">과목 폴더로 정리</span></h2>${dls.map(f => `
-    <div class="item"><span class="txt">${esc(f.name)}</span><span class="acts" style="opacity:1">
-      <select data-dl="${esc(f.path)}">${["", ...D.courseFolders].map(c => `<option value="${esc(c)}" ${c === f.course ? "selected" : ""}>${c || "과목?"}</option>`).join("")}</select>
-      <button data-act="dlmove" data-path="${esc(f.path)}">옮기기</button><button data-act="dlskip" data-path="${esc(f.path)}" title="무시">✕</button></span></div>`).join("")}</div>` : "";
-
-  if ($("statsBox").open) renderStats(today);
+  if (dayEnd > cursor) h += gap(cursor, dayEnd);
+  if (!rows.length) h += `<p class="empty">오늘은 수업도 계획도 없습니다.</p>`;
+  h += `</div>`;
+  const tm = addDays(today, 1);
+  h += `<p class="foot">내일 ${label(tm)} — 수업·약속 ${D.busy.filter(b => ymd(b.start) === tm).length} · 할 일 ${D.plan.filter(p => ymd(p.start) === tm).length}</p>`;
+  if (D.todayDone.length) h += `<div class="foot">오늘 끝낸 일 ${D.todayDone.length}<div class="done-l">${D.todayDone.map(t => `<div>${esc(t.title)}</div>`).join("")}</div></div>`;
+  h += `</section>`;
+  return h + duesHtml(now, today);
+}
+// 마감 표기 — 지남은 빨강·굵게, 24시간 안은 굵게 (전주의 속성: 색 + 굵기, 둘 다 '급함'에만 쓴다)
+function dueMeta(t, now, today) {
+  const h = (dt(t.due) - now) / 36e5;
+  if (h < 0) return `<span class="late">마감 지남 ${label(ymd(t.due))} ${hm(t.due)}</span>`;
+  if (h < 24) return `<span class="soon">마감 ${Math.max(1, Math.round(h))}시간 남음</span>`;
+  return `마감 ${ddayText(t.due, today)} ${hm(t.due)}`;
 }
 
-// ---- 아침 브리핑 · 저녁 마무리 (하루에 한 번씩, 닫으면 그날은 다시 안 뜸)
-const seenToday = k => { try { return localStorage.getItem(k) === ymdOf(new Date()); } catch { return false; } };
-function ritual(now, today) {
+function hero(rows, now, today) {
+  if (D.active) {  // ⏱ 기록 중이면 그게 '지금'
+    const a = D.active, t = findTask(a.key);
+    return { key: a.key, row: null, html: `<section class="hero" id="hero"><div class="eyebrow">⏱ 기록 중${a.estimate ? ` <span class="sep">·</span> 예상 ${dur(a.estimate)}` : ""}</div>
+      <div class="hero-head">${t ? ck(t) : "<span></span>"}<div class="hero-body"><h2 class="hero-title">${esc(a.title)}</h2>
+      <div class="timer-num" id="elapsed" role="timer" aria-label="경과 시간">0:00:00</div>
+      <div class="hero-acts"><button class="btn primary" data-act="stopdone" data-label="끝내고 완료">✓ 끝내고 완료</button><button class="btn plain" data-act="stop" data-label="멈춤">멈춤</button></div></div></div></section>` };
+  }
+  const cur = rows.find(r => !r.busy && dt(r.start) <= now && now < dt(r.end));
+  const next = rows.find(r => !r.busy && dt(r.start) > now);
+  const pick = cur || next;
+  let t = pick && pick.t, eyebrow, progress = "";
+  if (t) {
+    const left = Math.round((dt(pick.end) - now) / 6e4), until = Math.round((dt(pick.start) - now) / 6e4);
+    eyebrow = cur ? `지금 <span class="sep">·</span> <span class="num">${hm(pick.start)}–${hm(pick.end)}</span> <span class="sep">·</span> ${dur(left)} 남음`
+                  : `다음 <span class="sep">·</span> <span class="num">${hm(pick.start)}</span> 시작 <span class="sep">·</span> ${dur(until)} 뒤`;
+    if (cur) { const pct = Math.min(100, Math.max(2, (now - dt(pick.start)) / (dt(pick.end) - dt(pick.start)) * 100));
+      progress = `<div class="bar" role="progressbar" aria-label="이 블록 진행" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div>`; }
+  } else {
+    t = D.tasks.filter(x => dt(x.due) >= now)[0];
+    if (!t) return { key: null, row: null, html: `<section class="hero" id="hero"><div class="eyebrow">오늘 남은 계획 없음</div><h2 class="hero-title" style="margin-top:8px">쉬어도 됩니다</h2></section>` };
+    eyebrow = `오늘 남은 계획 없음 <span class="sep">·</span> 가장 급한 일`;
+  }
+  const P = primaryOf(t);
+  // 주인공 안에서도 '완료'는 원형 체크 하나로 (A 는 원 + ✓ 완료 버튼 두 개). 그 자리에 자주 쓰는 ⏱ 를 꺼냈다.
+  return { key: t.key, row: t && pick && pick.t === t ? pick : null, html: `<section class="hero" id="hero"><div class="eyebrow">${eyebrow}</div>
+    <div class="hero-head">${ck(t)}<div class="hero-body">
+      <h2 class="hero-title">${esc(t.title)}${pick && pick.part ? ` <span class="clip">(${pick.part})</span>` : ""}</h2>
+      <div class="hero-meta">${[KIND[t.kind], t.course && esc(t.course), `마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})`, links(t).length && `자료 ${links(t).length}`].filter(Boolean).join(" · ")}</div>
+      ${progress}
+      <div class="hero-acts"><button class="btn primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>
+        ${P.act !== "start" && !MOB ? `<button class="btn plain" data-act="start" data-key="${esc(t.key)}" data-label="시간 재기 시작">⏱ 시간 재기</button>` : ""}
+        <button class="icon-btn" data-menu="${esc(t.key)}" title="다른 동작 (.)" aria-label="다른 동작: ${esc(t.title)}" aria-haspopup="menu" aria-expanded="false">⋯</button></div>
+      ${pick && pick.why ? `<p class="why">왜 지금? ${esc(pick.why)}</p>` : ""}</div></div></section>` };
+}
+
+// ---- 심각도 분류: 2 = 지금 행동해야 함(빨강) · 1 = 행동 필요하지만 급하지 않음(주황) · 0 = '확인할 것' 안에 접어 둠
+function sevOf(w) {
+  if (/로그인 필요|Google Calendar 로그인/.test(w)) return 2;
+  if (/반영하지 못했|실패/.test(w)) return 1;
+  return 0;
+}
+function critHtml(now) {
+  const L = [], st = engineState();
+  if (st === "off" && location.protocol.startsWith("http")) L.push({ sev: 2, t: "엔진이 꺼져 있음", s: `${ago(D.generated)} 데이터를 보여 주는 중 · VSCode: Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시` });
+  if (st === "stale") L.push({ sev: 1, t: `엔진이 ${ago(D.generated).replace(" 전", "")}째 새로 고치지 않음`, s: "감시기가 멈췄을 수 있음 · bin/pa run" });
+  for (const w of WARN) {
+    const v = sevOf(w); if (!v) continue;
+    const plain = w.replace(/\s*\[(ack|keep)[:=][^\]]+\]/g, "");
+    if (/LearningX|강의 플랫폼/.test(w)) L.push({ sev: v, t: "강의 플랫폼(LearningX) 로그인 만료", s: "새 강의·자료를 받지 못하는 중 · 비서는 스스로 다시 로그인하지 않음",
+      b: `<button class="tbtn" data-act="relogin" data-label="다시 로그인 (직접 누를 때만)">다시 로그인</button>` });
+    else if (/Google Calendar/.test(w)) L.push({ sev: v, t: "Google 캘린더 로그인 필요", s: "캘린더에 일정이 올라가지 않는 중",
+      b: `<button class="tbtn" data-act="glogin" data-label="Google 다시 로그인">Google 로그인</button>` });
+    else { const m = plain.split(/\s+—\s+/);
+      L.push({ sev: v, t: m[0], s: m.slice(1).join(" — "), b: w.includes("[ack:") ? `<button class="tbtn" data-act="ack" data-what="${(w.match(/\[ack:(\w+)\]/) || [])[1] || ""}" data-label="확인">확인</button>` : "" }); }
+  }
+  for (const j of (D.jobs || []).filter(j => j.status === "failed"))
+    L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button>` : "" });
+  if (!L.length) return "";
+  L.sort((a, b) => b.sev - a.sev);
+  return `<div class="crit" role="region" aria-label="바로 처리할 것">${L.map(x => `<div class="cline ${x.sev < 2 ? "warn" : ""}">
+    <span class="ic" aria-hidden="true">!</span><span class="tx"><span class="sr">${x.sev === 2 ? "긴급: " : "주의: "}</span><b>${esc(x.t)}</b>${x.s ? `<small>${esc(x.s)}</small>` : ""}</span><span>${x.b || ""}</span></div>`).join("")}</div>`;
+}
+
+// ---- 확인할 것: 알림·점수·시험·공지·작업·파일·브리핑을 한 줄로 접는다
+function checkHtml(now, today) {
+  const G = [], hint = [];
+  let n = 0;
+  const warns = WARN.filter(w => !sevOf(w));  // 위로 꺼낸 경고는 여기서 다시 쓰지 않는다
+  if (warns.length) {
+    n += warns.length; hint.push(`알림 ${warns.length}`);
+    G.push(`<div class="cgrp"><h3 class="cgrp-h">알림</h3>${warns.map(w => {
+      const txt = esc(w.replace(/\s*\[ack:\w+\]/, "").replace(/\s*\[keep=[^\]]+\]/, "")).replace(/`([^`]+)`/g, "<code>$1</code>");
+      const b = [];
+      if (w.includes("로그인 필요")) b.push(`<button class="tbtn" data-act="relogin" data-label="다시 로그인 (직접 누를 때만)">다시 로그인</button>`);
+      if (w.includes("Google Calendar 로그인")) b.push(`<button class="tbtn" data-act="glogin" data-label="Google 다시 로그인">Google 로그인</button>`);
+      if (w.includes("[keep=")) b.push(`<button class="tbtn gray" data-act="keep" data-key="${esc(w.match(/\[keep=([^\]]+)\]/)[1])}" data-label="계속 보이기">보이기</button>`);
+      if (w.includes("[ack:")) b.push(`<button class="tbtn gray" data-act="ack" data-what="${(w.match(/\[ack:(\w+)\]/) || [])[1] || ""}" data-label="확인">확인</button>`);
+      return `<div class="citem"><span class="tx">${txt}</span><span class="ac">${b.join("")}</span></div>`;
+    }).join("")}</div>`);
+  }
+  const gr = (D.grades || []).filter(g => !(MOB && (ls.get("pa.ack.grades") || "") >= g.graded_at));
+  if (gr.length) {
+    n += gr.length; hint.push(`새 점수 ${gr.length}`);
+    G.push(`<div class="cgrp"><h3 class="cgrp-h">새 점수 <button class="tbtn gray" data-act="gradeack" data-label="점수 확인">확인</button></h3>${gr.map(g => `<div class="citem"><span class="tx">${esc(g.title)}<small>${esc(g.course)}</small></span><span class="num"><b>${g.score}</b> / ${g.points}</span></div>`).join("")}</div>`);
+  }
+  const ex = D.exams || [];
+  if (ex.length) {
+    n += ex.length; hint.push(`시험 후보 ${ex.length}`);
+    G.push(`<div class="cgrp"><h3 class="cgrp-h">시험 일정 후보 <span class="small" style="font-weight:400">공지에서 찾음</span></h3>${ex.map(x => `<div class="citem"><span class="tx"><b>${esc(x.title)}</b> ${label(x.date)}${x.time ? " " + x.time : ""}<small>「${esc(x.line)}」</small></span>
+      <span class="ac"><button class="tbtn" data-act="examadd" data-x='${esc(JSON.stringify(x))}' data-label="시험을 할 일로 추가">추가</button><button class="tbtn gray" data-act="examno" data-id="${esc(x.id)}" data-label="아니요">아니요</button></span></div>`).join("")}
+      <p class="small" style="margin:4px 0 0">추가하면 시험 7·4·2일 전에 복습이 잡히고 마감 캘린더에 알림이 갑니다.</p></div>`);
+  }
+  const ns = D.notices || [], sg = D.suggestions || [];
+  if (ns.length || sg.length) {
+    n += ns.length + sg.length; if (ns.length) hint.push(`공지 ${ns.length}`); if (sg.length) hint.push(`제외 후보 ${sg.length}`);
+    G.push(`<div class="cgrp"><h3 class="cgrp-h">새 공지 ${ns.length}${ns.length ? `<button class="tbtn gray" data-act="nreadall" data-label="모두 읽음">모두 읽음</button>` : ""}</h3>
+      ${ns.map(x => `<div class="citem"><span class="tx">${esc(x.title)}<small>${esc(String(x.course).replace(/\s*\d{6}$/, ""))}${x.summary ? " · 요약: " + esc(x.summary) : ""}</small></span>
+        <span class="ac"><button class="tbtn" data-act="nopen" data-id="${esc(x.id)}" data-label="공지 열기">열기</button><button class="tbtn gray" data-act="nread" data-id="${esc(x.id)}" data-label="읽음">읽음</button></span></div>`).join("")}
+      ${ns.length ? `<button class="tbtn" data-act="njob" data-label="공지 요약·제외 후보 찾기 (Claude)" style="padding-left:0">요약·제외 후보 찾기 <span class="small" style="font-weight:400">Claude 사용</span></button>` : ""}
+      ${sg.map(x => `<div class="citem"><span class="tx">제외 후보 · ${esc(x.course)} ${esc(x.title)}<small>${esc(x.reason)}</small></span>
+        <span class="ac"><button class="tbtn" data-act="ign-one" data-key="${esc(x.key)}" data-label="제외">제외</button><button class="tbtn gray" data-act="sgno" data-key="${esc(x.key)}" data-label="아니요">아니요</button></span></div>`).join("")}</div>`);
+  }
+  const js = (D.jobs || []).filter(j => j.status !== "failed");
+  if (js.length) {
+    const ST = { queued: "대기", running: "진행 중", done: "완료", failed: "실패" };
+    n += js.length; hint.push(`작업 ${js.length}`);
+    G.push(`<div class="cgrp" id="jobs"><h3 class="cgrp-h">에이전트 작업</h3>${js.map(j => `<div class="citem"><span class="tx"><b>${ST[j.status] || j.status}</b> · ${esc(j.title)}
+      <small>${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · Claude 사용 " + j.claude + "회" : ""}</small></span>
+      ${j.status === "done" && j.result ? `<span class="ac"><button class="tbtn" data-act="openfile" data-path="${esc(j.result)}" data-label="결과 열기">열기</button></span>` : ""}</div>`).join("")}</div>`);
+  }
+  const dls = D.downloads || [];
+  if (dls.length) {
+    n += dls.length; hint.push(`새 파일 ${dls.length}`);
+    const shown = UI.allDl ? dls : dls.slice(0, 3);
+    G.push(`<div class="cgrp"><h3 class="cgrp-h">새로 받은 파일 ${dls.length} <span class="small" style="font-weight:400">과목 폴더로 정리</span></h3>${shown.map(f => `<div class="citem"><span class="tx">${esc(f.name)}</span>
+      <span class="ac"><select class="dl-sel" data-dl="${esc(f.path)}" aria-label="과목">${["", ...(D.courseFolders || [])].map(c => `<option value="${esc(c)}" ${c === f.course ? "selected" : ""}>${esc(c || "과목?")}</option>`).join("")}</select>
+      <button class="tbtn" data-act="dlmove" data-path="${esc(f.path)}" data-label="파일 옮기기">옮기기</button><button class="tbtn gray" data-act="dlskip" data-path="${esc(f.path)}" data-label="파일 무시" aria-label="무시">무시</button></span></div>`).join("")}
+      ${dls.length > 3 ? `<button class="link" data-ui="alldl">${UI.allDl ? "접기" : `${dls.length - 3}개 더 보기`}</button>` : ""}</div>`);
+  }
+  // 브리핑 / 마무리 — 카드 대신 이 안의 한 묶음
   const evening = `${pad(now.getHours())}:${pad(now.getMinutes())}` >= D.eveningReview;
-  const todayPlan = D.plan.filter(p => ymd(p.start) === today);
-  const tomorrow = addDays(today, 1);
-  const firstTomorrow = [...D.busy.filter(b => ymd(b.start) === tomorrow), ...D.plan.filter(p => ymd(p.start) === tomorrow)]
-    .sort((a, b) => dt(a.start) - dt(b.start))[0];
-  if (evening && !seenToday("pa.evening")) {
-    const missed = todayPlan.filter(p => dt(p.end) <= now).map(p => taskOf(p.key)).filter(t => t && t.status === "open");
+  const todayPlan = D.plan.filter(p => ymd(p.start) === today), tm = addDays(today, 1);
+  const li = [];
+  if (evening) {
+    const missed = todayPlan.filter(p => dt(p.end) <= now).map(p => findTask(p.key)).filter(t => t && t.status === "open");
     const worked = D.sessionsToday.reduce((s, x) => s + (x.minutes || 0), 0);
-    return `<div class="card ritual"><h2>🌙 하루 마무리 <button class="chip" data-act="ritualclose" data-k="pa.evening" style="margin-left:auto">마무리</button></h2>
-      <h3>오늘 끝낸 일 ${D.todayDone.length}</h3><ul>${D.todayDone.map(t => `<li>${esc(t.title)}</li>`).join("") || "<li>없음</li>"}</ul>
-      ${missed.length ? `<h3>계획했지만 아직 안 끝난 일 — 실제로 했으면 ✓, 아니면 다음 빈 시간으로 자동으로 옮겨집니다</h3>${missed.map(t => `<div class="item"><span class="txt">${esc(t.title)}</span>
-        <button data-act="done" data-key="${esc(t.key)}">✓ 했음</button></div>`).join("")}` : ""}
-      ${worked ? `<h3>⏱ 오늘 기록한 시간 ${dur(worked)}</h3>` : ""}
-      ${now.getDay() === 0 && D.weekReview ? `<h3>🗓 이번 주 돌아보기</h3>${weekReviewHtml(D.weekReview)}` : ""}
-      <h3>내일 ${label(tomorrow)}</h3><ul><li>${firstTomorrow ? `첫 일정 ${hm(firstTomorrow.start)} ${esc(firstTomorrow.label || firstTomorrow.summary)}` : "일정 없음"}</li></ul></div>`;
+    const first = [...D.busy.filter(b => ymd(b.start) === tm), ...D.plan.filter(p => ymd(p.start) === tm)].sort((a, b) => dt(a.start) - dt(b.start))[0];
+    li.push(`오늘 끝낸 일 ${D.todayDone.length}${D.todayDone.length ? ": " + D.todayDone.map(t => esc(t.title)).join(", ") : ""}`);
+    for (const t of missed) li.push(`계획했지만 안 끝남 · ${esc(t.title)} <button class="tbtn" data-act="done" data-key="${esc(t.key)}" data-label="했음">✓ 했음</button>`);
+    if (worked) li.push(`오늘 기록한 시간 ${dur(worked)}`);
+    li.push(`내일 ${label(tm)} 첫 일정 ${first ? `${hm(first.start)} ${esc(first.label || clean(first.summary))}` : "없음"}`);
+  } else {
+    const cls = D.busy.filter(b => ymd(b.start) === today), m = todayPlan.reduce((s, p) => s + (dt(p.end) - dt(p.start)) / 6e4, 0);
+    li.push(`수업·약속 ${cls.length}개${cls.length ? " (" + cls.map(b => `${hm(b.start)} ${esc(b.label)}`).join(", ") + ")" : ""}`);
+    li.push(`계획된 할 일 ${todayPlan.length}개 · ${dur(Math.round(m))}${todayPlan[0] ? ` · 첫 블록 ${hm(todayPlan[0].start)}` : ""}`);
+    const rest = D.plan.filter(p => p.why && p.why.includes("다른 요일") && dt(p.end) > now);
+    if (rest.length) li.push(`쉬려던 요일에 잡힌 것 ${rest.length}개 (마감 때문에): ${rest.map(p => `${label(ymd(p.start))} ${esc(clean(p.summary))}`).join(", ")}`);
+    const soon2 = D.tasks.filter(t => dt(t.due) >= now && between(today, ymd(t.due)) <= 2);
+    if (soon2.length) li.push(`이틀 안 마감 ${soon2.length}개`);
   }
-  if (!evening && !seenToday("pa.morning")) {
-    const cls = D.busy.filter(b => ymd(b.start) === today);
-    const mins = todayPlan.reduce((s, p) => s + (dt(p.end) - dt(p.start)) / 6e4, 0);
-    const soon = D.tasks.filter(t => dt(t.due) >= now && between(today, ymd(t.due)) <= 2);
-    return `<div class="card ritual"><h2>☀️ 오늘 브리핑 <button class="chip primary" data-act="ritualclose" data-k="pa.morning" style="margin-left:auto">오늘 시작</button></h2>
-      <ul><li>수업·약속 ${cls.length}개${cls.length ? " (" + cls.map(b => `${hm(b.start)} ${esc(b.label)}`).join(", ") + ")" : ""}</li>
-        <li>계획된 할 일 ${todayPlan.length}개 · ${dur(Math.round(mins))}${todayPlan[0] ? ` · 첫 블록 ${hm(todayPlan[0].start)}` : ""}</li></ul>
-      ${(() => { const rest = D.plan.filter(p => p.why && p.why.includes("다른 요일") && dt(p.end) > now);
-        return rest.length ? `<h3>쉬려던 요일(월수금토·일 밖)에 잡힌 것 ${rest.length}개 — 마감 때문에</h3><ul>${rest.map(p =>
-          `<li>${label(ymd(p.start))} ${hm(p.start)} ${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}</li>`).join("")}</ul>` : ""; })()}
-      ${soon.length ? `<h3>이틀 안 마감</h3><ul>${soon.map(t => `<li>${ddayText(t.due, today)} ${hm(t.due)} ${esc(t.title)}</li>`).join("")}</ul>` : ""}
-      ${D.quiz && D.quiz.stale ? `<h3>📝 퀴즈 복습</h3><ul><li>퀴즈 기록을 ${D.quiz.backupAt ? label(ymd(D.quiz.backupAt)) + " 이후로" : "아직"} 가져오지 않았어요.
-        퀴즈 앱에서 <b>[기록 내보내기]</b>를 누르면 틀린 문제 복습 일정이 생깁니다. <button class="chip" data-act="openquiz">퀴즈 앱 열기</button></li></ul>` : ""}
-      ${D.recent.length ? `<h3>지난 하루 동안 바뀐 것</h3><ul>${D.recent.map(r => `<li>${r.label} · ${esc(r.name)}</li>`).join("")}</ul>` : ""}</div>`;
-  }
-  return "";
+  if (D.quiz && D.quiz.stale) li.push(`퀴즈 기록을 ${D.quiz.backupAt ? label(ymd(D.quiz.backupAt)) + " 이후로" : "아직"} 가져오지 않았어요 — 퀴즈 앱에서 [기록 내보내기] <button class="tbtn" data-act="openquiz" data-label="퀴즈 앱 열기">퀴즈 앱 열기</button>`);
+  if (evening && now.getDay() === 0 && D.weekReview) li.push(`이번 주 돌아보기 — 아래 '통계'에 있음`);
+  G.push(`<div class="cgrp"><h3 class="cgrp-h">${evening ? "하루 마무리" : "오늘 브리핑"}<button class="tbtn gray" data-act="ritualclose" data-label="${evening ? "마무리" : "오늘 시작"}">${evening ? "마무리" : "오늘 시작"}</button></h3>
+    <ul class="clist">${li.map(x => `<li>${x}</li>`).join("")}</ul>
+    ${D.recent.length ? `<h3 class="cgrp-h" style="margin-top:12px">지난 하루 동안 바뀐 것 ${D.recent.length}</h3><ul class="clist">${D.recent.map(r => `<li>${esc(String(r.label).replace(/^\S+\s/, ""))} · ${esc(r.name)}</li>`).join("")}</ul>` : ""}</div>`);
+  hint.push(evening ? "하루 마무리" : "오늘 브리핑");
+  return `<details class="check" data-k="check" ${det("check")}><summary><span class="cnt num" aria-label="${n}개">${n}</span>
+    <span class="ttl">확인할 것</span><span class="hint">${hint.join(" · ")}</span><span class="chev">›</span></summary>
+    <div class="check-body">${G.join("")}</div></details>`;
 }
 
+// ---- 다가오는 마감: 3일만, 나머지는 '2주 보기'
+function duesHtml(now, today) {
+  const open = D.tasks.filter(t => dt(t.due) >= now), late = D.tasks.filter(t => dt(t.due) < now);
+  const span = UI.allDues ? 14 : 4;  // 오늘 + 3일
+  const hidden = open.filter(t => between(today, ymd(t.due)) >= span && between(today, ymd(t.due)) < 14).length;
+  // 오늘 타임라인에 잡힌 일은 '오늘 HH:MM 계획' 꼬리표로 이어 준다 (같은 일이라는 걸 색으로 묶음 — 게슈탈트 유사성)
+  const planned = t => D.plan.find(p => p.key === t.key && ymd(p.start) === today && dt(p.end) > now);
+  const row = (t, lateRow) => { const pl = planned(t);
+    return `<div class="row nt${lateRow ? " is-late" : ""}"${rowAttr(t)}>${ck(t)}<div class="body"><div class="ttl">${esc(t.title)}${clip(t)}</div>
+    <div class="meta">${lateRow ? `<span class="late">${label(ymd(t.due))} ${hm(t.due)} 지남</span>` : (dt(t.due) - now) < 864e5 ? `<span class="soon num">${hm(t.due)} · ${Math.max(1, Math.round((dt(t.due) - now) / 36e5))}시간 남음</span>` : `<span class="num">${hm(t.due)}</span>`}${t.course ? " · " + esc(t.course) : ""} · ${KIND[t.kind]}${pl ? ` · <span class="plan-tag">오늘 ${hm(pl.start)} 계획</span>` : ""}</div></div>${rowActs(t)}</div>`; };
+  let h = `<section class="sec"><div class="sec-h"><h2>다가오는 마감</h2><span class="aside">${UI.allDues ? "2주" : "앞으로 3일"}</span>
+    <button class="link" data-ui="alldues" aria-expanded="${UI.allDues}">${UI.allDues ? "3일만 보기" : hidden ? `2주 보기 (+${hidden})` : "2주 보기"}</button></div><div class="rows">`;
+  if (late.length) h += `<div class="day-h danger" id="late">마감 지남 ${late.length} <span class="d">아직 안 끝남 — 끝냈으면 ○, 안 할 거면 ⋯ → 제외</span></div>` + late.map(t => row(t, true)).join("");
+  let any = false;
+  for (let i = 0; i < span; i++) {
+    const d = addDays(today, i), all = open.filter(t => ymd(t.due) === d), its = all.filter(t => t.key !== HERO_KEY);
+    if (!all.length) continue;
+    any = true;
+    h += `<div class="day-h ${i === 0 ? "today" : ""}">${relDay(d, today) || "D-" + i} <span class="d">${label(d)} · ${all.length}개${its.length < all.length ? " (1개는 위 '지금')" : ""}</span></div>` + its.map(t => row(t)).join("");
+  }
+  if (!any && !late.length) h += `<p class="empty">${UI.allDues ? "2주" : "3일"} 안 마감 없음</p>`;
+  return h + `</div></section>`;
+}
+
+// ---- 주차별 (간단히: 날짜별 목록)
+function curWeekIdx(today) {
+  const ws = D.semester || [];
+  const i = ws.findIndex(w => w.start <= today && today <= addDays(w.start, 6));
+  return i >= 0 ? i : (ws.length && today < ws[0].start ? 0 : ws.length - 1);
+}
+function weekView(now, today) {
+  const ws = D.semester || [];
+  if (!ws.length) return `<p class="empty">학기 정보가 없습니다.</p>`;
+  const cur = curWeekIdx(today), i = wkIdx === null ? cur : Math.max(0, Math.min(ws.length - 1, wkIdx));
+  const w = ws[i], days = [...Array(7)].map((_, k) => addDays(w.start, k)), maxMin = Math.max(60, ...ws.map(x => x.minutes));
+  HERO_KEY = null;
+  let h = critHtml(now) + `<section class="hero" style="margin-top:32px"><div class="wk-nav"><button class="icon-btn" data-wk="${i - 1}" ${i === 0 ? "disabled" : ""} aria-label="이전 주">‹</button>
+    <b>${i + 1}주차</b><span class="r num">${label(w.start)} – ${label(days[6])}</span><button class="icon-btn" data-wk="${i + 1}" ${i === ws.length - 1 ? "disabled" : ""} aria-label="다음 주">›</button>
+    ${i !== cur ? `<button class="link push" data-wk="${cur}">이번 주로</button>` : `<span class="r push">이번 주</span>`}</div>
+    <div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""} ${x.items.some(y => y.exam) ? "ex" : ""}" data-wk="${j}"
+      title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}"><em></em><i style="height:${Math.max(3, Math.round(x.minutes / maxMin * 32))}px"></i><span>${j + 1}</span></button>`).join("")}</div>
+    <p class="strip-note">막대 = 그 주에 남은 일의 양 · 빨간 점 = 시험</p></section>`;
+
+  h += `<section class="sec"><div class="sec-h"><h2>날짜별 일정</h2><span class="aside">계획은 2주 앞까지</span></div><div class="rows">`;
+  for (const d of days) {
+    const items = [...D.busy.filter(b => ymd(b.start) === d).map(b => ({ busy: true, ...b })), ...D.plan.filter(p => ymd(p.start) === d)].sort((a, b) => dt(a.start) - dt(b.start));
+    const rd = relDay(d, today), dd = new Date(d + "T12:00:00");
+    h += `<div class="day-h ${d === today ? "today" : ""}">${WD[dd.getDay()]}요일${rd ? " · " + rd : ""} <span class="d">${label(d)}${items.length ? "" : " · 일정 없음"}</span></div>`;
+    for (const p of items) {
+      const past = dt(p.end) <= now ? " past" : "", curC = dt(p.start) <= now && now < dt(p.end) ? " cur" : "";
+      const tcol = `<span class="t num">${hm(p.start)}<small>${hm(p.end)}</small></span>`;
+      if (p.busy) { h += `<div class="row busy${past}">${tcol}<span class="bmark"></span><div class="body"><div class="ttl">${esc(p.label)}</div></div><span></span></div>`; continue; }
+      const t = findTask(p.key);
+      h += `<div class="row${past}${curC}"${past ? "" : rowAttr(t)}>${tcol}${t ? ck(t) : "<span></span>"}<div class="body" title="${esc(p.why || "")}"><div class="ttl">${esc(t ? t.title : clean(p.summary))}${clip(t)}</div>
+        <div class="meta">${t ? [KIND[t.kind], t.course && esc(t.course), "마감 " + ddayText(t.due, today)].filter(Boolean).join(" · ") : ""}</div></div>${t && !past ? rowActs(t) : "<span></span>"}</div>`;
+    }
+  }
+  h += `</div></section>`;
+
+  const its = w.items, openIts = its.filter(x => x.status === "open"), doneIts = its.filter(x => x.status === "done");
+  h += `<section class="sec"><div class="sec-h"><h2>이 주에 마감</h2><span class="aside">${openIts.length}개 남음 / 전체 ${its.length}개</span></div><div class="rows">`;
+  for (const [kind, name] of [["lecture", "강의"], ["assignment", "과제"], ["quiz", "퀴즈"], ["review", "퀴즈 복습"], ["todo", "할 일"]]) {
+    const g = openIts.filter(x => x.kind === kind).sort((a, b) => dt(a.due) - dt(b.due));
+    if (!g.length) continue;
+    h += `<div class="day-h">${name} <span class="d">${g.length}</span></div>` + g.map(x => {
+      const late = dt(x.due) < now;
+      return `<div class="row nt"${rowAttr(x)}>${ck(x)}<div class="body"><div class="ttl">${x.exam ? "시험 · " : ""}${esc(x.title)}${clip(x)}</div>
+        <div class="meta">${x.course ? esc(x.course) + " · " : ""}마감 ${label(ymd(x.due))} ${hm(x.due)} · ${late ? `<span class="late">지남</span>` : ddayText(x.due, today)}${x.minutes ? " · 예상 " + dur(x.minutes) : ""}</div></div>${rowActs(x)}</div>`;
+    }).join("");
+  }
+  if (!its.length) h += `<p class="empty">이 주에 마감인 것이 없습니다.</p>`;
+  if (doneIts.length) h += `<details data-k="wkdone" ${det("wkdone")} style="margin-top:8px"><summary class="small"><span class="chev">›</span> 끝낸 것 ${doneIts.length}개</summary>
+    <div class="done-l" style="padding-left:20px">${doneIts.map(x => `<div>${esc(x.title)}</div>`).join("")}</div></details>`;
+  return h + `</div></section>`;
+}
+
+// ---- 맨 아래: 하고 싶은 일 · 제외한 것 · 통계 (모두 접힘)
+function moreHtml(now, today) {
+  const sd = D.someday, ex = D.excluded || [];
+  let h = `<details data-k="someday" ${det("someday")}><summary><span class="ttl">하고 싶은 일</span><span class="hint">${sd.length}개 · 기한 없음</span><span class="chev">›</span></summary><div class="inner">
+    <div class="rows">${sd.map(t => `<div class="row nt"${rowAttr(t)}>${ck(t)}<div class="body"><div class="ttl">${esc(t.title)}</div>${t.course ? `<div class="meta">${esc(t.course)}</div>` : ""}</div>
+      <span class="ra">${t.source === "inbox" ? `<button class="tbtn" data-act="dotoday" data-key="${esc(t.key)}" data-label="오늘 빈 시간에 넣기">오늘 하기</button>` : ""}${dots(t)}</span></div>`).join("") || `<p class="empty">아직 없음</p>`}</div>
+    <form class="inline" data-form="someday"><input class="field" type="text" placeholder="하고 싶은 일 추가" aria-label="하고 싶은 일 추가"><button class="btn" type="submit" style="height:36px">추가</button></form></div></details>`;
+  if (ex.length) h += `<details data-k="excluded" ${det("excluded")}><summary><span class="ttl">제외한 것</span><span class="hint">${ex.length}개 · 취소하면 다시 나타남</span><span class="chev">›</span></summary><div class="inner">
+    ${ex.map(x => `<div class="citem"><span class="tx">${esc(x.keep ? "예외(계속 보이기): " + (x.titles[0] || x.text) : x.text)}<small>${x.keep ? "단어 규칙에 걸려도 보이게" : (x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만") + ` · 걸린 과제 ${x.count}개`}</small></span>
+      ${LIVE || MOB ? `<span class="ac"><button class="tbtn" data-act="unign" data-text="${esc(x.text)}" data-label="제외 취소">취소</button></span>` : ""}</div>`).join("")}</div></details>`;
+  h += `<details data-k="stats" ${det("stats")}><summary><span class="ttl">통계</span><span class="hint">학습량 · 과목별 진행 · 완료 추이 · 걸린 시간 · 돌아보기</span><span class="chev">›</span></summary><div class="inner">${statsHtml(today)}</div></details>`;
+  return h;
+}
+function statsHtml(today) {
+  const days14 = [...Array(14)].map((_, i) => addDays(today, i));
+  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
+  const maxLoad = Math.max(D.cap, ...days14.map(planMin));
+  const tick = (d, i) => i % 2 ? "&nbsp;" : `${+d.slice(5, 7)}/${+d.slice(8)}`;
+  const load = `<div class="bars"><div class="cap" style="bottom:${D.cap / maxLoad * 100}%" title="하루 한도 ${dur(D.cap)}"></div>${days14.map((d, i) => { const m = planMin(d);
+    return `<div class="b ${m > D.cap ? "over" : ""}" title="${label(d)} ${dur(m)}"><i style="height:${m / maxLoad * 100}%"></i><span>${tick(d, i)}</span></div>`; }).join("")}</div>`;
+  const past14 = [...Array(14)].map((_, i) => addDays(today, i - 13)), maxDone = Math.max(1, ...past14.map(d => D.doneByDay[d] || 0));
+  const trend = `<div class="bars">${past14.map((d, i) => `<div class="b" title="${label(d)} ${D.doneByDay[d] || 0}건"><i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%"></i><span>${tick(d, i)}</span></div>`).join("")}</div>`;
+  const prog = D.progress.map(p => `<div class="prog"><div class="r"><span>${esc(p.course)}</span><span class="num">${p.done}/${p.total}</span></div><div class="tr"><i style="width:${p.total ? p.done / p.total * 100 : 0}%"></i></div></div>`).join("") || `<p class="empty">아직 없음</p>`;
+  const ses = D.sessionsToday.length ? D.sessionsToday.map(s => { const t = findTask(s.key); return `<div class="citem"><span class="tx">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span><span class="small">${s.minutes ? dur(s.minutes) : ""}</span></div>`; }).join("")
+    : `<p class="small">⏱ 시간 재기로 기록하면 여기에 쌓이고, 쌓인 기록으로 예상 시간을 고칩니다.</p>`;
+  const cal = (D.calibration || []).length ? D.calibration.map(c => `<div class="citem"><span class="tx">${esc(c.what)}</span><span class="small">예상의 ×${c.factor} (${c.n}번)</span></div>`).join("")
+    : `<p class="small">같은 종류가 3번 기록되면 계획에 반영됩니다.</p>`;
+  const q = D.quiz || {};
+  const quiz = `<p class="small" style="margin:0">마지막으로 가져온 기록: ${q.backupAt ? stamp(q.backupAt) : "없음"}${q.stale ? " (오래됨)" : ""}</p>${Object.entries(q.dueBySubject || {}).map(([s, n]) => `<div class="citem"><span class="tx">${esc(s)}</span><span class="small">복습 ${n}</span></div>`).join("")}
+    <button class="tbtn" data-act="openquiz" data-label="퀴즈 앱 열기" style="padding-left:0">퀴즈 앱 열기</button>`;
+  const W = D.weekReview;
+  const wr = W ? `<ul class="clist"><li>끝낸 일 <b>${W.doneTotal}</b>${W.doneTotal ? " (" + Object.entries(W.done).map(([k, n]) => `${KIND[k] || k} ${n}`).join(", ") + ")" : ""}</li>
+    <li>기록 ${W.trackedCount ? `${W.trackedCount}번 · 실제 ${dur(W.trackedMinutes)} / 예상 ${dur(W.trackedEstimate)}` : "없음"}</li>
+    <li>${W.missed.length ? `놓친 마감 ${W.missed.length}: ${W.missed.map(m => esc(m.title)).join(", ")}` : "놓친 마감 없음"}</li>
+    <li>다음 주 마감 ${W.nextCount}개 · 예상 ${dur(W.nextMinutes)}${W.nextExams.length ? " · 시험 " + W.nextExams.map(esc).join(", ") : ""}</li></ul>` : `<p class="empty">아직 없음</p>`;
+  const S = (t, s, b) => `<div class="stat"><h3>${t} <small>${s}</small></h3>${b}</div>`;
+  return `<div class="stats">${S("일별 학습량", "계획 · 점선 = 하루 한도", load)}${S("완료 추이", "14일", trend)}${S("과목별 진행", "추적한 항목 중 완료", prog)}
+    ${S("이번 주 돌아보기", "월요일부터", wr)}${S("오늘 실제로 한 시간", "기록", ses)}${S("예상 시간 보정", "기록 3번 이상부터", cal)}${S("퀴즈 복습", "기록 내보내기 기준", quiz)}</div>`;
+}
+
+// ---- ⋯ 메뉴 (열면 첫 항목에 포커스, ↑↓ 로 이동, 닫으면 누른 버튼으로 포커스가 돌아간다)
+function openMenu(btn, key) {
+  const t = findTask(key), m = $("menu");
+  if (!t) return;
+  closeMenu(false);
+  UI.menuKey = key; UI.menuFrom = btn;
+  btn.setAttribute("aria-expanded", "true");
+  fillMenu(t);
+  m.hidden = false;
+  const r = btn.getBoundingClientRect(), W = m.offsetWidth, H = m.offsetHeight;
+  let left = Math.min(window.innerWidth - W - 16, Math.max(16, r.right - W)), top = r.bottom + 4;
+  if (top + H > window.innerHeight - 16) top = Math.max(16, r.top - H - 4);
+  m.style.left = left + "px"; m.style.top = top + "px";
+  m.querySelector("button").focus({ preventScroll: true });
+}
+function fillMenu(t) {
+  $("menu").setAttribute("aria-label", t.title);
+  $("menu").innerHTML = `<div class="mh" aria-hidden="true">${esc(t.title)}</div>` + menuItems(t).map(g => g.map(x =>
+    `<button role="menuitem" class="${x.strong ? "strong" : ""} ${x.danger ? "danger" : ""}" data-act="${x.act}" data-key="${esc(t.key)}" data-label="${esc(x.label)}">${esc(x.label)}${x.hint ? `<small>${esc(x.hint)}</small>` : ""}</button>`).join("")).join(`<hr aria-hidden="true">`);
+}
+function closeMenu(restore = true) {
+  const m = $("menu"), from = UI.menuFrom;
+  if (m.hidden) return;
+  const had = m.contains(document.activeElement);
+  m.hidden = true; UI.menuKey = null; UI.menuFrom = null;
+  if (from) { from.setAttribute("aria-expanded", "false"); if (restore && had && document.contains(from)) from.focus({ preventScroll: true }); }
+}
+function ignoreMenu(key) {  // 제외: 이것만(되돌리기 가능 → 바로) / 앞으로도(규칙이 남음 → 확인 창)
+  const t = findTask(key);
+  $("menu").innerHTML = `<div class="mh" aria-hidden="true">제외 — ${esc(t ? t.title : "")}</div>
+    <button role="menuitem" data-act="ign-one" data-key="${esc(key)}" data-label="이것만 제외">이것만<small>이 과제 하나 · 되돌리기 가능</small></button>
+    <button role="menuitem" data-act="ign-all" data-key="${esc(key)}" data-label="앞으로도 제외">앞으로도…<small>같은 이름 계속 · 확인 후</small></button><hr aria-hidden="true">
+    <button role="menuitem" data-menu="${esc(key)}">취소</button>`;
+  $("menu").querySelector("button").focus({ preventScroll: true });
+}
+
+// ---- 시트 (보고서 작성 창 · 자료 창 · 확인 · 행동 · 단축키): 위에 뜨고, 포커스를 가두고, 닫으면 원래 자리로
+function openSheet(html) {
+  if ($("scrim").hidden) UI.sheetFrom = document.activeElement;
+  $("sheet").classList.remove("wide");
+  $("sheet").innerHTML = html; $("scrim").hidden = false;
+  ($("sheet").querySelector("[data-autofocus]") || $("sheet").querySelector("button,textarea,input"))?.focus({ preventScroll: true });
+}
+function closeSheet() {
+  if ($("scrim").hidden) return;
+  $("scrim").hidden = true; $("sheet").classList.remove("wide"); MP = null; REP = null;
+  const f = UI.sheetFrom; UI.sheetFrom = null;
+  if (f && document.contains(f)) f.focus({ preventScroll: true });
+}
+const sheetTop = (title, sub) => `<div class="sh-top"><h3 id="sheetTitle">${esc(title)}</h3><button class="icon-btn" data-ui="sheetclose" aria-label="닫기">✕</button></div>${sub ? `<p class="small" style="margin:4px 0 0">${sub}</p>` : ""}`;
+// ---- 보고서 창 · 자료 창: 시트 안에 (예전과 같은 기능 — 아래 코드는 예전 화면에서 그대로)
+async function openPanel(kind, key, opts) {
+  closeMenu(false);
+  if ($("scrim").hidden || !$("matPanel")) { openSheet(`<div class="panel"><div id="repPanel"></div><div id="matPanel"></div></div>`); MP = null; REP = null; }
+  $("sheet").classList.add("wide");
+  if (kind === "report") await showReport(key); else await showMaterials(key, opts || {});
+  if (kind !== "report" && !$("repPanel").innerHTML) $("matPanel").querySelector("h2")?.insertAdjacentHTML("beforeend", `<button class="icon-btn" data-ui="sheetclose" aria-label="닫기" style="margin-left:auto">✕</button>`);
+}
 // ---- 📄 자료 창: 연결된 자료(칩) · 추천 · 실시간 찾기(/ 경로 + Tab) · 📁 둘러보기 · 📥 최근 다운로드
 // 찾기는 화면 안에서 한다 — 파일 '이름' 목록을 1분에 한 번 받아 두고 글자를 칠 때마다 여기서 거름 (디스크·서버 0).
 // 범위·개수 같은 규칙은 config/materials.yaml (바꾸려면 채팅에서).
@@ -708,7 +1130,7 @@ function mpResults() {
 }
 function mpKey(e) {
   const inp = e.target, items = MP.items || [];
-  if (e.key === "Escape") { e.preventDefault(); if (inp.value) { inp.value = ""; mpResults(); } else { $("matPanel").innerHTML = ""; MP = null; } return; }
+  if (e.key === "Escape") { e.preventDefault(); if (inp.value) { inp.value = ""; mpResults(); } else { closeSheet(); } return; }
   if (!items.length) return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();
@@ -749,7 +1171,7 @@ function mpDraw() {
     ${MP.note ? `<p class="msg">${esc(MP.note)}</p>` : ""}`;
   $("mpDays").textContent = MP.days;
   $("mpFoot").innerHTML = `${MP.deleted.length ? `<p class="hint" title="${esc(MP.deleted.join("\n"))}">이 과목에서 교수님이 지운 자료 ${MP.deleted.length}개는 받지 않았습니다 (마우스를 올리면 목록).</p>` : ""}
-    <div class="row" style="margin-top:6px"><button class="chip" data-act="quizcopy" data-key="${esc(MP.key)}" title="채팅에 붙여 넣으면 연결된 자료로 퀴즈를 만듭니다 (퀴즈 프로젝트 규칙: 계획서 → 승인 → 제작)">🧩 퀴즈 요청 복사</button>
+    <div class="frow" style="margin-top:6px"><button class="chip" data-act="quizcopy" data-key="${esc(MP.key)}" title="채팅에 붙여 넣으면 연결된 자료로 퀴즈를 만듭니다 (퀴즈 프로젝트 규칙: 계획서 → 승인 → 제작)">🧩 퀴즈 요청 복사</button>
       <span class="hint">찾기: 단어 몇 개 · <code>/</code> 로 폴더 (예: 자료/) · <kbd>↑↓</kbd> 고르기 · <kbd>Tab</kbd> 채우기 · <kbd>Enter</kbd> 연결 · <kbd>Esc</kbd> 지우기·닫기</span></div>`;
   if (MP.browse) mpBrowseList();
 }
@@ -760,7 +1182,7 @@ async function showMaterials(key, opts = {}) {
   if (fresh) {
     MP = { key, sel: 0, limit: 8, dl: null, browse: null, items: [], note: "" };
     $("matPanel").innerHTML = `<div class="card mat"><h2>📄 <span id="mpTitle"></span>
-        <button class="chip" data-act="matclose" style="margin-left:auto">닫기</button></h2>
+        </h2>
       <div id="mpTop"></div>
       <div class="msearch"><input id="mpQ" type="text" autocomplete="off" spellcheck="false" placeholder="자료 찾기 — 예) 17강 배포   ·   자료/ 처럼 / 로 폴더 따라가기">
         <button data-act="mpbrowse" title="폴더를 눌러 다니며 여러 개 고르기">📁 둘러보기</button>
@@ -773,7 +1195,6 @@ async function showMaterials(key, opts = {}) {
       mpResults();
       if (MP.browse) mpBrowseDraw();
     });
-    $("matPanel").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   Object.assign(MP, j);
   if (opts.note !== undefined) MP.note = opts.note;
@@ -827,14 +1248,14 @@ function mpBrowseDraw() {
   const roots = [...(FILES.roots.length ? FILES.roots : ["자료", "노트", "보고서"]), "다운로드"], parts = B.path ? B.path.split("/") : [];
   const go = (p, label) => `<button class="link" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc(p)}">${esc(label)}</button>`;
   el.innerHTML = `<div class="mbrowse">
-    <div class="row">${roots.map(r => `<button class="chip ${r === B.root ? "primary" : ""}" data-act="mpls" data-root="${esc(r)}" data-path="">${r === "다운로드" ? `📥 다운로드 (최근 ${MP.days}일)` : esc(r)}</button>`).join("")}
+    <div class="frow">${roots.map(r => `<button class="chip ${r === B.root ? "primary" : ""}" data-act="mpls" data-root="${esc(r)}" data-path="">${r === "다운로드" ? `📥 다운로드 (최근 ${MP.days}일)` : esc(r)}</button>`).join("")}
       <button class="chip" data-act="mpbclose" style="margin-left:auto">접기</button></div>
     <div class="crumb">${go("", B.root)}${parts.map((p, i) => " / " + go(parts.slice(0, i + 1).join("/"), p)).join("")}
       ${parts.length ? `<button class="chip" data-act="mpls" data-root="${esc(B.root)}" data-path="${esc(parts.slice(0, -1).join("/"))}" title="한 단계 위로">⬆</button>` : ""}</div>
-    <div class="row"><input id="mpBF" type="text" placeholder="이 폴더에서 거르기" autocomplete="off" style="flex:1 1 160px">
+    <div class="frow"><input id="mpBF" type="text" placeholder="이 폴더에서 거르기" autocomplete="off" style="flex:1 1 160px">
       <select id="mpBS"><option value="name">이름순</option><option value="m" ${B.sort === "m" ? "selected" : ""}>최근순</option></select></div>
     <div id="mpBL" class="mres"></div>
-    <div class="row" style="margin-top:6px"><button class="primary" data-act="mpbadd" id="mpBAdd" disabled>선택한 0개 연결</button>
+    <div class="frow" style="margin-top:6px"><button class="primary" data-act="mpbadd" id="mpBAdd" disabled>선택한 0개 연결</button>
       ${B.root === "다운로드" ? `<span class="hint">다운로드 파일은 이 할 일의 과목 자료 폴더로 옮긴 뒤 연결합니다</span>` : ""}</div></div>`;
   $("mpBF").addEventListener("input", e => { B.filter = e.target.value.toLowerCase(); mpBrowseList(); });
   $("mpBS").addEventListener("change", e => { B.sort = e.target.value; mpBrowseList(); });
@@ -883,7 +1304,7 @@ async function showReport(key) {
   REP = { key, ...r };
   const due = r.due ? `${label(ymd(r.due))} ${hm(r.due)}` : "기한 없음";
   $("repPanel").innerHTML = `<div class="card mat rep"><h2>✍ ${esc(r.title)} <span class="hint">마감 ${due}</span>
-      <button class="chip" data-act="repclose" style="margin-left:auto">닫기</button></h2>
+      <button class="icon-btn" data-ui="sheetclose" aria-label="닫기" style="margin-left:auto">✕</button></h2>
     ${r.desc ? `<details ${r.desc.length < 300 ? "open" : ""}><summary class="meta">Canvas 과제 설명</summary><p class="desc">${esc(r.desc)}</p></details>` : ""}
     <div class="meta" style="margin-top:6px">파일: <b>${esc(r.name)}</b> ${r.exists ? `— 이미 있음 <button class="chip" data-act="openfile" data-path="${esc(r.path)}">열기</button>
       <button class="chip" data-act="reveal" data-path="${esc(r.path)}" title="Windows 탐색기에서 파일 위치 보기">📂 위치</button>
@@ -899,7 +1320,6 @@ async function showReport(key) {
       <button data-act="repfile">📝 빈 파일만 만들고 열기 <small>규칙에 맞는 이름·제목·학번 줄만. Claude 안 씀</small></button>
     </div><p id="repMsg" class="msg"></p></div>`;
   await showMaterials(key);
-  $("repPanel").scrollIntoView({ behavior: "smooth", block: "start" });
   $("repText").focus({ preventScroll: true });
 }
 const repBrief = () => ({ key: REP.key, text: $("repText").value, blanks: $("repBlank").checked });
@@ -943,243 +1363,80 @@ async function quizCopy(key) {
   else alert("🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요\n\n" + text);
 }
 
-function todayView(now, today) {
-  const rows = [
-    ...D.busy.filter(b => ymd(b.start) === today).map(b => ({ busy: true, start: b.start, end: b.end, title: b.label })),
-    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: taskOf(p.key), summary: p.summary, kind: p.kind, why: p.why,
-                                                          part: (p.summary.match(/\((\d+\/\d+)\)$/) || [])[1] })),
-  ].sort((a, b) => dt(a.start) - dt(b.start));
 
-  // 지금 할 일: 진행 중인 블록 → 오늘 다음 블록 → 가장 급한 마감
-  const cur = rows.find(r => !r.busy && dt(r.start) <= now && now < dt(r.end));
-  const next = rows.find(r => !r.busy && dt(r.start) > now);
-  const pick = cur || next;
-  let html = "";
-  if (pick && pick.t) {
-    const t = pick.t;
-    html += `<div class="now-card"><div class="lbl">${cur ? "▶ 지금 할 일" : `다음 · ${hm(pick.start)} 시작`}</div>
-      <div class="ttl">${esc(t.title)}${pick.part ? ` <span class="hint">(${pick.part})</span>` : ""}${clip(t)}</div>
-      <div class="meta">${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · ${hm(pick.start)}–${hm(pick.end)} · 마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})</div>
-      ${pick.why ? `<div class="meta">왜 지금? ${esc(pick.why)}</div>` : ""}
-      ${acts(t, true)}</div>`;
-  } else {
-    const urgent = D.tasks.filter(t => dt(t.due) >= now)[0];
-    html += `<div class="now-card"><div class="lbl">오늘 남은 계획 없음</div>${urgent
-      ? `<div class="meta">가장 급한 일: ${esc(urgent.title)} (${ddayText(urgent.due, today)})</div>${acts(urgent, true)}` : `<div class="meta">쉬어도 됩니다 🙂</div>`}</div>`;
-  }
-
-  // 타임라인 + 빈 시간
-  const [ds, de] = [D.dayStart, D.dayEnd];
-  let cursor = Math.max(dt(`${today}T${ds}:00`), now);
-  const dayEnd = dt(`${today}T${de}:00`);
-  const gap = (a, b) => (b - a) >= 30 * 6e4 ? `<div class="gap">빈 시간 ${hm(new Date(a).toISOString())}–${hm(new Date(b).toISOString())} (${dur(Math.round((b - a) / 6e4))})</div>` : "";
-  html += `<div class="tl">`;
-  for (const r of rows) {
-    const s = dt(r.start), e = dt(r.end);
-    if (s > cursor) html += gap(cursor, s);
-    if (e > cursor) cursor = e;
-    const past = e <= now ? " past" : "", curC = s <= now && now < e ? " cur" : "";
-    if (r.busy) {
-      html += `<div class="tl-row busy${past}${curC}" style="border-left-color:var(--busy)"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
-        <span class="what">🏫 ${esc(r.title)}</span><span></span></div>`;
-    } else {
-      const t = r.t;
-      html += `<div class="tl-row${past}${curC}" style="border-left-color:${color(r.kind)}"><span class="t">${hm(r.start)}–${hm(r.end)}</span>
-        <span class="what" title="${esc(r.why || "")}">${t ? esc(t.title) + (r.part ? ` (${r.part})` : "") + clip(t) : esc(r.summary)}<span class="meta">${t ? `${KIND[t.kind]}${t.course ? " · " + esc(t.course) : ""} · 마감 ${ddayText(t.due, today)} ${hm(t.due)}` : ""}</span></span>
-        ${t && !past ? acts(t) : "<span></span>"}</div>`;
-    }
-  }
-  if (dayEnd > cursor) html += gap(cursor, dayEnd);
-  html += `</div>`;
-  if (!rows.length) html += `<p class="empty">오늘은 수업도 계획도 없습니다.</p>`;
-
-  const tomorrow = addDays(today, 1);
-  const tb = D.busy.filter(b => ymd(b.start) === tomorrow).length, tp = D.plan.filter(p => ymd(p.start) === tomorrow).length;
-  html += `<div class="tl-foot">내일 ${label(tomorrow)}: 수업·약속 ${tb} · 할 일 ${tp}</div>`;
-  if (D.todayDone.length) html += `<div class="tl-foot">✓ 오늘 완료 ${D.todayDone.length}<div class="done-list">${D.todayDone.map(t => `<div>${esc(t.title)}</div>`).join("")}</div></div>`;
-  return html;
+// 오류 예방 (닐슨 5): 되돌리기 어려운 것만 확인 창. 기본 버튼은 '취소' 쪽에 포커스.
+function confirmSheet(title, body, okLabel, act, key) {
+  openSheet(sheetTop(title) + `<p class="confirm-x">${body}</p>
+    <div class="confirm-acts"><button class="btn" data-ui="sheetclose" data-autofocus>취소</button>
+    <button class="btn danger" data-act="${act}" data-key="${esc(key || "")}" data-label="${esc(okLabel)}">${esc(okLabel)}</button></div>`);
+}
+// 터치: 줄을 누르면 이 시트 — 주 행동이 맨 위에 크게, 나머지는 ⋯ 메뉴와 같은 순서
+function actionSheet(t) {
+  const P = primaryOf(t), today = ymdOf(new Date());
+  const items = menuItems(t).flat().filter(x => !(x.act === P.act));
+  openSheet(sheetTop(t.title) + `<p class="asheet-meta">${[KIND[t.kind], t.course && esc(t.course), t.due && `마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})`].filter(Boolean).join(" · ")}</p>
+    <div class="ways"><button class="primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>
+    </div><div class="alist">${items.map(x => `<button data-act="${x.act}" data-key="${esc(t.key)}" data-label="${esc(x.label)}" class="${x.danger ? "danger" : ""}">${esc(x.label)}${x.hint && x.hint.length > 1 ? `<small>${esc(x.hint)}</small>` : ""}</button>`).join("")}</div>`);
+}
+function keysSheet() {
+  const K = [["/", "또는 Ctrl+K — 새 할 일 입력"], ["t · w", "오늘 · 주차별 보기"], ["j · k", "다음 · 이전 줄로 (↓ ↑ 도 됨)"], ["Enter", "고른 줄의 주 행동"],
+    ["x", "고른 줄 완료 (되돌리기 가능)"], [".", "고른 줄의 ⋯ 메뉴"], ["← →", "주차별에서 이전 · 다음 주"], ["Esc", "메뉴 · 창 닫기"], ["?", "이 도움말"]];
+  openSheet(sheetTop("단축키") + `<dl class="keys">${K.map(([k, v]) => `<dt>${k.split(" ").map(x => /^[·또는]$/.test(x) ? x : `<kbd>${esc(x)}</kbd>`).join(" ")}</dt><dd>${v}</dd>`).join("")}</dl>`);
 }
 
-function curWeekIdx(today) {
-  const ws = D.semester || [];
-  const i = ws.findIndex(w => w.start <= today && today <= addDays(w.start, 6));
-  return i >= 0 ? i : (ws.length && today < ws[0].start ? 0 : ws.length - 1);
-}
-
-// 주차별: 주 이동 + 학기 띠 + 그 주의 캘린더 + 그 주에 할 것 (버튼 항상 보임)
-function weekView(now, today, nowMin) {
-  const ws = D.semester || [];
-  if (!ws.length) return `<p class="empty">학기 정보가 없습니다.</p>`;
-  const cur = curWeekIdx(today);
-  const i = wkIdx === null ? cur : Math.max(0, Math.min(ws.length - 1, wkIdx));
-  const w = ws[i], days = [...Array(7)].map((_, k) => addDays(w.start, k)), end = days[6];
-  const maxMin = Math.max(60, ...ws.map(x => x.minutes));
-
-  let h = `<div class="wk-nav"><button data-wk="${i - 1}" ${i === 0 ? "disabled" : ""}>◀</button>
-    <b>${i + 1}주차</b><span class="meta">${label(w.start)} ~ ${label(end)}</span>
-    <button data-wk="${i + 1}" ${i === ws.length - 1 ? "disabled" : ""}>▶</button>
-    ${i !== cur ? `<button class="chip" data-wk="${cur}">이번 주로</button>` : `<span class="pill on">이번 주</span>`}</div>`;
-  h += `<div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""}"
-      data-wk="${j}" style="--lvl:${(x.minutes / maxMin).toFixed(2)}" title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}">
-      ${j + 1}${x.items.some(y => y.exam) ? "<i>시험</i>" : ""}</button>`).join("")}</div>`;
-
-  // 캘린더: 계획·수업 데이터가 있는 주만 (계획은 2주 앞까지)
-  const hasData = days.some(d => D.plan.some(p => ymd(p.start) === d) || D.busy.some(b => ymd(b.start) === d));
-  if (hasData) h += calendar(days, now, today, nowMin);
-  else h += `<p class="empty">${end < today ? "지난 주입니다" : "계획은 2주 앞까지만 짭니다"} — 아래 목록으로 보세요.</p>`;
-
-  // 그 주에 할 것 (마감 기준), 종류별
-  const groups = [["lecture", "📘 강의"], ["assignment", "📝 과제"], ["quiz", "❓ 퀴즈"], ["review", "🔁 퀴즈 복습"], ["todo", "✅ 할 일"]];
-  const its = w.items;
-  h += `<h3 class="wl-h">이 주에 마감인 것 ${its.filter(x => x.status === "open").length}개 남음 / 전체 ${its.length}개</h3>`;
-  for (const [kind, name] of groups) {
-    const g = its.filter(x => x.kind === kind).sort((a, b) => (a.status === "done") - (b.status === "done") || dt(a.due) - dt(b.due));
-    if (!g.length) continue;
-    h += `<div class="wl-g">${name} <span class="meta">${g.filter(x => x.status === "open").length}/${g.length}</span></div>` + g.map(x => {
-      const done = x.status === "done", late = !done && dt(x.due) < now;
-      return `<div class="wl ${done ? "done" : ""}"><span class="dot" style="background:${color(x.kind)}"></span>
-        <span class="txt">${x.exam ? "📝 " : ""}${esc(x.title)}${clip(x)}<span class="meta">${x.course ? esc(x.course) + " · " : ""}마감 ${label(ymd(x.due))} ${hm(x.due)}
-          ${done ? "· 완료" : late ? "· <b style='color:var(--danger)'>지남</b>" : "· " + ddayText(x.due, today)}${x.minutes ? " · 예상 " + dur(x.minutes) : ""}</span></span>
-        ${done ? "" : acts(x)}</div>`;
-    }).join("");
-  }
-  if (!its.length) h += `<p class="empty">이 주에 마감인 것이 없습니다.</p>`;
-
-  const sel = selKey && taskOf(selKey), sp = selKey && D.plan.find(p => p.key === selKey);
-  if (sel) h += `<div class="detail"><b>${esc(sel.title)}</b>${clip(sel)}<div class="meta">${KIND[sel.kind]}${sel.course ? " · " + esc(sel.course) : ""}
-    ${sp ? ` · ${label(ymd(sp.start))} ${hm(sp.start)}–${hm(sp.end)}` : ""} · 마감 ${label(ymd(sel.due))} ${hm(sel.due)}</div>
-    ${sp && sp.why ? `<div class="meta">왜 여기? ${esc(sp.why)}</div>` : ""}<div style="margin-top:6px">${acts(sel)}</div></div>`;
-  return h;
-}
-
-function calendar(days, now, today, nowMin) {
-  const [ds, de] = [D.dayStart, D.dayEnd].map(t => +t.slice(0, 2));
-  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
-  const PX = 34, H = (de - ds) * PX, y = m => (m - ds * 60) / 60 * PX;
-  let h = `<div class="board-wrap"><div class="board"><div></div>` +
-    days.map(d => `<div class="head ${d === today ? "today" : ""} ${d < today ? "pastday" : ""} ${planMin(d) > D.cap ? "over" : ""}">${label(d)}</div>`).join("") +
-    `<div class="axis" style="height:${H}px">` + [...Array(de - ds)].map((_, i) => `<div style="top:${i * PX}px">${ds + i}</div>`).join("") + `</div>`;
-  for (const d of days) {
-    let col = [...Array(de - ds)].map((_, i) => `<div class="hour" style="top:${i * PX}px"></div>`).join("");
-    for (const b of D.busy.filter(b => ymd(b.start) === d)) {
-      const top = Math.max(0, y(mins(b.start))), hh = Math.min(H, y(mins(b.end))) - top;
-      if (hh > 0) col += `<div class="blk busy${dt(b.end) <= now ? " past" : ""}" style="top:${top}px;height:${hh}px">${esc(b.label)}<small>${hm(b.start)}–${hm(b.end)}</small></div>`;
-    }
-    for (const p of D.plan.filter(p => ymd(p.start) === d)) {
-      const top = y(mins(p.start)), hh = y(mins(p.end)) - top;
-      col += `<div class="blk${dt(p.end) <= now ? " past" : ""}${selKey === p.key ? " sel" : ""}" data-sel="${esc(p.key)}" style="top:${top}px;height:${hh}px;background:${color(p.kind)}"
-        title="${esc(p.summary)} — 누르면 버튼">${esc(p.summary.replace(/^\[[^\]]+\]\s*/, ""))}<small>${hm(p.start)}–${hm(p.end)}</small></div>`;
-    }
-    if (d === today && nowMin >= ds * 60 && nowMin <= de * 60) col += `<div class="nowline" style="top:${y(nowMin)}px"></div>`;
-    h += `<div class="day ${d < today ? "pastday" : ""}" style="height:${H}px">${col}</div>`;
-  }
-  return h + `</div></div><div class="legend">${Object.entries(KIND).map(([k, v]) => `<span><i class="dot" style="background:${color(k)}"></i>${v}</span>`).join("")}<span><i class="dot" style="background:var(--busy)"></i>수업·약속</span></div>`;
-}
-
-function renderStats(today) {
-  const days14 = [...Array(14)].map((_, i) => addDays(today, i));
-  const planMin = d => D.plan.filter(p => ymd(p.start) === d).reduce((s, p) => s + mins(p.end) - mins(p.start), 0);
-  const maxLoad = Math.max(D.cap, ...days14.map(planMin));
-  $("load").innerHTML = `<div class="bars"><div class="cap" style="bottom:${D.cap / maxLoad * 100}%"></div>` + days14.map(d => { const m = planMin(d);
-    return `<div class="bar ${m > D.cap ? "over" : ""}" title="${label(d)} ${dur(m)}"><i style="height:${m / maxLoad * 100}%"></i><span>${tick(d, days14)}</span></div>`; }).join("") + `</div>`;
-  $("prog").innerHTML = D.progress.map(p => `<div class="prog"><div class="r"><span>${esc(p.course)}</span><span>${p.done}/${p.total}</span></div>
-    <div class="track"><div class="fill" style="width:${p.total ? p.done / p.total * 100 : 0}%"></div></div></div>`).join("") || `<p class="empty">아직 없음</p>`;
-  const past14 = [...Array(14)].map((_, i) => addDays(today, i - 13));
-  const maxDone = Math.max(1, ...past14.map(d => D.doneByDay[d] || 0));
-  $("trend").innerHTML = `<div class="bars">` + past14.map(d => `<div class="bar" title="${label(d)} ${D.doneByDay[d] || 0}건">
-    <i style="height:${(D.doneByDay[d] || 0) / maxDone * 100}%;background:var(--todo)"></i><span>${tick(d, past14)}</span></div>`).join("") + `</div>`;
-  renderCalib();
-  $("weekrev").innerHTML = weekReviewHtml(D.weekReview) || `<p class="empty">아직 없음</p>`;
-  const q = D.quiz || {};
-  $("quizStat").innerHTML = `<div class="meta">마지막으로 가져온 기록: ${q.backupAt ? stamp(q.backupAt) : "없음"}${q.stale ? " (오래됨 — 복습 일정을 만들지 않음)" : ""}</div>
-    ${Object.entries(q.dueBySubject || {}).map(([sub, n]) => `<div class="item"><span class="txt">${esc(sub)}</span><span class="meta">복습할 문제 ${n}</span></div>`).join("")}
-    ${LIVE ? `<button class="chip" data-act="openquiz" style="margin-top:6px">퀴즈 앱 열기</button>` : ""}
-    <p class="hint">퀴즈 앱 첫 화면의 [기록 내보내기] → 다운로드 폴더에 저장되면 비서가 자동으로 읽습니다.</p>`;
-  $("sessions").innerHTML = D.sessionsToday.length ? D.sessionsToday.map(s => { const t = taskOf(s.key);
-    return `<div class="item"><span class="txt">${hm(s.start)}${s.end ? "–" + hm(s.end) : " (진행 중)"} ${esc(t ? t.title : s.key)}</span>
-      <span class="meta">${s.minutes ? dur(s.minutes) : ""}${t && s.minutes ? ` / 예상 ${dur(t.minutes)}` : ""}</span></div>`; }).join("")
-    : `<p class="empty">⏱ 시작 버튼으로 기록하면 여기에 쌓이고, 쌓인 기록으로 예상 시간을 고칩니다.</p>`;
-}
-
-// 이번 주 돌아보기: 코드로 숫자만 (끝낸 일 · ⏱ 기록 · 놓친 마감 · 다음 주)
-function weekReviewHtml(W) {
-  if (!W) return "";
-  return `<ul style="margin:0;padding-left:18px;font-size:13px">
-    <li>끝낸 일 <b>${W.doneTotal}</b>${W.doneTotal ? " (" + Object.entries(W.done).map(([k, n]) => `${KIND[k] || k} ${n}`).join(", ") + ")" : ""}</li>
-    <li>⏱ 기록 ${W.trackedCount ? `${W.trackedCount}번 · 실제 ${dur(W.trackedMinutes)} / 예상 ${dur(W.trackedEstimate)}` : "없음 — ⏱ 로 재면 예상 시간이 정확해집니다"}</li>
-    <li>${W.missed.length ? `마감이 지났는데 안 끝난 것 ${W.missed.length}: ${W.missed.map(m => esc(m.title)).join(", ")}` : "놓친 마감 없음 👍"}</li>
-    <li>다음 주 마감 ${W.nextCount}개 · 예상 ${dur(W.nextMinutes)}${W.nextExams.length ? " · 📝 " + W.nextExams.map(esc).join(", ") : ""}</li></ul>`;
-}
-
-// 알림 띠 (잠깐 보였다 사라짐)
-function toast(html, ms = 15000) {
+// ---- 알림 띠 (되돌리기 단추를 붙일 수 있다 — 닐슨 3 사용자 통제)
+function toast(text, undo, ms, extra) {
   const el = $("toast");
-  el.innerHTML = html + ` <button class="chip" data-act="toastclose" style="margin-left:auto">✕</button>`;
+  toast.undo = typeof undo === "function" ? undo : null;
+  el.innerHTML = `<span>${esc(text)}</span>${toast.undo ? `<button data-act="undo">되돌리기</button>` : ""}${extra || ""}`;
   el.hidden = false;
-  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms || (toast.undo || extra ? 8000 : 3000));
+}
+async function run(fn, okMsg) {  // 실패하면 알림 띠에 이유
+  try { const r = await fn(); if (okMsg) toast(typeof okMsg === "function" ? okMsg(r) : okMsg); return r; }
+  catch (err) { toast(err.message || "실패", null, 6000); }
 }
 // 강의를 들은 뒤: 그 강의의 내 노트가 있으면 바로 열 수 있게 (기록은 study_system 규칙대로 내 말로)
-async function noteAfter(key, title) {
+async function noteAfter(key, title, undo) {
   try {
     const r = await getJSON("/api/note-for?key=" + encodeURIComponent(key));
-    toast(r.path ? `✓ 들었음 — 기억할 것을 적어 둘까요? <button data-act="openfile" data-path="${esc(r.path)}">📝 ${esc(r.name)} 열기</button>`
-                 : `✓ 들었음 — 기록하려면 Claude 채팅에서 "공부하자 ${esc(title)}" (내 노트 ${esc(r.folder || "")})`);
-  } catch {}
+    toast(`들었음: ${title}`, undo, 10000, r.path ? `<button data-act="openfile" data-path="${esc(r.path)}">노트 열기</button>` : "");
+  } catch { toast(`들었음: ${title}`, undo); }
 }
 
-function renderCalib() {
-  $("calib").innerHTML = (D.calibration || []).length ? D.calibration.map(c => `<div class="item"><span class="txt">${esc(c.what)}</span>
-    <span class="meta">예상의 ×${c.factor} (${c.n}번)</span></div>`).join("")
-    : `<p class="empty">아직 기록이 부족합니다. 할 일을 ⏱ 시작 → ✓ 끝내고 완료 로 마치면, 같은 종류가 3번 쌓였을 때부터 계획에 반영됩니다.</p>`;
-}
-
-function tickTimer() {
-  const el = $("elapsed");
-  if (!el || !D || !D.active) return;
-  const s = Math.max(0, Math.floor((Date.now() - dt(D.active.start)) / 1000));
-  el.textContent = `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ":" : ""}${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
-}
-
-// ---- 입력·버튼
-$("days").innerHTML = ["월", "화", "수", "목", "금", "토", "일"].map((d, i) => `<label><input type="checkbox" name="every" value="${i}"><span>${d}</span></label>`).join("");
+// ---- 입력
+if (matchMedia("(max-width: 600px)").matches) $("quickInput").placeholder = "새 할 일 — 예) 발표 @금 18시 ~2h";
+$("days").innerHTML = ["월", "화", "수", "목", "금", "토", "일"].map((d, i) => `<label><input type="checkbox" value="${i}"><span>${d}</span></label>`).join("");
+$("fullToggle").addEventListener("click", () => { const f = $("addForm"); f.hidden = !f.hidden; $("fullToggle").textContent = f.hidden ? "자세히" : "접기"; });
 document.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => {
   const f = $("addForm"), v = b.dataset.day, d = new Date();
   if (v === "clear") { f.date.value = ""; f.time.value = ""; return; }
   if (v === "fri") d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7)); else d.setDate(d.getDate() + +v);
   f.date.value = ymdOf(d);
 }));
-async function submitWith(msgEl, fn) {
-  msgEl.className = "msg"; msgEl.textContent = "반영 중…";
-  try { const r = await fn(); msgEl.textContent = "추가됨: " + (r.message || "").replace(/^- \[ \] /, ""); return true; }
-  catch (err) { msgEl.className = "msg err"; msgEl.textContent = err.message; return false; }
-}
 $("quickForm").addEventListener("submit", async e => {
   e.preventDefault();
   const text = $("quickInput").value.trim();
-  if (text && await submitWith($("quickMsg"), () => post("quick", { text }))) $("quickInput").value = "";
+  if (!text) return;
+  const r = await run(() => post("quick", { text }), r => "추가: " + String(r.message || text).replace(/^- \[ \] /, ""));
+  if (r) $("quickInput").value = "";
 });
 $("addForm").addEventListener("submit", async e => {
   e.preventDefault();
   const f = e.target;
+  if (!f.title.value.trim()) { f.title.focus(); return; }
   const body = { title: f.title.value, date: f.date.value, time: f.time.value, minutes: f.minutes.value, course: f.course.value,
-                 every: [...f.querySelectorAll("[name=every]:checked")].map(x => x.value) };
-  if (await submitWith($("addMsg"), () => post("add", body))) f.reset();
+                 every: [...f.querySelectorAll("#days input:checked")].map(x => x.value) };
+  if (await run(() => post("add", body), "추가했습니다")) f.reset();
 });
-$("somedayForm").addEventListener("submit", async e => {
+document.addEventListener("submit", async e => {
+  if (e.target.dataset.form !== "someday") return;
   e.preventDefault();
-  try { await post("add", { title: e.target.title.value }); e.target.reset(); } catch (err) { alert(err.message); }
+  const inp = e.target.querySelector("input");
+  if (inp.value.trim() && await run(() => post("add", { title: inp.value }), "하고 싶은 일에 추가")) inp.value = "";
 });
-$("mobSet").addEventListener("click", mobileSettings);
-$("syncBtn").addEventListener("click", async () => { try { const r = await post("sync"); $("status").textContent = r.message; } catch (err) { alert(err.message); } });
-$("statsBox").addEventListener("toggle", () => D && $("statsBox").open && renderStats(ymdOf(new Date())));
 
 document.addEventListener("click", async e => {
-  const tab = e.target.closest("[data-view]");
-  if (tab) { view = tab.dataset.view; try { localStorage.setItem("pa.view", view); } catch {} render(); return; }
-  const wkb = e.target.closest("[data-wk]");
-  if (wkb) { wkIdx = +wkb.dataset.wk; selKey = null; render(); return; }
-  const blk = e.target.closest("[data-sel]");
-  if (blk) { selKey = selKey === blk.dataset.sel ? null : blk.dataset.sel; render(); return; }
   const mrow = e.target.closest("[data-mi]");  // 자료 찾기 결과 줄: 고르기 (폴더면 들어가기)
   if (mrow && MP && !e.target.closest("[data-act]")) {
     MP.sel = +mrow.dataset.mi;
@@ -1187,118 +1444,205 @@ document.addEventListener("click", async e => {
     if (k && k.dir) { $("mpQ").value = k.path + "/"; MP.sel = 0; }
     mpResults(); $("mpQ").focus(); return;
   }
+  const tab = e.target.closest("[data-view]");
+  if (tab) { view = tab.dataset.view; try { localStorage.setItem("pa.view", view); } catch {} closeMenu(); render(); return; }
+  const wk = e.target.closest("[data-wk]");
+  if (wk) { if (!wk.disabled) { wkIdx = +wk.dataset.wk; render(); } return; }
+  const mb = e.target.closest("[data-menu]");
+  if (mb) {
+    if ($("menu").contains(mb)) { fillMenu(findTask(mb.dataset.menu)); $("menu").querySelector("button").focus(); return; }  // 제외 → 취소: 같은 자리에서 원래 목록으로
+    if (UI.menuKey === mb.dataset.menu && !$("menu").hidden) closeMenu(); else openMenu(mb, mb.dataset.menu);
+    return;
+  }
+  const ui = e.target.closest("[data-ui]");
+  if (ui) {
+    const u = ui.dataset.ui;
+    if (u === "tolate") { if (view !== "today") { e.preventDefault(); view = "today"; render(); $("late")?.scrollIntoView(); } return; }
+    if (u === "sheetclose") { closeSheet(); return; }
+    if (u === "keys") { keysSheet(); return; }
+    if (u === "tohero") { $("hero")?.scrollIntoView({ block: "start" }); return; }
+    if (u === "jobs") { UI.open.add("check"); if (view !== "today") view = "today"; render(); $("jobs")?.scrollIntoView({ block: "center" }); return; }
+    if (u === "alldues") UI.allDues = !UI.allDues;
+    if (u === "alldl") UI.allDl = !UI.allDl;
+    render(); return;
+  }
+  if (e.target === $("scrim")) { closeSheet(); return; }
   const b = e.target.closest("[data-act]");
-  if (!b) return;
-  const act = b.dataset.act, key = b.dataset.key;
-  if (act === "ignore") {  // 이것만 / 앞으로도 / 취소
-    b.parentElement.innerHTML = `<span class="meta">제외:</span><button data-act="ign-one" data-key="${esc(key)}">이것만</button>
-      <button data-act="ign-all" data-key="${esc(key)}" title="같은 과목·같은 이름의 과제가 앞으로 또 생겨도 계속 제외">앞으로도</button><button data-act="ign-cancel">취소</button>`;
+  if (!b) {
+    if (!$("menu").contains(e.target)) closeMenu(false);
+    // 터치(또는 좁은 화면): 줄 아무 데나 누르면 행동 시트 — 마우스 올리기 없이도 모든 행동에 닿는다
+    const row = e.target.closest("[data-row]");
+    if (row && COARSE.matches && !e.target.closest("a,input,select,summary")) { const t = findTask(row.dataset.row); if (t) actionSheet(t); }
     return;
   }
-  if (act === "ign-cancel") { render(); return; }
-  if (act === "ign-one" || act === "ign-all" || act === "unign") {
-    b.disabled = true;
-    try {
-      const r = act === "unign" ? await post("unignore", { text: b.dataset.text }) : await post("ignore", { key, pattern: act === "ign-all" });
-      if (act === "ign-all" && r.message) $("quickMsg").textContent = r.message;
-    } catch (err) { alert(err.message); b.disabled = false; }
+  const act = b.dataset.act, key = b.dataset.key, t = findTask(key);
+  // 자료 창·보고서 창 안의 동작 (시트를 닫지 않음)
+  if (await panelAct(act, b, key)) return;
+  if (act === "ignore") { ignoreMenu(key); return; }
+  if (act === "ign-all") { closeMenu(false); confirmSheet("앞으로도 제외할까요?", `「${esc(t ? t.title : "")}」 과 <b>같은 이름</b>의 과제가 앞으로 새로 올라와도 계속 숨겨집니다. 아래 '제외한 것'에서 언제든 취소할 수 있습니다.`, "앞으로도 제외", "ign-all-ok", key); return; }
+  if (act === "remove") { closeMenu(false); confirmSheet("이 할 일을 삭제할까요?", `「${esc(t ? t.title : "")}」 을(를) inbox.md 에서 지웁니다. 되돌릴 수 없습니다 — 끝낸 거라면 '완료'를 쓰세요.`, "삭제", "remove-ok", key); return; }
+  if (act === "relogin") {
+    closeMenu(false);
+    confirmSheet("강의 플랫폼에 다시 로그인할까요?", "비서용 로그인 창이 열립니다.<br><br>주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다. 그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.", "로그인 창 열기", "relogin-ok");
     return;
   }
-  if (act === "toastclose") { $("toast").hidden = true; return; }
-  if (act === "gradeack") {
-    if (MOB) { ls.set("pa.ack.grades", (D.grades || []).reduce((m, g) => g.graded_at > m ? g.graded_at : m, "")); render(); return; }
-    try { await post("ack", { what: "grades" }); } catch (err) { alert(err.message); } return;
+  if (act === "report" && t && !MOB) { closeSheet(); await run(() => openPanel("report", key)); return; }
+  if (act === "mat" && t && !MOB) { closeSheet(); await run(() => openPanel("mat", key, { openSingle: true })); return; }
+  if (act === "matshow" && !MOB) { await run(() => openPanel("mat", key)); return; }
+  closeMenu(); closeSheet();
+  if (act === "undo") { const f = toast.undo; toast.undo = null; $("toast").hidden = true; if (f) await run(f, "되돌렸습니다"); return; }
+  if (!LIVE && !MOB) { toast("엔진이 꺼져 있어 보기만 됩니다 — VSCode 에서 '비서: 자동 감시'"); return; }
+  if (MOB && !["done", "ign-one", "ign-all-ok", "remove-ok", "open", "dotoday", "keep", "examadd", "examno", "unign", "ack", "gradeack", "clipnames", "openquiz", "mobset"].includes(act)) {
+    toast("이 기능은 PC 대시보드에서만 됩니다"); return;
   }
-  if (act === "done" && !MOB) {  // 강의면 들은 뒤 노트 열기 제안
-    const t = taskOf(key);
-    b.disabled = true;
-    try { await post("done", { key }); } catch (err) { alert(err.message); b.disabled = false; return; }
-    if (t && t.kind === "lecture") noteAfter(key, t.title);
+  if (act === "done") {
+    if (b.classList.contains("ck")) b.classList.add("on");
+    const title = t ? t.title : "", undo = MOB ? null : () => post("undone", { key });
+    if (!await run(() => post("done", { key }))) { b.classList.remove("on"); return; }
+    if (t && t.kind === "lecture" && !MOB) noteAfter(key, title, undo); else toast(`${t && t.kind === "lecture" ? "들었음" : "완료"}: ${title}`, undo);
     return;
   }
-  if (act === "matclose") { $("matPanel").innerHTML = ""; MP = null; return; }
-  if (act === "ritualclose") { try { localStorage.setItem(b.dataset.k, ymdOf(new Date())); } catch {} render(); return; }
-  if (act === "mat") { try { await showMaterials(key, { openSingle: true }); } catch (err) { alert(err.message); } return; }
-  if (act === "matshow") { try { await showMaterials(key); } catch (err) { alert(err.message); } return; }
-  if (act === "clipnames") { alert("연결된 자료 (파일은 PC 에 있음)\n\n" + ((D.links || {})[key] || []).join("\n")); return; }
+  if (act === "ign-one") { if (await run(() => post("ignore", { key }))) toast(`제외: ${t ? t.title : key}`, () => post("unignore", { text: key })); return; }
+  if (act === "ign-all-ok") { await run(() => post("ignore", { key, pattern: true }), r => r.message || "앞으로도 제외"); return; }
+  if (act === "remove-ok") { await run(() => post("remove", { key }), "삭제했습니다"); return; }
+  if (act === "relogin-ok") { await run(() => post("browser-login"), r => r.message || "로그인 창을 열었습니다"); return; }
+  if (act === "open") { if (MOB) { if (t && t.url) window.open(t.url, "_blank", "noopener"); return; } await run(() => api("open", { key }), "브라우저로 열었습니다"); return; }
+  if (act === "openquiz") { if (MOB) { window.open(D.quiz.url, "_blank", "noopener"); return; } await run(() => api("open-quiz")); return; }
+  if (act === "start") { await run(() => post("timer/start", { key }), "시간 재기 시작"); return; }
+  if (act === "stop") { await run(() => post("timer/stop", {}), "기록을 멈췄습니다"); return; }
+  if (act === "stopdone") { await run(() => post("timer/stop", { done: true }), "끝내고 완료"); return; }
+  if (act === "dotoday") { await run(() => post("today", { key }), "오늘 빈 시간에 넣었습니다"); return; }
+  if (act === "sumfor") {
+    const r = await run(() => post("job/summary-for", { key }));
+    if (r && r.choose) await run(() => openPanel("mat", key, { note: "연결된 PDF 가 여러 개입니다 — 정리할 자료 칩의 🤖 를 누르세요 (이미 만든 정리는 📝 로 열림)" }));
+    else if (r && r.message) toast(r.message);
+    return;
+  }
+  if (act === "workspace") { await run(() => api("workspace", { key }), r => r.message); return; }
   if (act === "quizcopy") { await quizCopy(key); return; }
-  if (act === "unlink") { try { await api("unlink", { key: MP.key, path: b.dataset.path }); await showMaterials(MP.key); load(); } catch (err) { mpMsg(err.message); } return; }
-  if (act === "refind") { const q = $("mpQ"); q.value = b.dataset.name.replace(/\.[^.]+$/, ""); MP.sel = 0; mpResults(); q.focus(); return; }
-  if (act === "mplinkp") { await mpLink([{ p: b.dataset.path, r: "" }]); return; }
-  if (act === "mplink") { await mpLink([MP.items[+b.dataset.i].f]); return; }
-  if (act === "mpin") { const q = $("mpQ"); q.value = MP.items[+b.dataset.i].path + "/"; MP.sel = 0; mpResults(); q.focus(); return; }
-  if (act === "mpmore") { MP.limit += 20; mpResults(); return; }
-  if (act === "mpbrowse") { try { if (MP.browse) { MP.browse = null; mpBrowseDraw(); } else await mpBrowse(MP.start.root, MP.start.path); } catch (err) { mpMsg(err.message); } return; }
-  if (act === "mpls") { try { await mpBrowse(b.dataset.root, b.dataset.path); } catch (err) { mpMsg(err.message); } return; }
-  if (act === "mpbclose") { MP.browse = null; mpBrowseDraw(); return; }
-  if (act === "mpbadd") { b.disabled = true; await mpLink([...MP.browse.checked.values()]); return; }
-  if (act === "openfile") { try { await api("open-file", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
-  if (act === "dlmove") {
-    const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
-    if (!course) { alert("과목을 골라 주세요"); return; }
-    try { await post("move-download", { path: b.dataset.path, course }); } catch (err) { alert(err.message); } return;
-  }
-  if (act === "summarize") {
-    if (!confirm("이 자료의 요약을 Claude 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return;
-    try { await post("job/summary", { path: b.dataset.path }); $("matPanel").innerHTML = ""; MP = null; } catch (err) { alert(err.message); } return;
-  }
-  if (act === "dlskip") { try { await post("dismiss-download", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
-  if (act === "remove" && !confirm("이 할 일을 지울까요?")) return;
-  if (act === "glogin") { try { const r = await post("google-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
-  if (act === "examadd") {
-    const x = JSON.parse(b.dataset.x); b.disabled = true;
-    try { await post(MOB ? "add" : "exam-add", MOB ? { title: x.title, date: x.date, time: x.time || "09:00", minutes: "", course: x.course, every: [] } : x); }
-    catch (err) { alert(err.message); b.disabled = false; } return;
-  }
-  if (act === "examno") { try { await post("exam-dismiss", { id: b.dataset.id }); } catch (err) { alert(err.message); } return; }
-  if (act === "keep") { try { await post("keep", { key }); } catch (err) { alert(err.message); } return; }
+  if (act === "clipnames") { alert("연결된 자료 (파일은 PC 에 있음)\n\n" + ((D.links || {})[key] || []).join("\n")); return; }
+  if (act === "sync") { await run(() => post("sync"), r => r.message || "Canvas 확인 시작"); return; }
+  if (act === "mobset") { mobileSettings(); return; }
+  if (act === "glogin") { await run(() => post("google-login"), r => r.message); return; }
+  if (act === "keep") { await run(() => post("keep", { key }), "이 과제는 계속 보이기"); return; }
   if (act === "ack") {
     if (MOB) { ls.set("pa.ack." + b.dataset.what, D.warnings.find(w => w.includes("[ack:" + b.dataset.what)) || ""); render(); return; }
-    try { await post("ack", { what: b.dataset.what }); } catch (err) { alert(err.message); } return;
+    await run(() => post("ack", { what: b.dataset.what })); return;
   }
-  if (act === "relogin") {
-    if (!confirm("비서용 로그인 창을 엽니다.\n\n주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다.\n그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.\n\n계속할까요?")) return;
-    try { const r = await post("browser-login"); alert(r.message); } catch (err) { alert(err.message); } return; }
-  if (act === "sumfor") {
-    b.disabled = true;
-    try {
-      const r = await post("job/summary-for", { key });
-      if (r.choose) await showMaterials(key, { note: "연결된 PDF 가 여러 개입니다 — 정리할 자료 칩의 🤖 를 누르세요 (이미 만든 정리는 📝 로 열림)" });
-      else if (r.message) alert(r.message);
-    }
-    catch (err) { alert(err.message); } b.disabled = false; return;
+  if (act === "gradeack") {
+    if (MOB) { ls.set("pa.ack.grades", (D.grades || []).reduce((m, g) => g.graded_at > m ? g.graded_at : m, "")); render(); return; }
+    await run(() => post("ack", { what: "grades" })); return;
   }
-  if (act === "openquiz") { try { await post("open-quiz"); } catch (err) { alert(err.message); } return; }
-  if (act === "dotoday") { try { await post("today", { key }); } catch (err) { alert(err.message); } return; }
-  const nact = { nopen: ["notice/open", { id: b.dataset.id }], nread: ["notice/read", { id: b.dataset.id }],
-                 nreadall: ["notice/read", { id: "all" }], njob: ["job/notices", {}], sgno: ["suggest/dismiss", { key }] }[act];
-  if (nact) { b.disabled = true; try { await post(...nact); } catch (err) { alert(err.message); b.disabled = false; } return; }
-  if (act === "report") { try { await showReport(key); } catch (err) { alert(err.message); } return; }
-  if (act === "repwin") { b.disabled = true; try { await api("report-brief", repBrief()); const r = await api("workspace", { key: REP.key }); $("repMsg").textContent = r.message; REP.exists = true; } catch (err) { $("repMsg").className = "msg err"; $("repMsg").textContent = err.message; } b.disabled = false; return; }
-  if (act === "reveal") { try { await api("reveal", { path: b.dataset.path }); } catch (err) { alert(err.message); } return; }
-  if (act === "reppdf") { b.disabled = true; try { const r = await api("report-pdf", { key: REP.key }); $("repMsg").className = "msg"; $("repMsg").textContent = r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : ""); } catch (err) { $("repMsg").className = "msg err"; $("repMsg").textContent = err.message; } b.disabled = false; return; }
-  if (act === "workspace") { try { const r = await api("workspace", { key }); toast(esc(r.message), 6000); } catch (err) { alert(err.message); } return; }
-  if (act === "repdraft" || act === "repfile" || act === "repchat") { b.disabled = true; await repAction(act); b.disabled = false; return; }
-  if (act === "repclose") { $("repPanel").innerHTML = $("matPanel").innerHTML = ""; REP = MP = null; return; }
-  const call = { report: ["job/report", { key }], done: ["done", { key }], ignore: ["ignore", { key }], remove: ["remove", { key }], open: ["open", { key }],
-                 start: ["timer/start", { key }], stop: ["timer/stop", {}], stopdone: ["timer/stop", { done: true }] }[act];
-  b.disabled = true;
-  try { await post(...call); } catch (err) { alert(err.message); b.disabled = false; }
+  if (act === "examadd") {
+    const x = JSON.parse(b.dataset.x);
+    await run(() => post(MOB ? "add" : "exam-add", MOB ? { title: x.title, date: x.date, time: x.time || "09:00", minutes: "", course: x.course, every: [] } : x), "시험을 할 일로 추가 — 7·4·2일 전 복습이 잡힙니다");
+    return;
+  }
+  if (act === "examno") { await run(() => post("exam-dismiss", { id: b.dataset.id })); return; }
+  if (act === "unign") { await run(() => post("unignore", { text: b.dataset.text }), "제외 취소 — 다시 나타납니다"); return; }
+  if (act === "nopen") { await run(() => api("notice/open", { id: b.dataset.id })); return; }
+  if (act === "nread") { await run(() => post("notice/read", { id: b.dataset.id })); return; }
+  if (act === "nreadall") { await run(() => post("notice/read", { id: "all" })); return; }
+  if (act === "njob") { await run(() => post("job/notices"), "공지 정리를 시작합니다 (Claude, 몇 분)"); return; }
+  if (act === "sgno") { await run(() => post("suggest/dismiss", { key })); return; }
+  if (act === "dlmove") {
+    const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
+    if (!course) { toast("과목을 먼저 골라 주세요"); return; }
+    await run(() => post("move-download", { path: b.dataset.path, course }), r => r.message); return;
+  }
+  if (act === "dlskip") { await run(() => post("dismiss-download", { path: b.dataset.path })); return; }
+  if (act === "jobretry") {
+    const k = b.dataset.kind, call = k === "notices" ? ["job/notices", {}] : k === "summary" ? ["job/summary", { path: key }] : ["job/report", { key, force: k === "report-force" }];
+    await run(() => post(...call), "다시 시작합니다"); return;
+  }
+  if (act === "ritualclose") { UI.open.delete("check"); render(); return; }
+  toast("알 수 없는 동작: " + act);
 });
-// '/' 또는 Ctrl+K → 빠른 입력, t/w → 보기 전환 (입력 중이 아닐 때)
+
+// 자료 창·보고서 창 안의 버튼 (예전 화면과 같은 동작). 처리했으면 true
+async function panelAct(act, b, key) {
+  const msg = t => { const el = $("repMsg"); if (el) { el.className = "msg"; el.textContent = t; } };
+  const err = e => { const el = $("repMsg") || $("mpMsg"); if (el) { el.className = "msg err"; el.textContent = e.message; } else toast(e.message); };
+  try {
+    if (act === "openfile") { await api("open-file", { path: b.dataset.path }); return true; }
+    if (act === "reveal") { await api("reveal", { path: b.dataset.path }); return true; }
+    if (act === "unlink") { await api("unlink", { key: MP.key, path: b.dataset.path }); await showMaterials(MP.key); load(); return true; }
+    if (act === "refind") { const q = $("mpQ"); q.value = b.dataset.name.replace(/\.[^.]+$/, ""); MP.sel = 0; mpResults(); q.focus(); return true; }
+    if (act === "mplinkp") { await mpLink([{ p: b.dataset.path, r: "" }]); return true; }
+    if (act === "mplink") { await mpLink([MP.items[+b.dataset.i].f]); return true; }
+    if (act === "mpin") { const q = $("mpQ"); q.value = MP.items[+b.dataset.i].path + "/"; MP.sel = 0; mpResults(); q.focus(); return true; }
+    if (act === "mpmore") { MP.limit += 20; mpResults(); return true; }
+    if (act === "mpbrowse") { if (MP.browse) { MP.browse = null; mpBrowseDraw(); } else await mpBrowse(MP.start.root, MP.start.path); return true; }
+    if (act === "mpls") { await mpBrowse(b.dataset.root, b.dataset.path); return true; }
+    if (act === "mpbclose") { MP.browse = null; mpBrowseDraw(); return true; }
+    if (act === "mpbadd") { b.disabled = true; await mpLink([...MP.browse.checked.values()]); return true; }
+    if (act === "summarize") {
+      if (!confirm("이 자료의 요약을 Claude 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return true;
+      await post("job/summary", { path: b.dataset.path }); closeSheet(); toast("요약을 시작합니다 — 위 상태 줄에서 진행 상황"); return true;
+    }
+    if (act === "reppdf") { b.disabled = true; const r = await api("report-pdf", { key: REP.key }); msg(r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : "")); b.disabled = false; return true; }
+    if (act === "repwin") { b.disabled = true; await api("report-brief", repBrief()); const r = await api("workspace", { key: REP.key }); msg(r.message); REP.exists = true; b.disabled = false; return true; }
+    if (act === "repdraft" || act === "repfile" || act === "repchat") { b.disabled = true; await repAction(act); b.disabled = false; return true; }
+    if (act === "repclose" || act === "matclose") { closeSheet(); return true; }
+  } catch (e) { err(e); b.disabled = false; return true; }
+  return false;
+}
+
+// ---- 키보드 (유연성·효율 — 닐슨 7). '?' 로 언제든 목록을 본다.
+const rowsNow = () => [...document.querySelectorAll("#view [data-row], #more details[open] [data-row]")].filter(r => r.offsetParent);
+function moveRow(dir) {
+  const R = rowsNow(); if (!R.length) return;
+  const cur = document.activeElement.closest?.("[data-row]"), i = R.indexOf(cur);
+  const n = R[i < 0 ? (dir > 0 ? 0 : R.length - 1) : Math.max(0, Math.min(R.length - 1, i + dir))];
+  n.focus(); n.scrollIntoView({ block: "nearest" });
+}
 document.addEventListener("keydown", e => {
+  if (e.defaultPrevented) return;
+  const m = $("menu");
+  if (!m.hidden && m.contains(document.activeElement) && /^(ArrowDown|ArrowUp|Home|End)$/.test(e.key)) {
+    e.preventDefault();
+    const B = [...m.querySelectorAll("button")], i = B.indexOf(document.activeElement);
+    const j = e.key === "Home" ? 0 : e.key === "End" ? B.length - 1 : (i + (e.key === "ArrowDown" ? 1 : -1) + B.length) % B.length;
+    B[j].focus(); return;
+  }
+  if (e.key === "Escape") { if (!m.hidden) closeMenu(); else closeSheet(); return; }
+  if (!$("scrim").hidden) {  // 시트 안에 포커스 가두기
+    if (e.key === "Tab") {
+      const F = [...$("sheet").querySelectorAll("button,input,textarea,select,summary,[href]")].filter(x => !x.disabled && x.offsetParent);
+      if (F.length && e.shiftKey && document.activeElement === F[0]) { e.preventDefault(); F[F.length - 1].focus(); }
+      else if (F.length && !e.shiftKey && document.activeElement === F[F.length - 1]) { e.preventDefault(); F[0].focus(); }
+    }
+    return;
+  }
   const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
   if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)) { e.preventDefault(); $("quickInput").focus(); return; }
-  if (typing) return;
-  if (e.key === "t" || e.key === "w") { view = e.key === "t" ? "today" : "week"; try { localStorage.setItem("pa.view", view); } catch {} render(); }
-  if (view === "week" && (e.key === "ArrowLeft" || e.key === "ArrowRight") && D) {
+  if (typing || !D || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "?") { e.preventDefault(); keysSheet(); return; }
+  if (e.key === "t" || e.key === "w") { view = e.key === "t" ? "today" : "week"; render(); return; }
+  const row = document.activeElement.closest?.("[data-row]"), onRow = row && document.activeElement === row;
+  if (e.key === "j" || (onRow && e.key === "ArrowDown")) { e.preventDefault(); moveRow(1); return; }
+  if (e.key === "k" || (onRow && e.key === "ArrowUp")) { e.preventDefault(); moveRow(-1); return; }
+  if (onRow && e.key === "Enter") { e.preventDefault(); row.querySelector(".ra .tbtn")?.click(); return; }
+  if (onRow && e.key === "x") { row.querySelector(".ck")?.click(); return; }
+  if (onRow && e.key === ".") { const d = row.querySelector("[data-menu]"); if (d) openMenu(d, d.dataset.menu); return; }
+  if (view === "week" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
     const base = wkIdx === null ? curWeekIdx(ymdOf(new Date())) : wkIdx;
     wkIdx = Math.max(0, Math.min((D.semester || []).length - 1, base + (e.key === "ArrowLeft" ? -1 : 1))); render();
   }
 });
+window.addEventListener("resize", () => closeMenu(false));
+window.addEventListener("scroll", () => { if (!$("menu").contains(document.activeElement)) closeMenu(false); }, { passive: true });
 
+function tickTimer() {
+  if (!D || !D.active) return;
+  const s = Math.max(0, Math.floor((Date.now() - dt(D.active.start)) / 1000));
+  const txt = `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;  // 늘 시:분:초 — '23:00' 이 시각처럼 읽히지 않게
+  for (const id of ["elapsed", "elapsed2"]) { const el = $(id); if (el) el.textContent = txt; }
+}
 load();
-setInterval(load, (MOB ? 300 : 30) * 1000);
+setInterval(() => {  // 30초마다(휴대폰은 5분) 새 데이터 — 메뉴·시트를 보고 있거나 입력 중이면 건너뜀
+  if ($("menu").hidden && $("scrim").hidden && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) load();
+}, (MOB ? 300 : 30) * 1000);
 setInterval(tickTimer, 1000);
 </script>
 </body>
