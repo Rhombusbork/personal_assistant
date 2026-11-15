@@ -172,6 +172,10 @@
   .cline .tx b { font-weight: 600; }
   .cline .tx small { display: block; color: var(--text2); font-size: 13px; }
   .cline .tbtn { min-height: var(--hit); padding: 0 12px; }
+  .cline.lateline { grid-template-columns: 20px minmax(0, 1fr); }
+  .cline.lateline > span:last-child { grid-column: 2; }
+  .lacts { display: flex; flex-wrap: wrap; gap: 0 2px; margin-left: -12px; }
+  .lacts .tbtn { min-height: 36px; }
 
   /* ---- 섹션 */
   .sec { margin-top: var(--s5); }
@@ -478,6 +482,9 @@ const taskOf = findTask;
 // ---- 행동 정의: 종류마다 '주 행동' 하나, 나머지는 ⋯ 안으로
 const MOB_OK = new Set(["open", "done", "ignore", "remove", "redo-today", "redo-day", "redo-clear"]);
 const redoOf = t => t && D.redo && D.redo[t.key];  // 마감이 지난 일을 하기로 한 날
+// 마감이 지났고, 할 날을 정하지 않았거나 정한 날도 지난 일 → 맨 위 줄
+const overdueOpen = () => { const today = ymdOf(new Date());
+  return D.tasks.filter(t => isLate(t) && !(redoOf(t) && redoOf(t) >= today)); };
 const redoTag = t => { const d = redoOf(t); if (!d) return ""; const n = between(ymdOf(new Date()), d);
   return ` · <span class="plan-tag">${n === 0 ? "오늘 하기" : n === 1 ? "내일 하기" : label(d) + " 하기"}</span>`; };
 function primaryOf(t) {
@@ -667,7 +674,7 @@ function render() {
   const soon = open.filter(t => between(today, ymd(t.due)) <= 3);
   const leftMin = D.plan.filter(p => ymd(p.start) === today && dt(p.end) > now).reduce((s, p) => s + (dt(p.end) - Math.max(dt(p.start), now)) / 6e4, 0);
   const sl = D.slack ? D.slack.capacity - D.slack.need : null, lateN = D.tasks.filter(t => dt(t.due) < now).length;
-  $("summary").innerHTML = [lateN ? `<a class="bad" href="#late" data-ui="tolate">마감 지남 <span class="num">${lateN}</span></a>` : "", `남은 할 일 <b class="num">${open.length}</b>`, `오늘 남은 계획 <b class="num">${dur(Math.round(leftMin))}</b>`,
+  $("summary").innerHTML = [lateN ? `<a class="bad" href="#top" data-ui="tolate">마감 지남 <span class="num">${lateN}</span></a>` : "", `남은 할 일 <b class="num">${open.length}</b>`, `오늘 남은 계획 <b class="num">${dur(Math.round(leftMin))}</b>`,
     `3일 안 마감 <b class="num">${soon.length}</b>`,
     sl === null ? "" : `<span title="앞으로 7일: 쓸 수 있는 시간 ${dur(D.slack.capacity)} / 마감 7일 안 할 일 ${dur(D.slack.need)}">이번 주 ${sl < 0 ? `<b class="bad">부족 ${dur(-sl)}</b>` : `여유 <b>${dur(sl)}</b>`}</span>`]
     .filter(Boolean).join(" · ");
@@ -790,11 +797,19 @@ function critHtml(now) {
     else { const m = plain.split(/\s+—\s+/);
       L.push({ sev: v, t: m[0], s: m.slice(1).join(" — "), b: w.includes("[ack:") ? `<button class="tbtn" data-act="ack" data-what="${(w.match(/\[ack:(\w+)\]/) || [])[1] || ""}" data-label="확인">확인</button>` : "" }); }
   }
+  // 마감이 지난 일 (할 날을 아직 안 정한 것): 맨 위에 한 줄씩 — 고르면 바로 사라진다
+  if (LIVE || MOB) for (const t of overdueOpen()) {
+    const k = esc(t.key), tm = addDays(ymdOf(now), 1);
+    L.push({ sev: 2, late: true, t: t.title, s: `${t.course ? t.course + " · " : ""}${KIND[t.kind]} · 마감 ${label(ymd(t.due))} ${hm(t.due)} 지남`,
+      b: `<span class="lacts"><button class="tbtn" data-act="done" data-key="${k}" data-vanish>이미 함</button><button class="tbtn" data-act="redo-today" data-key="${k}" data-vanish>오늘 하기</button>`
+       + `<button class="tbtn" data-act="redo-set" data-key="${k}" data-day="${tm}" data-vanish>내일 하기</button><button class="tbtn gray" data-act="redo-day" data-key="${k}">날짜…</button>`
+       + `<button class="tbtn gray" data-act="ign-one" data-key="${k}" data-vanish title="이 과제만 제외 (되돌리기 가능)">안 함</button></span>` });
+  }
   for (const j of (D.jobs || []).filter(j => j.status === "failed"))
     L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button>` : "" });
   if (!L.length) return "";
   L.sort((a, b) => b.sev - a.sev);
-  return `<div class="crit" role="region" aria-label="바로 처리할 것">${L.map(x => `<div class="cline ${x.sev < 2 ? "warn" : ""}">
+  return `<div class="crit" role="region" aria-label="바로 처리할 것">${L.map(x => `<div class="cline ${x.sev < 2 ? "warn" : ""}${x.late ? " lateline" : ""}">
     <span class="ic" aria-hidden="true">!</span><span class="tx"><span class="sr">${x.sev === 2 ? "긴급: " : "주의: "}</span><b>${esc(x.t)}</b>${x.s ? `<small>${esc(x.s)}</small>` : ""}</span><span>${x.b || ""}</span></div>`).join("")}</div>`;
 }
 
@@ -888,7 +903,8 @@ function checkHtml(now, today) {
 
 // ---- 다가오는 마감: 3일만, 나머지는 '2주 보기'
 function duesHtml(now, today) {
-  const open = D.tasks.filter(t => dt(t.due) >= now), late = D.tasks.filter(t => dt(t.due) < now);
+  const open = D.tasks.filter(t => dt(t.due) >= now), top = new Set(overdueOpen().map(t => t.key)),
+        late = D.tasks.filter(t => dt(t.due) < now && !((LIVE || MOB) && top.has(t.key)));
   const span = UI.allDues ? 14 : 4;  // 오늘 + 3일
   const hidden = open.filter(t => between(today, ymd(t.due)) >= span && between(today, ymd(t.due)) < 14).length;
   // 오늘 타임라인에 잡힌 일은 '오늘 HH:MM 계획' 꼬리표로 이어 준다 (같은 일이라는 걸 색으로 묶음 — 게슈탈트 유사성)
@@ -898,7 +914,7 @@ function duesHtml(now, today) {
     <div class="meta">${lateRow ? `<span class="late">${label(ymd(t.due))} ${hm(t.due)} 지남</span>${redoTag(t)}` : (dt(t.due) - now) < 864e5 ? `<span class="soon num">${hm(t.due)} · ${Math.max(1, Math.round((dt(t.due) - now) / 36e5))}시간 남음</span>` : `<span class="num">${hm(t.due)}</span>`}${t.course ? " · " + esc(t.course) : ""} · ${KIND[t.kind]}${pl ? ` · <span class="plan-tag">오늘 ${hm(pl.start)} 계획</span>` : ""}</div></div>${lateRow && !redoOf(t) && (LIVE || MOB) ? lateActs(t) : rowActs(t)}</div>`; };
   let h = `<section class="sec"><div class="sec-h"><h2>다가오는 마감</h2><span class="aside">${UI.allDues ? "2주" : "앞으로 3일"}</span>
     <button class="link" data-ui="alldues" aria-expanded="${UI.allDues}">${UI.allDues ? "3일만 보기" : hidden ? `2주 보기 (+${hidden})` : "2주 보기"}</button></div><div class="rows">`;
-  if (late.length) h += `<div class="day-h danger" id="late">마감 지남 ${late.length} <span class="d">끝냈으면 ○ · 아직이면 [오늘 하기] 또는 ⋯ → 다른 날로 · 안 할 거면 ⋯ → 제외</span></div>` + late.map(t => row(t, true)).join("");
+  if (late.length) h += `<div class="day-h danger" id="late">마감 지남 ${late.length} <span class="d">할 날을 정한 것 · 끝냈으면 ○</span></div>` + late.map(t => row(t, true)).join("");
   let any = false;
   for (let i = 0; i < span; i++) {
     const d = addDays(today, i), all = open.filter(t => ymd(t.due) === d), its = all.filter(t => t.key !== HERO_KEY);
@@ -1445,7 +1461,7 @@ function toast(text, undo, ms, extra) {
 }
 async function run(fn, okMsg) {  // 실패하면 알림 띠에 이유
   try { const r = await fn(); if (okMsg) toast(typeof okMsg === "function" ? okMsg(r) : okMsg); return r; }
-  catch (err) { toast(err.message || "실패", null, 6000); }
+  catch (err) { toast(err.message || "실패", null, 6000); if (D) render(); }  // 바로 지운 줄을 되살린다
 }
 // 강의를 들은 뒤: 그 강의의 내 노트가 있으면 바로 열 수 있게 (기록은 study_system 규칙대로 내 말로)
 async function noteAfter(key, title, undo) {
@@ -1515,7 +1531,7 @@ document.addEventListener("click", async e => {
   const ui = e.target.closest("[data-ui]");
   if (ui) {
     const u = ui.dataset.ui;
-    if (u === "tolate") { if (view !== "today") { e.preventDefault(); view = "today"; render(); $("late")?.scrollIntoView(); } return; }
+    if (u === "tolate") { e.preventDefault(); if (view !== "today") { view = "today"; render(); } (document.querySelector(".crit") || $("late"))?.scrollIntoView({ block: "start" }); return; }
     if (u === "sheetclose") { closeSheet(); return; }
     if (u === "keys") { keysSheet(); return; }
     if (u === "tohero") { $("hero")?.scrollIntoView({ block: "start" }); return; }
@@ -1534,6 +1550,7 @@ document.addEventListener("click", async e => {
     return;
   }
   const act = b.dataset.act, key = b.dataset.key, t = findTask(key);
+  if (b.hasAttribute("data-vanish")) { const line = b.closest(".cline"); if (line) line.remove(); }
   // 자료 창·보고서 창 안의 동작 (시트를 닫지 않음)
   if (await panelAct(act, b, key)) return;
   if (act === "ignore") { ignoreMenu(key); return; }
