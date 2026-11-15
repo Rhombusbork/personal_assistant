@@ -1,6 +1,6 @@
 """보고서 .md → A4 PDF (Claude 안 씀). 제출용: 쪽수를 알려 주고, 만든 뒤 탐색기에서 그 파일을 보여 준다.
 
-마크다운은 보고서에 쓰는 만큼만 (제목, 문단, 목록, 표, 굵게, 오른쪽 정렬 div, 아래 첨자 ₀-₉).
+마크다운은 보고서에 쓰는 만큼만 (제목, 문단, 목록, 표, 구분선, 굵게, 오른쪽 정렬 div, 아래 첨자 ₀-₉).
 글꼴은 설치된 나눔고딕. 브라우저는 LearningX 로그인과 같은 Playwright Chromium.
 """
 import html
@@ -17,7 +17,8 @@ CSS = """@page { size: A4; margin: 13mm 15mm; }
 body { font-family: 'NanumGothic','NanumSquare',sans-serif; font-size: 10.5pt; line-height: 1.45; }
 h1 { font-size: 15pt; margin: 0; } h2 { font-size: 11pt; margin: 2px 0 0; font-weight: normal; color: #444; }
 h3 { font-size: 10.5pt; margin: 7px 0 2px; } p { margin: 2px 0; } ul, ol { margin: 2px 0; padding-left: 16px; } li { margin: 1px 0; }
-table { border-collapse: collapse; margin: 3px 0; } td, th { border: 1px solid #999; padding: 1px 8px; } th { background: #eee; }"""
+table { border-collapse: collapse; margin: 3px 0; } td, th { border: 1px solid #999; padding: 1px 8px; } th { background: #eee; }
+hr { border: 0; border-top: 1px solid #bbb; margin: 8px 0; }"""
 
 
 def _inline(t):
@@ -31,6 +32,8 @@ def to_html(md):
         line = lines[i]
         if line.startswith("<div"):
             out.append(line)
+        elif re.match(r"(-{3,}|\*{3,})\s*$", line):
+            out.append("<hr>")
         elif m := re.match(r"(#{1,4}) (.*)", line):
             out.append(f"<h{len(m[1])}>{_inline(m[2])}</h{len(m[1])}>")
         elif line.startswith("|"):
