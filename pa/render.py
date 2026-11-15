@@ -220,7 +220,20 @@ def dashboard_data(conn):
         "sessionsToday": [dict(r) for r in conn.execute(
             "SELECT key, start, end, minutes FROM sessions WHERE start >= ? ORDER BY start",
             (t_now.replace(hour=0, minute=0).isoformat(),))],
+        "worklog": worklog(conn, by_key, t_now),
     }
+
+
+def worklog(conn, by_key, t_now, days=14):
+    """한 일 기록 창: 최근 days 일의 직접 적은 기록 + ⏱ 로 잰 기록 (새것부터)."""
+    from datetime import timedelta
+    since = (t_now - timedelta(days=days - 1)).date().isoformat()
+    rows = [{"id": r["id"], "day": r["day"], "title": r["title"], "minutes": r["minutes"], "at": r["created"], "src": "manual"}
+            for r in conn.execute("SELECT * FROM worklog WHERE day >= ?", (since,))]
+    for r in conn.execute("SELECT key, start, minutes FROM sessions WHERE start >= ? AND minutes IS NOT NULL", (since,)):
+        t = by_key.get(r["key"])
+        rows.append({"day": r["start"][:10], "title": t.title if t else r["key"], "minutes": r["minutes"], "at": r["start"], "src": "timer"})
+    return sorted(rows, key=lambda x: (x["day"], x["at"]), reverse=True)
 
 
 CHANGE_LABEL = {"task_added": "🆕 새로 생김", "due_changed": "🔁 마감 바뀜", "material_downloaded": "📥 자료 받음",

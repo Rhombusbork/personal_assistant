@@ -10,7 +10,7 @@ notices Canvas 과목 공지
 """
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 
 from pa.config import ROOT
 from pa.model import KST, Task, now, parse_dt
@@ -80,6 +80,13 @@ CREATE TABLE IF NOT EXISTS sessions (           -- 실제로 한 시간 (⏱ 시
   start TEXT NOT NULL,
   end TEXT,                                     -- NULL = 진행 중
   minutes INTEGER
+);
+CREATE TABLE IF NOT EXISTS worklog (            -- 한 일 기록 (직접 적은 것: 무엇을 · 몇 분)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL,                            -- YYYY-MM-DD
+  title TEXT NOT NULL,
+  minutes INTEGER NOT NULL,
+  created TEXT NOT NULL
 );
 """
 
@@ -179,6 +186,22 @@ def start_session(conn, key):
     conn.execute("INSERT INTO sessions (key, start) VALUES (?, ?)",
                  (key, datetime.now(KST).isoformat(timespec="seconds")))
     log(conn, "session_start", key)
+
+
+def add_worklog(conn, title, minutes, day=None):
+    """한 일 기록 추가. day 를 비우면 오늘."""
+    title, minutes = str(title).strip(), int(minutes)
+    if not title or not 1 <= minutes <= 24 * 60:
+        raise ValueError("무엇을 했는지와 1분~24시간 사이의 시간을 적어 주세요")
+    day = day or datetime.now(KST).date().isoformat()
+    date.fromisoformat(day)
+    conn.execute("INSERT INTO worklog (day, title, minutes, created) VALUES (?, ?, ?, ?)",
+                 (day, title, minutes, datetime.now(KST).isoformat(timespec="seconds")))
+    log(conn, "worklog_add", None, title=title, minutes=minutes, day=day)
+
+
+def delete_worklog(conn, wid):
+    conn.execute("DELETE FROM worklog WHERE id = ?", (int(wid),))
 
 
 def stop_session(conn):

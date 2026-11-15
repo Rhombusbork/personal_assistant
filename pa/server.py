@@ -10,6 +10,7 @@ POST /api/unignore   제외 취소 (## 제외 의 그 줄을 지움)
 POST /api/remove     inbox 할 일 삭제
 POST /api/quick      빠른 입력 한 줄 ('@내일 18시 ~2h #과목')
 POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop 에 done=true 면 완료까지)
+POST /api/worklog/add, /api/worklog/delete  한 일 기록 (무엇을 · 몇 분 · 날짜) 추가·지우기
 POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
@@ -189,7 +190,7 @@ class Handler(SimpleHTTPRequestHandler):
                 msg = "오늘 하기"
             elif action == "/api/quick":
                 msg = inbox.add_task_line(inbox.quick_line(str(body.get("text", ""))))
-            elif action in ("/api/timer/start", "/api/timer/stop", "/api/open", "/api/sync", "/api/open-file",
+            elif action in ("/api/timer/start", "/api/timer/stop", "/api/worklog/add", "/api/worklog/delete", "/api/open", "/api/sync", "/api/open-file",
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
@@ -254,6 +255,14 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             if action == "/api/timer/start":
                 db.start_session(conn, body["key"])
+                conn.commit()
+                return {"ok": True}
+            if action == "/api/worklog/add":
+                db.add_worklog(conn, body.get("title", ""), body.get("minutes") or 0, body.get("day") or None)
+                conn.commit()
+                return {"ok": True}
+            if action == "/api/worklog/delete":
+                db.delete_worklog(conn, body["id"])
                 conn.commit()
                 return {"ok": True}
             if action == "/api/timer/stop":
