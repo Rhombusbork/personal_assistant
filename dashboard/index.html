@@ -990,7 +990,7 @@ function moreHtml(now, today) {
     ${ex.map(x => `<div class="citem"><span class="tx">${esc(x.keep ? "예외(계속 보이기): " + (x.titles[0] || x.text) : x.text)}<small>${x.keep ? "단어 규칙에 걸려도 보이게" : (x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만") + ` · 걸린 과제 ${x.count}개`}</small></span>
       ${LIVE || MOB ? `<span class="ac"><button class="tbtn" data-act="unign" data-text="${esc(x.text)}" data-label="제외 취소">취소</button></span>` : ""}</div>`).join("")}</div></details>`;
   const rd = D.recentDone || [];
-  if (rd.length) h += `<details data-k="donelist" ${det("donelist")}><summary><span class="ttl">끝낸 것</span><span class="hint">최근 2주 ${rd.length}개 · 다시 해야 하면 되살리기</span><span class="chev">›</span></summary><div class="inner">
+  if (rd.length) h += `<details data-k="donelist" ${det("donelist")}><summary><span class="ttl">끝낸 것</span><span class="hint">최근 3일 ${rd.length}개 · 다시 해야 하면 되살리기</span><span class="chev">›</span></summary><div class="inner">
     ${rd.map(t => `<div class="citem"><span class="tx">${esc(t.title)}<small>${[t.course && esc(t.course), KIND[t.kind], "끝냄 " + stamp(t.doneAt)].filter(Boolean).join(" · ")}</small></span>
       ${LIVE || MOB ? `<span class="ac"><button class="tbtn" data-act="revive" data-key="${esc(t.key)}" data-title="${esc(t.title)}" title="완료를 취소하고 다시 할 일로">되살리기</button></span>` : ""}</div>`).join("")}
     <p class="small">Canvas 에 이미 제출한 과제는 다음 Canvas 확인 때 다시 '완료'가 됩니다 (제출을 취소했다면 그대로 남음).</p></div></details>`;
