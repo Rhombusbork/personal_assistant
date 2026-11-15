@@ -218,6 +218,9 @@ def dashboard_data(conn):
         "todayDone": [task_json(by_key[r["key"]]) for r in conn.execute(
             "SELECT key FROM tasks WHERE status = 'done' AND done_at >= ? ORDER BY done_at",
             (t_now.replace(hour=0, minute=0).isoformat(),)) if r["key"] in by_key],
+        "recentDone": [dict(task_json(by_key[r["key"]]), doneAt=r["done_at"]) for r in conn.execute(  # 끝낸 것 (되살리기용, 2주)
+            "SELECT key, done_at FROM tasks WHERE status = 'done' AND done_at >= ? ORDER BY done_at DESC LIMIT 40",
+            ((t_now - timedelta(days=14)).isoformat(),)) if r["key"] in by_key],
         "sessionsToday": [dict(r) for r in conn.execute(
             "SELECT key, start, end, minutes FROM sessions WHERE start >= ? ORDER BY start",
             (t_now.replace(hour=0, minute=0).isoformat(),))],

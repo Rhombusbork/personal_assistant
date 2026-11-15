@@ -186,6 +186,12 @@ def apply_entry(op):
         inbox.unignore(op["text"])
     elif kind == "remove":
         inbox.remove(op["key"])
+    elif kind == "undone":
+        conn = db.connect()
+        try:
+            inbox.undone(conn, op["key"])
+        finally:
+            conn.close()
     elif kind == "redo":
         from pa import plan
         conn = db.connect()
