@@ -266,3 +266,8 @@ VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기�
 
 - `data/pa.db` (SQLite): `tasks` 할 일, `events` 자동 기록, `plan` 현재 계획, `busy` 수업·약속
 - 모두 git 제외. 대시보드 데이터 `dashboard/data.js` 도 자동 생성·git 제외.
+
+## 추가자료 폴더
+
+작업에 쓸 사진·파일(조원 필기 사진, 받은 PDF 등)은 `추가자료/<과목>/` 에 넣고 채팅에서 말하면 된다 (git 에 안 올라감).
+작업이 끝나면 Claude 가 남은 파일을 보여 주고 `~/study_system/materials/<과목>/` 의 어디로 옮길지, 지울지, 둘지 묻는다.

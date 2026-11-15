@@ -42,3 +42,6 @@ dashboard/data.js
 config/*.yaml
 !config/*.example.yaml
 config/profile.md
+
+# 작업용 추가자료 (사진·파일을 잠깐 두는 곳 — 끝나면 materials 로 옮기거나 지움)
+추가자료/
