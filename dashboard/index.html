@@ -799,10 +799,10 @@ function critHtml(now) {
   }
   // 마감이 지난 일 (할 날을 아직 안 정한 것): 맨 위에 한 줄씩 — 고르면 바로 사라진다
   if (LIVE || MOB) for (const t of overdueOpen()) {
-    const k = esc(t.key), tm = addDays(ymdOf(now), 1);
+    const k = esc(t.key);
     L.push({ sev: 2, late: true, t: t.title, s: `${t.course ? t.course + " · " : ""}${KIND[t.kind]} · 마감 ${label(ymd(t.due))} ${hm(t.due)} 지남`,
       b: `<span class="lacts"><button class="tbtn" data-act="done" data-key="${k}" data-vanish>이미 함</button><button class="tbtn" data-act="redo-today" data-key="${k}" data-vanish>오늘</button>`
-       + `<button class="tbtn" data-act="redo-pick" data-key="${k}" title="날짜를 골라 그날 계획에 넣기">날짜…</button><input type="date" class="sr" data-redo="${k}" min="${ymdOf(now)}" value="${tm}" aria-label="할 날짜: ${esc(t.title)}">`
+       + `<button class="tbtn" data-act="redo-pick" data-key="${k}" title="날짜를 골라 그날 계획에 넣기">날짜…</button><input type="date" class="sr" data-redo="${k}" min="${ymdOf(now)}" aria-label="할 날짜: ${esc(t.title)}">`
        + `<button class="tbtn gray" data-act="ign-one" data-key="${k}" data-vanish title="이 과제만 제외 (되돌리기 가능)">안 함</button></span>` });
   }
   for (const j of (D.jobs || []).filter(j => j.status === "failed"))
@@ -1570,6 +1570,7 @@ document.addEventListener("click", async e => {
   if (act === "redo-day" && t) { closeMenu(false); closeSheet(); redoSheet(t); return; }
   if (act === "redo-pick") {
     const inp = document.querySelector(`input[data-redo="${CSS.escape(key)}"]`);
+    inp.value = "";  // 비워 두고 열어야 같은 날을 다시 골라도 '바뀜'으로 잡힌다
     try { inp.showPicker(); } catch { if (t) redoSheet(t); }
     return;
   }
