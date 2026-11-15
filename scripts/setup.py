@@ -52,6 +52,11 @@ def main():
     if not report_rules.exists():
         shutil.copy(ROOT / "templates" / "report-CLAUDE.md", report_rules)
         print(f"   {report_rules} 만듦 (보고서 글쓰기 규칙 견본)")
+    for folder in (HOME / "report", HOME / "study_system"):  # Codex 는 CLAUDE.md 대신 AGENTS.md 를 읽는다 → 원본을 가리키는 안내만
+        if (folder / "CLAUDE.md").exists() and not (folder / "AGENTS.md").exists():
+            (folder / "AGENTS.md").write_text("이 폴더의 규칙 원본은 CLAUDE.md 다. 작업 전에 CLAUDE.md 를 읽고 그대로 따른다.\n",
+                                              encoding="utf-8")
+            print(f"   {folder / 'AGENTS.md'} 만듦 (Codex 용 안내 — 규칙은 CLAUDE.md)")
 
     print("== 4. 아직 남은 것")
     todo = []

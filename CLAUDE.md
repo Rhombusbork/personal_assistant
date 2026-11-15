@@ -41,7 +41,7 @@
 - `bin/pa lectures [과목] [--open N]` 강의 열기 / `bin/pa google-login` Google 캘린더 다시 로그인 (사용자 요청 때만)
 - 데이터: `data/pa.db` (SQLite, events 표가 자동 기록)
 - 대시보드 http://localhost:8765 — 엔진(`bin/pa watch`) 안의 서버. 보고서 초안·자료 요약·공지 정리는
-  대시보드 버튼 → 에이전트 작업(`pa/jobs.py`, `claude -p`). 엔진은 그 밖에는 Claude 를 쓰지 않는다
+  대시보드 버튼 → 에이전트 작업(`pa/jobs.py` → `pa/ai.py`: `.env` 의 `PA_AI` 에 따라 `claude -p` 또는 `codex exec`). 엔진은 그 밖에는 AI 를 쓰지 않는다
 - LearningX(강의 플랫폼)는 `bin/pa browser login` 으로 저장한 로그인으로 **데이터 API 만** 읽는다.
   강의·자료 **페이지를 자동으로 열지 않는다** (열람·출석 기록이 남을 수 있음). 교수자가 지운 자료는 받지 않는다.
   **비서가 스스로 다시 로그인하지 않는다** — 비서용 로그인이 평소 브라우저의 강의 콘텐츠 로그인을 끊은 일이 있음.

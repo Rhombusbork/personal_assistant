@@ -446,6 +446,7 @@
 const KIND = { lecture: "강의", quiz: "퀴즈", assignment: "과제", todo: "할 일", review: "퀴즈 복습" };
 const WD = "일월화수목금토";
 let D = null, LIVE = false, view = "today", wkIdx = null;
+const AI = () => (D && D.ai) || "AI";  // 설정한 AI 이름 (Claude / Codex)
 try { view = localStorage.getItem("pa.view") === "week" ? "week" : "today"; } catch {}
 const UI = { open: new Set(), allDues: false, allDl: false, menuKey: null, menuFrom: null, sheetFrom: null, sel: null };  // 다시 그려도 펼친 상태 유지
 let HERO_KEY = null;  // 주인공 영역에 크게 나온 일 — 아래 목록에서는 다시 그리지 않는다 (DRY)
@@ -509,7 +510,7 @@ function menuItems(t) {
   if (t.url && t.kind !== "todo") g[0].push({ act: "open", label: openName, strong: P.act === "open" });
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) g[0].push({ act: "report", label: "보고서 작성", hint: "설명·자료·지침", strong: P.act === "report" });
   if (t.course) g[1].push({ act: "mat", label: "자료", hint: links(t).length ? `연결 ${links(t).length}` : "고르기" });
-  if (t.kind === "lecture") g[1].push({ act: "sumfor", label: "내용정리", hint: "Claude 사용" },
+  if (t.kind === "lecture") g[1].push({ act: "sumfor", label: "내용정리", hint: AI() + " 사용" },
     { act: "workspace", label: "VSCode 작업 창", hint: "study_system" }, { act: "quizcopy", label: "퀴즈 요청 복사", hint: "채팅에 붙여 넣기" });
   g[2].push(isActive ? { act: "stop", label: "기록 멈춤" } : { act: "start", label: "시간 재기 시작", hint: "⏱" });
   g[2].push({ act: "done", label: t.kind === "lecture" ? "들었음" : "완료", hint: "✓" });
@@ -848,7 +849,7 @@ function checkHtml(now, today) {
     G.push(`<div class="cgrp"><h3 class="cgrp-h">새 공지 ${ns.length}${ns.length ? `<button class="tbtn gray" data-act="nreadall" data-label="모두 읽음">모두 읽음</button>` : ""}</h3>
       ${ns.map(x => `<div class="citem"><span class="tx">${esc(x.title)}<small>${esc(String(x.course).replace(/\s*\d{6}$/, ""))}${x.summary ? " · 요약: " + esc(x.summary) : ""}</small></span>
         <span class="ac"><button class="tbtn" data-act="nopen" data-id="${esc(x.id)}" data-label="공지 열기">열기</button><button class="tbtn gray" data-act="nread" data-id="${esc(x.id)}" data-label="읽음">읽음</button></span></div>`).join("")}
-      ${ns.length ? `<button class="tbtn" data-act="njob" data-label="공지 요약·제외 후보 찾기 (Claude)" style="padding-left:0">요약·제외 후보 찾기 <span class="small" style="font-weight:400">Claude 사용</span></button>` : ""}
+      ${ns.length ? `<button class="tbtn" data-act="njob" data-label="공지 요약·제외 후보 찾기 (${AI()})" style="padding-left:0">요약·제외 후보 찾기 <span class="small" style="font-weight:400">${AI()} 사용</span></button>` : ""}
       ${sg.map(x => `<div class="citem"><span class="tx">제외 후보 · ${esc(x.course)} ${esc(x.title)}<small>${esc(x.reason)}</small></span>
         <span class="ac"><button class="tbtn" data-act="ign-one" data-key="${esc(x.key)}" data-label="제외">제외</button><button class="tbtn gray" data-act="sgno" data-key="${esc(x.key)}" data-label="아니요">아니요</button></span></div>`).join("")}</div>`);
   }
@@ -857,7 +858,7 @@ function checkHtml(now, today) {
     const ST = { queued: "대기", running: "진행 중", done: "완료", failed: "실패" };
     n += js.length; hint.push(`작업 ${js.length}`);
     G.push(`<div class="cgrp" id="jobs"><h3 class="cgrp-h">에이전트 작업</h3>${js.map(j => `<div class="citem"><span class="tx"><b>${ST[j.status] || j.status}</b> · ${esc(j.title)}
-      <small>${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · Claude 사용 " + j.claude + "회" : ""}</small></span>
+      <small>${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · " + AI() + " 사용 " + j.claude + "회" : ""}</small></span>
       ${j.status === "done" && j.result ? `<span class="ac"><button class="tbtn" data-act="openfile" data-path="${esc(j.result)}" data-label="결과 열기">열기</button></span>` : ""}</div>`).join("")}</div>`);
   }
   const dls = D.downloads || [];
@@ -1224,7 +1225,7 @@ function mpDraw() {
   const chips = MP.links.map(x => x.exists
     ? `<span class="lchip" title="${esc(full(x))}${x.origin === "pair" ? " · 강의 플랫폼에서 같은 주차의 자료라 자동으로 연결됨" : ""}"><button data-act="openfile" data-path="${esc(x.p)}">${x.origin === "pair" ? "🔗" : "📄"} ${esc(x.name)}</button>${
         x.pdf ? (x.summary ? `<button data-act="openfile" data-path="${esc(x.summary)}" title="만들어 둔 요약 열기">📝</button>`
-                           : `<button data-act="summarize" data-path="${esc(x.p)}" title="🤖 이 PDF 의 핵심 정리 만들기 (Claude 사용, 몇 분)">🤖</button>`) : ""}<button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`
+                           : `<button data-act="summarize" data-path="${esc(x.p)}" title="🤖 이 PDF 의 핵심 정리 만들기 (${AI()} 사용, 몇 분)">🤖</button>`) : ""}<button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`
     : `<span class="lchip miss" title="${esc(x.p)}">⚠️ ${esc(x.name)} <i>파일 없음</i><button data-act="refind" data-name="${esc(x.name)}" title="같은 이름으로 다시 찾기">다시 찾기</button><button data-act="unlink" data-path="${esc(x.p)}" title="연결 빼기">✕</button></span>`).join("");
   $("mpTop").innerHTML = `<div class="meta">연결된 자료 ${live}/${MP.max}${MP.links.length ? " · 누르면 열림 · ✍ 보고서·🤖 내용정리가 이것만 참고" : " — 아직 없음. 고르면 ✍ 보고서·🤖 내용정리가 이것을 참고 (없으면 제목으로 추측)"}</div>
     ${MP.links.length ? `<div class="lchips">${chips}</div>` : ""}
@@ -1370,16 +1371,16 @@ async function showReport(key) {
     ${r.desc ? `<details ${r.desc.length < 300 ? "open" : ""}><summary class="meta">Canvas 과제 설명</summary><p class="desc">${esc(r.desc)}</p></details>` : ""}
     <div class="meta" style="margin-top:6px">파일: <b>${esc(r.name)}</b> ${r.exists ? `— 이미 있음 <button class="chip" data-act="openfile" data-path="${esc(r.path)}">열기</button>
       <button class="chip" data-act="reveal" data-path="${esc(r.path)}" title="탐색기에서 파일 위치 보기">📂 위치</button>
-      <button class="chip" data-act="reppdf" title="이 .md 를 A4 PDF 로 (쪽수 알려 줌, Claude 안 씀) → 탐색기에서 보여 줌">📄 PDF 만들기</button>` : "— 아직 없음"}</div>
+      <button class="chip" data-act="reppdf" title="이 .md 를 A4 PDF 로 (쪽수 알려 줌, AI 안 씀) → 탐색기에서 보여 줌">📄 PDF 만들기</button>` : "— 아직 없음"}</div>
     <div class="meta">참고 자료: 아래 📄 창에서 고른 것만 씀 (하나도 없으면 제목으로 자동 추측)</div>
     <label class="meta" for="repText" style="display:block;margin-top:8px">어떻게 쓸까요? (분량·구성·강조할 내용·내 의견·말투 등 — 비워도 됨)</label>
     <textarea id="repText" placeholder="예) A4 1쪽. 홉스의 자연 상태와 사회 계약을 중심으로, 마지막 문단에 오늘날 국가 권력과 비교한 내 생각 (내 생각은 비워 둬)">${esc(r.brief.text)}</textarea>
     <label class="meta"><input type="checkbox" id="repBlank" ${r.brief.blanks ? "checked" : ""}> 내 생각·경험이 들어갈 자리는 비워 두기 (<code>[✍ 내 생각: …]</code> 표시)</label>
     <div class="ways">
-      <button class="primary" data-act="repchat">💬 채팅에서 같이 쓰기 <small>보고서 파일을 VSCode 에 열고, 과제·자료·지침을 담은 요청을 복사 → 오른쪽 Claude 채팅에 붙여 넣기. 대화하며 한 부분씩</small></button>
-      <button data-act="repdraft">🤖 초안 한 번에 만들기 <small>Claude 가 뒤에서 전체 초안을 씀 (구독 사용, 몇 분)${r.exists ? " — 지금 파일은 _old 로 보관" : ""}</small></button>
-      <button data-act="repwin">🗂 VSCode 작업 창 열기 (report 폴더) <small>report 폴더를 VSCode 새 창으로 + 보고서 파일. 그 창의 Claude 채팅은 report 의 글쓰기 규칙을 따름 — 💬 요청을 붙여 넣어 거기서 작업</small></button>
-      <button data-act="repfile">📝 빈 파일만 만들고 열기 <small>규칙에 맞는 이름·제목·학번 줄만. Claude 안 씀</small></button>
+      <button class="primary" data-act="repchat">💬 채팅에서 같이 쓰기 <small>보고서 파일을 VSCode 에 열고, 과제·자료·지침을 담은 요청을 복사 → 옆의 AI 채팅(Claude Code·Codex)에 붙여 넣기. 대화하며 한 부분씩</small></button>
+      <button data-act="repdraft">🤖 초안 한 번에 만들기 <small>${AI()} 가 뒤에서 전체 초안을 씀 (구독 사용, 몇 분)${r.exists ? " — 지금 파일은 _old 로 보관" : ""}</small></button>
+      <button data-act="repwin">🗂 VSCode 작업 창 열기 (report 폴더) <small>report 폴더를 VSCode 새 창으로 + 보고서 파일. 그 창의 AI 채팅은 report 의 글쓰기 규칙을 따름 — 💬 요청을 붙여 넣어 거기서 작업</small></button>
+      <button data-act="repfile">📝 빈 파일만 만들고 열기 <small>규칙에 맞는 이름·제목·학번 줄만. AI 안 씀</small></button>
     </div><p id="repMsg" class="msg"></p></div>`;
   await showMaterials(key);
   $("repText").focus({ preventScroll: true });
@@ -1390,7 +1391,7 @@ async function repAction(act) {
   msg.className = "msg"; msg.textContent = "…";
   try {
     if (act === "repdraft") {
-      if (REP.exists && !confirm(`이미 있는 ${REP.name} 은 _old 로 보관하고 새로 씁니다 (Claude 사용, 몇 분). 진행할까요?`)) { msg.textContent = ""; return; }
+      if (REP.exists && !confirm(`이미 있는 ${REP.name} 은 _old 로 보관하고 새로 씁니다 (${AI()} 사용, 몇 분). 진행할까요?`)) { msg.textContent = ""; return; }
       await post("job/report", { ...repBrief(), force: REP.exists });
       msg.textContent = "🤖 초안을 쓰는 중 — 오른쪽 🤖 작업 칸에서 진행 상황, 끝나면 VSCode 에 열립니다";
     } else if (act === "repfile") {
@@ -1406,13 +1407,13 @@ async function repAction(act) {
         + (files.length ? "참고 자료 (이것만):\n" + files.map(x => "- " + x.p).join("\n") + "\n" : "참고 자료: 연결 없음 — 맞는 자료를 찾아 먼저 보여 줘\n")
         + (b.blanks ? "내 생각·경험이 들어갈 자리는 지어내지 말고 나에게 물어봐 줘." : "");
       REP.exists = true;
-      if (await copyText(text)) msg.textContent = "📋 요청을 복사했습니다 — 오른쪽 Claude 채팅에 붙여 넣으세요 (Ctrl+V)";
+      if (await copyText(text)) msg.textContent = "📋 요청을 복사했습니다 — 옆의 AI 채팅에 붙여 넣으세요 (Ctrl+V)";
       else msg.textContent = "";
     }
   } catch (err) { msg.className = "msg err"; msg.textContent = err.message; }
 }
 
-// 🧩 퀴즈 요청: 채팅에 붙여 넣을 문장 (퀴즈 제작은 판단이 필요해서 채팅에서 — 엔진은 Claude 안 씀)
+// 🧩 퀴즈 요청: 채팅에 붙여 넣을 문장 (퀴즈 제작은 판단이 필요해서 채팅에서 — 엔진은 AI 안 씀)
 async function quizCopy(key) {
   const t = taskOf(key);
   let files = MP && MP.key === key ? MP.links : null;
@@ -1421,8 +1422,8 @@ async function quizCopy(key) {
   const text = `/quiz ${t && t.course ? t.course + " " : ""}${t ? t.title : key} — 이 자료로 퀴즈 만들어줘 (할 일 키 ${key})\n`
     + (files.length ? "연결된 자료:\n" + files.map(x => "- " + x.p).join("\n") : "연결된 자료 없음 — study_system 의 이 강의 자료·노트에서 찾아서");
   if (!await copyText(text)) return;
-  if (MP && MP.key === key) { MP.note = "🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요"; mpDraw(); }
-  else alert("🧩 퀴즈 요청을 복사했습니다 — Claude 채팅에 붙여 넣으세요\n\n" + text);
+  if (MP && MP.key === key) { MP.note = "🧩 퀴즈 요청을 복사했습니다 — AI 채팅에 붙여 넣으세요"; mpDraw(); }
+  else alert("🧩 퀴즈 요청을 복사했습니다 — AI 채팅에 붙여 넣으세요\n\n" + text);
 }
 
 
@@ -1644,7 +1645,7 @@ document.addEventListener("click", async e => {
   if (act === "nopen") { await run(() => api("notice/open", { id: b.dataset.id })); return; }
   if (act === "nread") { await run(() => post("notice/read", { id: b.dataset.id })); return; }
   if (act === "nreadall") { await run(() => post("notice/read", { id: "all" })); return; }
-  if (act === "njob") { await run(() => post("job/notices"), "공지 정리를 시작합니다 (Claude, 몇 분)"); return; }
+  if (act === "njob") { await run(() => post("job/notices"), "공지 정리를 시작합니다 (" + AI() + ", 몇 분)"); return; }
   if (act === "sgno") { await run(() => post("suggest/dismiss", { key })); return; }
   if (act === "dlmove") {
     const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
@@ -1678,7 +1679,7 @@ async function panelAct(act, b, key) {
     if (act === "mpbclose") { MP.browse = null; mpBrowseDraw(); return true; }
     if (act === "mpbadd") { b.disabled = true; await mpLink([...MP.browse.checked.values()]); return true; }
     if (act === "summarize") {
-      if (!confirm("이 자료의 요약을 Claude 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return true;
+      if (!confirm("이 자료의 요약을 " + AI() + " 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return true;
       await post("job/summary", { path: b.dataset.path }); closeSheet(); toast("요약을 시작합니다 — 위 상태 줄에서 진행 상황"); return true;
     }
     if (act === "reppdf") { b.disabled = true; const r = await api("report-pdf", { key: REP.key }); msg(r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : "")); b.disabled = false; return true; }

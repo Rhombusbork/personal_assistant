@@ -7,7 +7,7 @@
 
 **필요한 것**: Python 3.10+, git, VSCode, 제주대 Canvas 계정, Google 계정.
 컴퓨터는 **Windows 그대로**, **WSL2(Ubuntu)**, **리눅스** 중 아무거나 된다 (Mac 은 시험하지 않음).
-선택: [Claude Code](https://claude.com/claude-code) (보고서 초안·자료 요약·채팅 비서).
+선택: AI 하나 — [Claude Code](https://claude.com/claude-code) 또는 [ChatGPT Codex](https://developers.openai.com/codex) (보고서 초안·자료 요약·채팅 비서). 없어도 일정 관리는 다 된다.
 
 **Windows** (PowerShell 또는 명령 프롬프트, [Python](https://www.python.org/downloads/)·[Git](https://git-scm.com/download/win) 먼저 설치):
 
@@ -45,6 +45,14 @@ bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남�
 - `config/profile.md`: 나는 누구인지, 과목 대응표, 내 백업 저장소 (Claude Code 가 읽음)
 - `~/report/CLAUDE.md`: 보고서 글쓰기 규칙 (setup 이 견본을 복사) — 0-1 절의 `<학번>`·`<이름>` 을 내 것으로
 - Claude Code 를 쓰면 채팅에서 "규칙 바꿔줘"(`rules`)로 해도 된다
+
+### AI: Claude Code 또는 Codex
+
+- 대시보드의 🤖 버튼(보고서 초안·자료 요약·공지 정리)은 `.env` 의 `PA_AI` 로 고른다 (`claude` / `codex`, 비우면 설치된 것).
+  어느 쪽이든 **내 구독**으로 돌고, 읽기만 허용한다 (파일은 비서가 쓴다).
+- 채팅 비서: Claude Code 는 `CLAUDE.md`·`.claude/skills/`, Codex 는 `AGENTS.md`·`.agents/skills/` 를 읽는다.
+  Codex 쪽 파일은 원본(CLAUDE.md·.claude/skills)을 가리키기만 하므로, 규칙은 원본에서만 고친다
+  (스킬을 고쳤으면 `python scripts/sync_agents.py`).
 
 ### 원래 저장소와 분리
 

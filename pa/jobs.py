@@ -4,10 +4,10 @@
   1. 과제 읽기     Canvas 과제 설명 (Canvas 과제일 때)
   2. 자료 모으기   materials 의 관련 자료, study_system/notes 의 내 노트
   3. 파일 만들기   ~/report/<학번>_<이름>_<과목>_<종류>_<번호>.md  (report/CLAUDE.md 규칙)
-  4. 초안 쓰기     내 구독의 Claude (`claude -p`, report 폴더에서 실행 → report 규칙 자동 적용)
+  4. 초안 쓰기     내 구독의 AI (pa/ai.py: `claude -p` 또는 `codex exec`, report 폴더에서 실행 → report 규칙 적용)
   5. 열기          VSCode 편집기 탭
 
-Claude 는 읽기(Read)만 허용한다. 파일은 엔진이 쓴다.
+AI 는 읽기만 허용한다. 파일은 엔진이 쓴다.
 """
 import html
 import re
@@ -160,7 +160,7 @@ def _template(task):
 
 
 def blank_report(conn, key):
-    """Claude 없이: 규칙에 맞는 이름의 파일만 만든다 (제목·학번 이름 줄). 이미 있으면 그대로."""
+    """AI 없이: 규칙에 맞는 이름의 파일만 만든다 (제목·학번 이름 줄). 이미 있으면 그대로."""
     task = conn.execute("SELECT * FROM tasks WHERE key = ?", (key,)).fetchone()
     if not task:
         raise ValueError("할 일을 찾지 못함")
@@ -211,7 +211,7 @@ def report_job(conn, job, force=False):
             n += 1
         path.rename(old)
 
-    _update(conn, job["id"], step="4/5 초안 쓰기 (Claude, 몇 분 걸림)")
+    _update(conn, job["id"], step=f"4/5 초안 쓰기 ({ai.name()}, 몇 분 걸림)")
     b = brief(conn, task["key"])
     blanks = ("- 학생 자신의 생각, 관찰, 경험, 의견이 들어가야 할 자리는 지어내지 말고\n"
               "  [✍ 내 생각: 여기에 무엇을 쓰면 좋을지 한 줄 안내] 로 비워 둔다." if b["blanks"] else
@@ -261,14 +261,14 @@ def report_job(conn, job, force=False):
 # ---- 공지 정리 (버튼을 눌렀을 때만) ------------------------------------------
 
 def notices_job(conn, job):
-    """새 공지를 Claude 가 읽고: 공지마다 한 줄 요약 + '이 학생이 안 해도 되는' 과제 제외 후보."""
+    """새 공지를 AI 가 읽고: 공지마다 한 줄 요약 + '이 학생이 안 해도 되는' 과제 제외 후보."""
     import json as _json
     notes = conn.execute("SELECT * FROM notices WHERE status = 'new' ORDER BY posted_at").fetchall()
     if not notes:
         return "새 공지 없음"
     tasks = conn.execute("SELECT key, course, title, due FROM tasks WHERE source = 'canvas' AND status = 'open' "
                          "AND kind IN ('assignment', 'quiz')").fetchall()
-    _update(conn, job["id"], step=f"공지 {len(notes)}개 읽는 중 (Claude)")
+    _update(conn, job["id"], step=f"공지 {len(notes)}개 읽는 중 ({ai.name()})")
     prompt = "학생의 Canvas 과목 공지를 정리한다. JSON 만 출력한다 (설명·코드 블록 표시 없이).\n\n[공지]\n" + "\n\n".join(
         f"id={n['id']} | {short_course(n['course'])} | {n['title']} | {n['posted_at'][:10]}\n{n['text'][:2500]}" for n in notes
     ) + "\n\n[학생의 남은 과제·퀴즈]\n" + "\n".join(
@@ -284,7 +284,7 @@ exclude 에는 공지가 '이 학생은 내지 않아도 된다'고 분명히 �
     conn.execute("UPDATE jobs SET claude = claude + 1 WHERE id = ?", (job["id"],))
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
-        raise ValueError("Claude 응답을 읽지 못함: " + text[:120])
+        raise ValueError(f"{ai.name()} 응답을 읽지 못함: " + text[:120])
     data = _json.loads(m.group(0))
     for x in data.get("summaries", []):
         conn.execute("UPDATE notices SET summary = ? WHERE id = ?", (x.get("summary", ""), str(x.get("id"))))
@@ -318,7 +318,7 @@ def summary_job(conn, job):
     if out.exists():
         materials.open_file(out)
         return out
-    _update(conn, job["id"], step="요약 쓰는 중 (Claude, 몇 분 걸림)")
+    _update(conn, job["id"], step=f"요약 쓰는 중 ({ai.name()}, 몇 분 걸림)")
     prompt = f"""학생이 공부할 강의 자료를 요약한다. 이 파일을 Read 로 읽는다: {pdf}
 
 마크다운만 출력한다 (인사·설명·코드 블록 표시 없이). 구성:

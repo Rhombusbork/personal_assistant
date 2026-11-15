@@ -14,6 +14,8 @@
 | 가끔 | 퀴즈 앱 [기록 내보내기] | 틀린 문제 복습 일정의 재료. 14일 넘게 안 하면 복습을 만들지 않음 | 퀴즈 앱 첫 화면 버튼 → 다운로드 폴더에 저장되면 자동으로 읽음 |
 | 선택 | VSCode 자동 작업 허용 | 창을 열 때 엔진·대시보드가 자동으로 켜지게 (Claude 는 사용자 설정을 못 바꿈) | `Ctrl+Shift+P → Tasks: Manage Automatic Tasks → Allow Automatic Tasks` |
 | 선택 | Windows 작업 스케줄러 | VSCode 를 안 열어도 하루 3번 동기화·휴대폰 화면 갱신 | usage.md "VSCode 를 안 열어도 자동 실행" 의 PowerShell 한 줄 |
+| 배포 전 확인 | 진짜 Windows(WSL 없이)에서 한 번 눌러 보기 | 자동 테스트(GitHub Actions)는 Windows 에서도 통과하지만, 브라우저·탐색기·VSCode 열기, 폴더를 열 때 엔진 자동 시작, 코드가 바뀌었을 때 엔진 재시작(`bin\pa.cmd` 가 다시 띄움)은 실제 화면에서만 확인된다 | Windows 에 Python·Git 설치 → README 의 Windows 설치 → 대시보드 ▶ 열기·📂 위치·📄 자료 열기 |
+| 배포 전 확인 | Codex 로 🤖 버튼 한 번 | `codex exec` 명령 줄은 문서대로 만들고 테스트했지만 이 PC 엔 Codex 가 없어 실제 호출은 안 해 봄 | Codex 설치·로그인 → `.env` 에 `PA_AI=codex` → 공지 정리 버튼 |
 | 선택 | 채팅에서 `bin/pa` 허용 | 매번 실행 허락을 묻지 않게 | 채팅에서 `/permissions` → `Bash(bin/pa:*)` 허용 |
 
 지금 엔진은 VSCode 와 별도로 켜져 있다 (기록: `data/engine.out`). 코드가 바뀌면 스스로 다시 시작한다.
