@@ -68,7 +68,7 @@ def decrypt(box, pw):
 # ---- 올리기 ------------------------------------------------------------------
 
 def _git(*args, cwd=PUB, check=True):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=120, check=check)
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=120, check=check, encoding="utf-8")
 
 
 def build():
@@ -85,8 +85,8 @@ def build():
     PUB.mkdir(parents=True, exist_ok=True)
     for f in SITE_FILES:
         shutil.copy(ROOT / "dashboard" / f, PUB / f)
-    (PUB / "data.enc.json").write_text(json.dumps(encrypt(data, password())))
-    (PUB / ".nojekyll").write_text("")
+    (PUB / "data.enc.json").write_text(json.dumps(encrypt(data, password())), encoding="utf-8")
+    (PUB / ".nojekyll").write_text("", encoding="utf-8")
     return digest
 
 
@@ -131,7 +131,7 @@ def ensure_inbox_branch(c):
     tmp = ROOT / "data" / "phone-inbox-init"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
-    (tmp / c["inbox_file"]).write_text("[]\n")
+    (tmp / c["inbox_file"]).write_text("[]\n", encoding="utf-8")
     _git("init", "-q", "-b", c["inbox_branch"], cwd=tmp)
     _git("add", "-A", cwd=tmp)
     _git("commit", "-q", "-m", "phone inbox", cwd=tmp)

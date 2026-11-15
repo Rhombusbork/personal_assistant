@@ -3,14 +3,13 @@
 사용법:
   python -m pa.lectures              # 온라인 수업 전체의 이번 주차 항목
   python -m pa.lectures 생약 --week 10
-  python -m pa.lectures 생약 --open 1  # 1번 항목을 Windows 브라우저로 열기
+  python -m pa.lectures 생약 --open 1  # 1번 항목을 브라우저로 열기
 """
 import argparse
 import re
-import subprocess
 from datetime import date
 
-from pa import canvas
+from pa import canvas, osutil
 from pa.config import load_timetable
 
 TYPE_LABEL = {"ExternalTool": "강의", "Quiz": "퀴즈", "Assignment": "과제", "Discussion": "토론", "File": "파일"}
@@ -30,8 +29,7 @@ def week_items(course, week):
 
 
 def open_in_browser(url):
-    # WSL 에서 Windows 기본 브라우저로 연다 (이미 로그인된 세션 사용)
-    subprocess.run(["explorer.exe", url], check=False)
+    osutil.open_url(url)  # 평소 브라우저 (이미 로그인된 세션 사용)
 
 
 def main():

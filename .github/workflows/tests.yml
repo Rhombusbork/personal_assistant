@@ -1,0 +1,20 @@
+# 리눅스와 Windows 에서 같은 테스트를 돌린다 (Windows 컴퓨터 없이 Windows 문제를 잡기 위해)
+name: tests
+on:
+  push:
+    branches-ignore: [gh-pages, phone-inbox]
+  pull_request:
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q

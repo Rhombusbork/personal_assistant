@@ -61,7 +61,7 @@ def test_summary_job_writes_beside_material(conn, monkeypatch, tmp_path):
     jobs.enqueue(conn, "summary", str(pdf), "요약")
     jobs.run_next(conn)
     out = root / "materials" / "ethics" / "요약" / "강의_요약.md"
-    assert out.read_text().startswith("# 강의 요약") and jobs.recent(conn)[0]["status"] == "done"
+    assert out.read_text(encoding="utf-8").startswith("# 강의 요약") and jobs.recent(conn)[0]["status"] == "done"
     outside = tmp_path / "x.pdf"; outside.write_bytes(b"%PDF")
     jobs.enqueue(conn, "summary", str(outside), "요약2")
     jobs.run_next(conn)
@@ -77,6 +77,6 @@ def test_brief_and_blank_file(conn, tmp_path, monkeypatch):
     jobs.save_brief(conn, "a5", " 1쪽, 자연 상태 중심 ", False)
     assert jobs.brief(conn, "a5") == {"text": "1쪽, 자연 상태 중심", "blanks": False}
     p = jobs.blank_report(conn, "a5")
-    assert p.read_text().startswith("# 리바이어던 텍스트 제출") and "2024 홍길동" in p.read_text()
-    p.write_text(p.read_text() + "내가 쓴 문장\n")
-    assert jobs.blank_report(conn, "a5").read_text().endswith("내가 쓴 문장\n")  # 있는 파일은 건드리지 않음
+    assert p.read_text(encoding="utf-8").startswith("# 리바이어던 텍스트 제출") and "2024 홍길동" in p.read_text(encoding="utf-8")
+    p.write_text(p.read_text(encoding="utf-8") + "내가 쓴 문장\n", encoding="utf-8")
+    assert jobs.blank_report(conn, "a5").read_text(encoding="utf-8").endswith("내가 쓴 문장\n")  # 있는 파일은 건드리지 않음

@@ -30,7 +30,7 @@ def _context(p, headless):
     ctx = p.chromium.launch_persistent_context(str(PROFILE), headless=headless, accept_downloads=True,
                                                viewport={"width": 1280, "height": 900}, locale="ko-KR")
     if STATE.exists():
-        ctx.add_cookies(json.loads(STATE.read_text())["cookies"])
+        ctx.add_cookies(json.loads(STATE.read_text(encoding="utf-8"))["cookies"])
     return ctx
 
 

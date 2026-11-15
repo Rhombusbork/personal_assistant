@@ -68,7 +68,7 @@ def make(md_path):
     with sync_playwright() as p:
         b = p.chromium.launch()
         page = b.new_page()
-        page.set_content(to_html(src.read_text()))
+        page.set_content(to_html(src.read_text(encoding="utf-8")))
         page.pdf(path=str(out), format="A4", prefer_css_page_size=True)
         b.close()
     pages = len(re.findall(rb"/Type\s*/Page[^s]", out.read_bytes()))

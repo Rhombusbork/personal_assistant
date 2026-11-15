@@ -33,20 +33,19 @@ def get_service():
             creds.refresh(Request())
         except RefreshError as e:  # 'invalid_grant' — 로그인 만료 (테스트 앱은 7일)
             raise GoogleAuthError(AUTH_HELP) from e
-        TOKEN.write_text(creds.to_json())
+        TOKEN.write_text(creds.to_json(), encoding="utf-8")
     return build("calendar", "v3", credentials=creds)
 
 
 def login():
-    """사용자가 직접 실행: 브라우저(Windows)로 Google 로그인 → token.json 저장."""
-    import webbrowser
+    """사용자가 직접 실행: 평소 브라우저로 Google 로그인 → token.json 저장."""
+    from pa import osutil
     if not CREDENTIALS.exists():
         raise SystemExit(f"{CREDENTIALS} 가 없습니다. docs/google-calendar-setup.md 를 참고하세요.")
-    webbrowser.register("wsl-windows", None, webbrowser.GenericBrowser("explorer.exe"))
     flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS), SCOPES)
-    creds = flow.run_local_server(port=8080, open_browser=True, browser="wsl-windows", timeout_seconds=600,
+    creds = flow.run_local_server(port=8080, open_browser=True, browser=osutil.browser_name(), timeout_seconds=600,
                                   access_type="offline", prompt="consent")
-    TOKEN.write_text(creds.to_json())
+    TOKEN.write_text(creds.to_json(), encoding="utf-8")
     print("✅ Google 로그인 저장됨")
 
 

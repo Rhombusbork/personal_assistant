@@ -6,8 +6,9 @@ set -e
 cd "$(dirname "$0")/.."
 REPO=${PA_RELEASE_REPO:-https://github.com/Rhombusbork/personal_assistant_release.git}
 [ -z "$(git status --porcelain)" ] || { echo "커밋 안 된 변경이 있습니다 — 먼저 커밋하세요"; exit 1; }
-if git grep -qIi "neojun\|학번은 [0-9]" HEAD -- . ':!bin/release'; then
-  echo "개인 정보로 보이는 줄이 있어 멈춥니다:"; git grep -nIi "neojun\|학번은 [0-9]" HEAD -- . ':!bin/release'; exit 1
+PERSONAL='neojun|학번은 [0-9]|[0-9]{10}_'  # 아이디, 학번 문장, 학번_이름 파일명
+if git grep -qIiE "$PERSONAL" HEAD -- . ':!bin/release'; then
+  echo "개인 정보로 보이는 줄이 있어 멈춥니다:"; git grep -nIiE "$PERSONAL" HEAD -- . ':!bin/release'; exit 1
 fi
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 git archive HEAD | tar -x -C "$TMP"

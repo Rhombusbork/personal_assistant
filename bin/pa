@@ -1,3 +1,3 @@
 #!/bin/sh
-# 비서 명령: bin/pa <명령>  (bin/pa -h 로 도움말)
-cd "$(dirname "$0")/.." && exec .venv/bin/python -m pa "$@"
+# 비서 명령: bin/pa <명령>  (bin/pa -h 로 도움말). Windows 는 bin\pa.cmd
+cd "$(dirname "$0")/.." && PYTHONUTF8=1 exec .venv/bin/python -m pa "$@"

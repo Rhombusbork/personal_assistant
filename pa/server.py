@@ -12,7 +12,7 @@ POST /api/remove     inbox 할 일 삭제
 POST /api/quick      빠른 입력 한 줄 ('@내일 18시 ~2h #과목')
 POST /api/timer/start, /api/timer/stop   ⏱ 실제로 한 시간 기록 (stop 에 done=true 면 완료까지)
 POST /api/worklog/add, /api/worklog/delete  한 일 기록 (무엇을 · 몇 분 · 날짜) 추가·지우기
-POST /api/open       항목의 Canvas 페이지를 Windows 브라우저로 열기
+POST /api/open       항목의 Canvas 페이지를 평소 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
 GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일 이름·있는지 · 저장한 작성 지침
@@ -33,7 +33,7 @@ POST /api/job/summary 자료 PDF 요약 (Claude, 버튼으로만)
 POST /api/job/summary-for  강의·과제에 맞는 자료를 찾아 바로 요약 (이미 있으면 그 정리를 연다)
 POST /api/notice/read, /api/notice/open, /api/suggest/dismiss
 POST /api/today      💭 하고 싶은 일을 오늘 하기 (오늘 23:59 마감을 붙임)
-POST /api/open-quiz  퀴즈 앱을 Windows 브라우저로 열기
+POST /api/open-quiz  퀴즈 앱을 평소 브라우저로 열기
 POST /api/browser-login  LearningX 다시 로그인 창 열기
 
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
@@ -47,7 +47,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from pa import db, inbox, jobs, links, materials, render
+from pa import db, inbox, jobs, links, materials, osutil, render
 from pa.config import ROOT
 from pa.model import KST
 
@@ -55,6 +55,8 @@ PORT = 8765
 DASH = ROOT / "dashboard"
 ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}"}
 VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
+# 엔진이 다시 시작해도 로그인 창 프로세스는 남게
+_DETACH = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if osutil.IS_WINDOWS else {"start_new_session": True}
 
 
 def viewer_count(window=45):
@@ -80,6 +82,10 @@ def parse_add(body):
 class Handler(SimpleHTTPRequestHandler):
     on_change = None  # 입력 후 호출할 함수 (계획 다시 짜기)
     on_sync = None    # 전체 동기화 함수
+    # Windows 는 파일 형식을 레지스트리에서 읽어 .js 가 text/plain 이 되기도 한다 → 직접 정한다
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript; charset=utf-8",
+                      ".html": "text/html; charset=utf-8", ".svg": "image/svg+xml",
+                      ".webmanifest": "application/manifest+json", ".json": "application/json"}
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(DASH), **kw)
@@ -285,7 +291,7 @@ class Handler(SimpleHTTPRequestHandler):
                 row = conn.execute("SELECT url FROM tasks WHERE key = ?", (body["key"],)).fetchone()
                 if not row or not row["url"]:
                     raise ValueError("열 수 있는 링크가 없음")
-                subprocess.Popen(["explorer.exe", row["url"]])  # Windows 기본 브라우저 (학교 로그인 유지)
+                osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
                 return {"ok": True}
             if action == "/api/report-brief":
                 jobs.save_brief(conn, body["key"], body.get("text", ""), body.get("blanks", True))
@@ -343,9 +349,9 @@ class Handler(SimpleHTTPRequestHandler):
                 exams.dismiss(conn, body["id"])
                 return {"ok": True}
             if action == "/api/google-login":
-                subprocess.Popen([str(ROOT / "bin" / "pa"), "google-login"],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                return {"ok": True, "message": "Windows 브라우저에 Google 로그인 창이 열립니다 — 허용하면 끝 (10분 안에)"}
+                subprocess.Popen(osutil.pa_command("google-login"), cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 **_DETACH)
+                return {"ok": True, "message": "브라우저에 Google 로그인 창이 열립니다 — 허용하면 끝 (10분 안에)"}
             if action == "/api/ack":  # 알림 확인 (휴대폰 입력 실패·새 점수 등) — 이 시각 이전 것은 더 안 보여 줌
                 if not str(body["what"]).isidentifier():
                     raise ValueError("잘못된 확인 요청")
@@ -356,10 +362,10 @@ class Handler(SimpleHTTPRequestHandler):
                 from pa import quiz
                 if not quiz.cfg()["url"]:
                     return {"ok": False, "error": "config/courses.yaml 의 quiz.url 이 비어 있습니다"}
-                subprocess.Popen(["explorer.exe", quiz.cfg()["url"]])
+                osutil.open_url(quiz.cfg()["url"])
                 return {"ok": True}
             if action == "/api/browser-login":
-                subprocess.Popen([str(ROOT / "bin" / "pa"), "browser", "login"],
+                subprocess.Popen(osutil.pa_command("browser", "login"), cwd=ROOT,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return {"ok": True, "message": "로그인 창을 엽니다 — 로그인하면 저절로 닫힙니다"}
             if action == "/api/job/summary-for":
@@ -398,7 +404,7 @@ class Handler(SimpleHTTPRequestHandler):
             if action == "/api/notice/open":
                 row = conn.execute("SELECT url FROM notices WHERE id = ?", (str(body["id"]),)).fetchone()
                 if row and row["url"]:
-                    subprocess.Popen(["explorer.exe", row["url"]])
+                    osutil.open_url(row["url"])
                 return {"ok": True}
             if action == "/api/suggest/dismiss":
                 sugg = [x for x in json.loads(db.get_meta(conn, "notice_suggestions") or "[]") if x["key"] != body["key"]]

@@ -15,7 +15,7 @@ def roots(tmp_path, monkeypatch):
     notes.mkdir()
     for name in ("17강_배포용.pdf", "18강_배포용.pdf", "스크린샷 1.pdf", "a.png"):
         (mat / "organic_chemistry" / name).write_bytes(b"x")
-    (notes / "17강 정리.md").write_text("노트")
+    (notes / "17강 정리.md").write_text("노트", encoding="utf-8")
     c = {"roots": [{"name": "자료", "path": mat.resolve(), "ext": {".pdf", ".md"}},
                    {"name": "노트", "path": notes.resolve(), "ext": {".md"}}],
          "skip": ["스크린샷"], "downloads": {"recent_days": 7, "ext": {".pdf"}}, "max_links": 2}

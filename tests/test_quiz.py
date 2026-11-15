@@ -32,7 +32,7 @@ def env(tmp_path, monkeypatch):
 
 
 def write_backup(path, log, age_days=0):
-    path.write_text(json.dumps({"questionStats": {}, "sessions": [], "bookmarks": [], "answerLog": log}))
+    path.write_text(json.dumps({"questionStats": {}, "sessions": [], "bookmarks": [], "answerLog": log}), encoding="utf-8")
     t = time.time() - age_days * 86400
     os.utime(path, (t, t))
 

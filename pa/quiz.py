@@ -56,12 +56,12 @@ def _read_decks(base):
     out = {}
     for idx in ("index.json", "index-hidden.json"):
         try:
-            paths = json.loads((base / idx).read_text())["decks"]
+            paths = json.loads((base / idx).read_text(encoding="utf-8"))["decks"]
         except (OSError, ValueError, KeyError):
             continue
         for p in paths:
             try:
-                d = json.loads((base / p).read_text())
+                d = json.loads((base / p).read_text(encoding="utf-8"))
                 out[d["deckId"]] = {"subject": d.get("subject", ""), "title": d.get("title", d["deckId"])}
             except (OSError, ValueError, KeyError):
                 continue
@@ -70,7 +70,7 @@ def _read_decks(base):
 
 def import_backup(conn, path):
     """백업의 풀이 기록을 합친다. 같은 기록은 한 번만. 들어간 수 반환."""
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict) or not isinstance(data.get("answerLog"), list):
         raise ValueError("퀴즈 기록 백업 형식이 아님")
     conn.executescript(SCHEMA)

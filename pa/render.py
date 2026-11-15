@@ -117,7 +117,7 @@ def fmt_time(iso):
 
 
 def write(conn):
-    TODAY_PATH.write_text(today_md(conn))
+    TODAY_PATH.write_text(today_md(conn), encoding="utf-8")
     write_dashboard(conn)
 
 
@@ -357,4 +357,4 @@ def active_json(conn, by_key):
 def write_dashboard(conn):
     DASH_DATA.parent.mkdir(exist_ok=True)
     data = json.dumps(dashboard_data(conn), ensure_ascii=False, indent=1)
-    DASH_DATA.write_text(f"// 자동 생성 — 직접 고치지 마세요\nwindow.PA_DATA = {data};\n")
+    DASH_DATA.write_text(f"// 자동 생성 — 직접 고치지 마세요\nwindow.PA_DATA = {data};\n", encoding="utf-8")

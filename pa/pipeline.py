@@ -7,15 +7,12 @@ watch()    시작할 때 full 실행 후, inbox.md 가 저장될 때마다 빠�
            pa/*.py 가 바뀌면 스스로 다시 시작한다 (VSCode 를 다시 열 필요 없음).
            VSCode 작업 공간을 열면 자동으로 켜진다.
 """
-import fcntl
-import os
-import sys
 import threading
 import time
 import traceback
 from datetime import datetime
 
-from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, plan, quiz, render, server
+from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, osutil, plan, quiz, render, server
 from pa.canvas import CanvasAuthError
 from pa.config import ROOT
 from pa.gcal import GoogleAuthError, get_service
@@ -34,8 +31,8 @@ def log(msg):
     print(line, flush=True)
     try:  # 창 없이(작업 스케줄러) 돌 때도 남도록 파일에도. 1MB 넘으면 뒤쪽 절반만 남김
         if LOG_FILE.exists() and LOG_FILE.stat().st_size > 1_000_000:
-            LOG_FILE.write_text(LOG_FILE.read_text()[-500_000:])
-        with LOG_FILE.open("a") as f:
+            LOG_FILE.write_text(LOG_FILE.read_text(encoding="utf-8")[-500_000:], encoding="utf-8")
+        with LOG_FILE.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
     except OSError:
         pass
@@ -44,8 +41,8 @@ def log(msg):
 def run(full=False, force_plan=False):
     # 실행은 한 번에 하나만 (감시기·수동 실행·작업 스케줄러가 겹쳐도 캘린더에 중복으로 쓰지 않게)
     db.PATH.parent.mkdir(exist_ok=True)
-    with open(db.PATH.parent / "run.lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with open(db.PATH.parent / "run.lock", "a", encoding="utf-8") as lock:
+        osutil.lock(lock)
         _run(full, force_plan or full)
 
 
@@ -179,15 +176,14 @@ def _restart_if_code_changed(state):
     if busy:
         return  # 보고서 초안 등이 끝난 뒤에
     log("코드가 바뀌어 엔진을 새 코드로 다시 시작합니다")
-    os.execv(sys.executable, [sys.executable, "-m", "pa", "watch"])  # 잠금·서버는 새 프로세스가 다시 잡는다
+    osutil.restart_self(["watch"])  # 잠금·서버는 새 프로세스가 다시 잡는다
 
 
 def watch():
     # 감시기는 하나만 (VSCode 창을 여러 개 열어도 캘린더에 중복으로 쓰지 않게)
-    lock = open(db.PATH.parent / "watch.lock", "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
+    db.PATH.parent.mkdir(exist_ok=True)
+    lock = open(db.PATH.parent / "watch.lock", "a", encoding="utf-8")
+    if not osutil.lock(lock, wait=False):
         log("이미 다른 창에서 감시 중 — 이 창에서는 실행하지 않습니다.")
         return
 

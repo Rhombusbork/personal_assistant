@@ -50,7 +50,7 @@ def root_of(path, c=None):
     p = Path(path).resolve()
     for r in c["roots"]:
         try:
-            return r["name"], str(p.relative_to(r["path"]))
+            return r["name"], p.relative_to(r["path"]).as_posix()
         except ValueError:
             continue
     return None
@@ -76,7 +76,7 @@ def index(max_age=60):
                     st = full.stat()
                 except OSError:
                     continue
-                out.append({"p": str(full), "r": r["name"], "rel": str(full.relative_to(r["path"])),
+                out.append({"p": str(full), "r": r["name"], "rel": full.relative_to(r["path"]).as_posix(),
                             "m": int(st.st_mtime), "s": st.st_size})
     _index.update(at=time.time(), files=out)
     return out
@@ -117,9 +117,9 @@ def ls(root_name, rel=""):
             dirs.append({"name": e.name, "count": sum(1 for x in index() if x["p"].startswith(prefix))})
         elif e.suffix.lower() in r["ext"]:
             st = e.stat()
-            files.append({"name": e.name, "p": str(e), "r": root_name, "rel": str(e.relative_to(r["path"])),
+            files.append({"name": e.name, "p": str(e), "r": root_name, "rel": e.relative_to(r["path"]).as_posix(),
                           "m": int(st.st_mtime), "s": st.st_size})
-    return {"root": root_name, "path": "" if folder == r["path"] else str(folder.relative_to(r["path"])),
+    return {"root": root_name, "path": "" if folder == r["path"] else folder.relative_to(r["path"]).as_posix(),
             "dirs": dirs, "files": files}
 
 

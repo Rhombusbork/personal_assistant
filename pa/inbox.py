@@ -119,7 +119,7 @@ def read_sections():
     """inbox.md → {'todo': [(줄번호, 체크여부, 내용)], 'done': [...], 'ignore': [...]}"""
     out = {"todo": [], "done": [], "ignore": []}
     section, in_comment = "todo", False
-    for no, line in enumerate(PATH.read_text().splitlines(), 1):
+    for no, line in enumerate(PATH.read_text(encoding="utf-8").splitlines(), 1):
         # <!-- 주석 --> 안의 줄은 무시
         if in_comment or line.lstrip().startswith("<!--"):
             in_comment = "-->" not in line
@@ -166,7 +166,7 @@ def format_line(title, due=None, minutes=None, course="", every=None):
 
 def _insert(section, line):
     """section 맨 위(제목과 바로 아래 주석 다음)에 한 줄 넣는다. 섹션이 없으면 끝에 만든다."""
-    lines = PATH.read_text().splitlines() if PATH.exists() else TEMPLATE.splitlines()
+    lines = PATH.read_text(encoding="utf-8").splitlines() if PATH.exists() else TEMPLATE.splitlines()
     head = SECTION_HEAD[section]
     idx = next((i for i, l in enumerate(lines) if l.strip() == head), None)
     if idx is None:
@@ -177,7 +177,7 @@ def _insert(section, line):
             in_comment = "-->" not in lines[pos]
             pos += 1
         lines.insert(pos, line)
-    PATH.write_text("\n".join(lines) + "\n")
+    PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 RE_DUE_WORD = re.compile(r"@(오늘|내일|모레|[월화수목금토일])(?:요일)?(?:\s+(\d{1,2})(?::(\d{2})|시))?")
@@ -229,23 +229,23 @@ def _todo_line_index(lines, title):
 def mark_done(key):
     """inbox 할 일이면 체크, 그 밖(Canvas·반복 할 일)은 ## 완료 에 키를 적는다."""
     if key.startswith("i:") and "@" not in key:
-        lines = PATH.read_text().splitlines()
+        lines = PATH.read_text(encoding="utf-8").splitlines()
         i = _todo_line_index(lines, key[2:])
         if i is not None:
             lines[i] = re.sub(r"\[ \]", "[x]", lines[i], count=1)
-            PATH.write_text("\n".join(lines) + "\n")
+            PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
             return
     _insert("done", f"- {key}")
 
 
 def undone(conn, key):
     """완료 되돌리기 (대시보드 [되돌리기]): inbox 할 일이면 체크를 풀고, 그 밖은 ## 완료 의 그 줄을 지운 뒤 다시 '열림'으로."""
-    lines = PATH.read_text().splitlines()
+    lines = PATH.read_text(encoding="utf-8").splitlines()
     if key.startswith("i:") and "@" not in key:
         i = _todo_line_index(lines, key[2:])
         if i is not None and "[x]" in lines[i].lower():
             lines[i] = re.sub(r"\[[xX]\]", "[ ]", lines[i], count=1)
-            PATH.write_text("\n".join(lines) + "\n")
+            PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
     else:
         section = "todo"
         for i, line in enumerate(lines):
@@ -255,7 +255,7 @@ def undone(conn, key):
             m = RE_BULLET.match(line)
             if section == "done" and m and m.group(1).strip().strip("`") == key:
                 del lines[i]
-                PATH.write_text("\n".join(lines) + "\n")
+                PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
                 break
     db.set_status(conn, key, "open", "user")
     conn.commit()
@@ -282,7 +282,7 @@ def keep(key):
 
 def unignore(text):
     """## 제외 칸에서 그 줄을 지운다 (키든 단어든). 다음 반영 때 다시 나타난다."""
-    lines = PATH.read_text().splitlines()
+    lines = PATH.read_text(encoding="utf-8").splitlines()
     section, in_comment, hit = "todo", False, None
     for i, line in enumerate(lines):
         if in_comment or line.lstrip().startswith("<!--"):
@@ -298,7 +298,7 @@ def unignore(text):
     if hit is None:
         raise ValueError("제외 목록에 없는 항목")
     del lines[hit]
-    PATH.write_text("\n".join(lines) + "\n")
+    PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def excluded(conn):
@@ -317,23 +317,23 @@ def excluded(conn):
 
 def set_due(key, due):
     """기한 없는 inbox 할 일에 마감을 붙인다 (예: 💭 하고 싶은 일 → 오늘 하기)."""
-    lines = PATH.read_text().splitlines()
+    lines = PATH.read_text(encoding="utf-8").splitlines()
     i = _todo_line_index(lines, key[2:]) if key.startswith("i:") else None
     if i is None:
         raise ValueError("inbox 에 없는 항목")
     it = parse_line(RE_CHECK.match(lines[i]).group(2), now().date(), None)
     lines[i] = format_line(it["title"], due, it["minutes"], it["course"], None)
-    PATH.write_text("\n".join(lines) + "\n")
+    PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def remove(key):
     """inbox 에 직접 쓴 할 일 줄을 지운다."""
-    lines = PATH.read_text().splitlines()
+    lines = PATH.read_text(encoding="utf-8").splitlines()
     i = _todo_line_index(lines, key[2:]) if key.startswith("i:") else None
     if i is None:
         raise ValueError("inbox 에 없는 항목")
     del lines[i]
-    PATH.write_text("\n".join(lines) + "\n")
+    PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def match(conn, text, statuses):
@@ -350,7 +350,7 @@ def match(conn, text, statuses):
 def sync(conn):
     """inbox.md 를 읽어 저장소에 반영. 경고 문장 목록을 반환 (TODAY.md 에 표시)."""
     if not PATH.exists():
-        PATH.write_text(TEMPLATE)
+        PATH.write_text(TEMPLATE, encoding="utf-8")
     cfg = load_timetable()["planner"]
     today = now().date()
     horizon = today + timedelta(days=cfg["horizon_days"])

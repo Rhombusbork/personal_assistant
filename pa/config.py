@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def load_env():
     env = ROOT / ".env"
     if env.exists():
-        for line in env.read_text().splitlines():
+        for line in env.read_text(encoding="utf-8").splitlines():
             if "=" in line and not line.lstrip().startswith("#"):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
@@ -21,7 +21,7 @@ def load_yaml(name):
     p = ROOT / "config" / f"{name}.yaml"
     if not p.exists():
         p = ROOT / "config" / f"{name}.example.yaml"
-    return yaml.safe_load(p.read_text()) or {}
+    return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
 
 
 def load_timetable():

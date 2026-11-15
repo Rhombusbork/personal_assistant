@@ -6,6 +6,7 @@
       "detail": "작업 공간을 열면 자동 시작 — 대시보드 서버, inbox.md 저장 시 반영, 15분마다 계획, Canvas 3시간마다",
       "type": "shell",
       "command": "${workspaceFolder}/bin/pa watch",
+      "windows": { "command": "${workspaceFolder}\\bin\\pa.cmd", "args": ["watch"], "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
       "isBackground": true,
       "problemMatcher": [],
       "runOptions": {
@@ -37,6 +38,7 @@
       "label": "비서: 서버 대기",
       "type": "shell",
       "command": "${workspaceFolder}/bin/pa dashboard-check",
+      "windows": { "command": "${workspaceFolder}\\bin\\pa.cmd", "args": ["dashboard-check"], "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
       "problemMatcher": [],
       "presentation": {
         "reveal": "never",
@@ -50,6 +52,7 @@
       "detail": "Canvas 확인 → 과제 캘린더 → 계획 → TODAY.md·대시보드",
       "type": "shell",
       "command": "${workspaceFolder}/bin/pa run --full",
+      "windows": { "command": "${workspaceFolder}\\bin\\pa.cmd", "args": ["run", "--full"], "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",

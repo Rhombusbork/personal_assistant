@@ -1,4 +1,4 @@
-"""비서 명령 모음. 프로젝트 폴더에서 `bin/pa <명령>` 으로 실행한다.
+"""비서 명령 모음. 프로젝트 폴더에서 `bin/pa <명령>` 으로 실행한다 (Windows 는 `bin\\pa.cmd <명령>`).
 
   bin/pa watch                자동 감시 (VSCode 를 열면 자동 실행)
   bin/pa run [--full]         한 번 실행: inbox → (Canvas) → 계획 → TODAY.md
@@ -18,7 +18,7 @@
   bin/pa link <키> <파일>...  자료 연결 (config/materials.yaml 범위 안, 최대 max_links) / unlink 로 빼기
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
   bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
-  bin/pa google-login         Google Calendar 다시 로그인 (Windows 브라우저가 열림)
+  bin/pa google-login         Google Calendar 다시 로그인 (브라우저가 열림)
 """
 import argparse
 import sys
@@ -53,7 +53,7 @@ def cmd_watch(conn, args):
 
 def cmd_today(conn, args):
     render.write(conn)
-    print(render.TODAY_PATH.read_text())
+    print(render.TODAY_PATH.read_text(encoding="utf-8"))
 
 
 def cmd_dashboard_check(conn, args):
@@ -180,6 +180,9 @@ def cmd_time(conn, args):
 
 
 def main():
+    for s in (sys.stdout, sys.stderr):  # Windows 콘솔·파이프에서도 한글·이모지가 깨지지 않게
+        if s and hasattr(s, "reconfigure") and (s.encoding or "").lower().replace("-", "") != "utf8":
+            s.reconfigure(encoding="utf-8", errors="replace")
     if len(sys.argv) > 1 and sys.argv[1] == "google-login":
         from pa import gcal
         return gcal.login()

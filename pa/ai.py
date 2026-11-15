@@ -37,7 +37,7 @@ def ask(prompt, files=(), timeout=600, cwd=ROOT, add_dirs=()):
     cmd = [claude_bin(), "-p", prompt, "--output-format", "text", "--allowedTools", "Read"]
     for d in add_dirs:
         cmd += ["--add-dir", str(d)]
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, encoding="utf-8")
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "claude 호출 실패")
     return result.stdout.strip()

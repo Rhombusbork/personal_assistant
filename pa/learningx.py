@@ -28,7 +28,7 @@ class NeedLogin(Exception):
 def _token():
     if not STATE.exists():
         raise NeedLogin("브라우저 로그인 필요")
-    for c in json.loads(STATE.read_text())["cookies"]:
+    for c in json.loads(STATE.read_text(encoding="utf-8"))["cookies"]:
         if c["name"] == "xn_api_token" and "jejunu" in c["domain"]:
             return c["value"]
     return None

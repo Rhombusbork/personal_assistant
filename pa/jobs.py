@@ -81,10 +81,11 @@ def reset_stuck(conn):
 # ---- 보고서 ---------------------------------------------------------------
 
 def student():
-    """학번·이름은 report/CLAUDE.md 에서 읽는다 (규칙 파일이 한 곳에서 관리)."""
-    m = re.search(r"학번은\s*(\d+),\s*이름은\s*(\S+?)다", (REPORT_DIR / "CLAUDE.md").read_text())
+    """학번·이름은 report/CLAUDE.md 에서 읽는다 (규칙 파일이 한 곳에서 관리). 없으면 bin/setup 이 견본을 복사해 둔다."""
+    rules = REPORT_DIR / "CLAUDE.md"
+    m = rules.exists() and re.search(r"학번은\s*(\d+),\s*이름은\s*(\S+?)다", rules.read_text(encoding="utf-8"))
     if not m:
-        raise ValueError("report/CLAUDE.md 에서 학번·이름을 찾지 못함")
+        raise ValueError(f"{rules} 에서 학번·이름을 찾지 못함 — 0-1 절의 <학번>·<이름> 을 채우세요 (없으면 bin/setup)")
     return m.group(1), m.group(2)
 
 
@@ -165,7 +166,7 @@ def blank_report(conn, key):
         raise ValueError("할 일을 찾지 못함")
     path = report_path(dict(task), conn)
     if not path.exists():
-        path.write_text(_template(task))
+        path.write_text(_template(task), encoding="utf-8")
         db.set_meta(conn, "report_file:" + key, str(path))
         materials.reveal(path)  # 새 보고서 파일 → 탐색기에서 위치 보여 주기
         db.log(conn, "report_file_created", key, path=path.name)
@@ -202,7 +203,7 @@ def report_job(conn, job, force=False):
         _update(conn, job["id"], step="이미 있는 파일 열기")
         materials.open_file(path)
         return path
-    if path.exists() and path.read_text().strip() == _template(task).strip():  # 📝 로 만든 빈 파일이면 그냥 덮어씀
+    if path.exists() and path.read_text(encoding="utf-8").strip() == _template(task).strip():  # 📝 로 만든 빈 파일이면 그냥 덮어씀
         path.unlink()
     if path.exists():  # 새로 쓰기: 지금 파일은 _old 로 보관 (지우지 않음)
         n = 1
@@ -246,7 +247,7 @@ def report_job(conn, job, force=False):
     text = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", text.strip())
     if not text.startswith("#"):
         raise ValueError("초안 형식이 이상함: " + text[:120])
-    path.write_text(text + "\n")
+    path.write_text(text + "\n", encoding="utf-8")
 
     _update(conn, job["id"], step="5/5 열기")
     try:
@@ -333,7 +334,7 @@ def summary_job(conn, job):
     if not text.startswith("#"):
         raise ValueError("요약 형식이 이상함: " + text[:120])
     out.parent.mkdir(exist_ok=True)
-    out.write_text(text + "\n")
+    out.write_text(text + "\n", encoding="utf-8")
     try:
         materials.open_file(out)
     except Exception:
