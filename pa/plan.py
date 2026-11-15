@@ -173,6 +173,40 @@ def is_exam(t):
     return t.kind == "todo" and bool(RE_EXAM.search(t.title)) and "@복습" not in t.key and "복습" not in t.title
 
 
+def redo_days(conn):
+    """마감이 지난 일을 '언제 할지' {키: 'YYYY-MM-DD'} — 원래 마감은 그대로 두고(지남 표시), 계획만 그날에."""
+    return json.loads(db.get_meta(conn, "redo") or "{}")
+
+
+def set_redo(conn, key, day):
+    """day: 'YYYY-MM-DD' (오늘 이후) 또는 None(취소)."""
+    d = redo_days(conn)
+    today = now().date().isoformat()
+    d = {k: v for k, v in d.items() if v >= today}  # 지난 날짜는 정리 (그날 못 했으면 다시 '지남'으로)
+    if day:
+        if day < today:
+            raise ValueError("오늘 이후 날짜를 골라 주세요")
+        d[key] = day
+    else:
+        d.pop(key, None)
+    db.set_meta(conn, "redo", json.dumps(d))
+    db.log(conn, "redo", key, day=day)
+    conn.commit()
+
+
+def _apply_redo(tasks, redo, t_now):
+    """지난 마감 + '이날 하기' → 그날 23:59 까지로 계획 (그날이 내일 이후면 그날 0시부터)."""
+    out = []
+    for t in tasks:
+        day = redo.get(t.key)
+        if day and t.due <= t_now and day >= t_now.date().isoformat():
+            d = datetime.fromisoformat(day).replace(tzinfo=KST)
+            t = replace(t, due=d.replace(hour=23, minute=59),
+                        earliest=d if d.date() > t_now.date() else None)
+        out.append(t)
+    return out
+
+
 def signature(conn):
     """계획에 영향을 주는 것들의 지문 — 할 일·예상 시간·설정·날짜·⏱ 기록. 같으면 다시 계획할 필요가 없다."""
     import hashlib
@@ -181,7 +215,7 @@ def signature(conn):
     tt = load_timetable()
     ses = conn.execute("SELECT COUNT(*), COALESCE(SUM(minutes), 0) FROM sessions").fetchone()
     raw = json.dumps([[tuple(r) for r in rows], now().date().isoformat(), tt.get("planner"), tt.get("reminders"),
-                      tuple(ses)], sort_keys=True, default=str)
+                      tuple(ses), redo_days(conn)], sort_keys=True, default=str)
     return hashlib.sha1(raw.encode()).hexdigest()
 
 
@@ -210,7 +244,7 @@ def run(conn, service=None, write=True):
     cfg = load_timetable()["planner"]
     t_now = now()
     horizon = t_now + timedelta(days=cfg["horizon_days"])
-    items = [t for t in db.tasks(conn, "status = 'open' AND due IS NOT NULL")
+    items = [t for t in _apply_redo(db.tasks(conn, "status = 'open' AND due IS NOT NULL"), redo_days(conn), t_now)
              if t_now < t.due <= horizon and (t.earliest is None or t.earliest <= horizon) and not is_exam(t)]
     # 예상 시간: 직접 정한 값(time 명령)은 그대로, 아니면 ⏱ 기록으로 보정. 이미 한 시간은 뺀다.
     fs = calibrate.factors(conn)

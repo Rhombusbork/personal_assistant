@@ -202,6 +202,7 @@ def dashboard_data(conn):
         "links": _link_names(conn, {t.key for t in all_tasks if t.status == "open"}),
         "exams": _exam_suggestions(conn),
         "grades": new_grades(conn),
+        "redo": _redo(conn),
         "weekReview": week_review(conn, t_now),
         "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),
@@ -278,6 +279,11 @@ def semester_weeks(all_tasks, t_now):
                       "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
         d = nxt
     return weeks
+
+
+def _redo(conn):
+    from pa import plan
+    return plan.redo_days(conn)
 
 
 def new_grades(conn):

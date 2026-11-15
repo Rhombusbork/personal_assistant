@@ -186,6 +186,13 @@ def apply_entry(op):
         inbox.unignore(op["text"])
     elif kind == "remove":
         inbox.remove(op["key"])
+    elif kind == "redo":
+        from pa import plan
+        conn = db.connect()
+        try:
+            plan.set_redo(conn, op["key"], op.get("day") or None)
+        finally:
+            conn.close()
     elif kind == "today":
         inbox.set_due(op["key"], datetime.now(KST).replace(hour=23, minute=59, second=0, microsecond=0))
     else:

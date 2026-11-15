@@ -67,3 +67,19 @@ def test_popup_reminders():
     from pa.config import popup
     assert popup([1410, 150, 30])["overrides"] == [{"method": "popup", "minutes": m} for m in (1410, 150, 30)]
     assert popup(0)["overrides"] == [] and popup(10)["overrides"][0]["minutes"] == 10
+
+
+def test_overdue_task_planned_on_redo_day():
+    from datetime import datetime, timedelta
+
+    from pa.model import KST, Task
+    from pa.plan import _apply_redo
+    t_now = datetime(2026, 11, 16, 10, 0, tzinfo=KST)
+    late = Task(key="a1", kind="assignment", course="", title="리포트", due=t_now - timedelta(days=2), minutes=60)
+    other = Task(key="a2", kind="assignment", course="", title="다른", due=t_now + timedelta(days=1), minutes=60)
+    out = {t.key: t for t in _apply_redo([late, other], {"a1": "2026-11-18", "a2": "2026-11-20"}, t_now)}
+    assert out["a1"].due == datetime(2026, 11, 18, 23, 59, tzinfo=KST) and out["a1"].earliest == datetime(2026, 11, 18, tzinfo=KST)
+    assert out["a2"].due == other.due  # 마감이 안 지난 일은 그대로
+    today = {t.key: t for t in _apply_redo([late], {"a1": "2026-11-16"}, t_now)}
+    assert today["a1"].due.date().isoformat() == "2026-11-16" and today["a1"].earliest is None
+    assert _apply_redo([late], {"a1": "2026-11-15"}, t_now)[0].due == late.due  # 하기로 한 날이 지나면 다시 '지남'

@@ -476,7 +476,10 @@ const clip = t => { const n = links(t).length;
 const taskOf = findTask;
 
 // ---- 행동 정의: 종류마다 '주 행동' 하나, 나머지는 ⋯ 안으로
-const MOB_OK = new Set(["open", "done", "ignore", "remove"]);
+const MOB_OK = new Set(["open", "done", "ignore", "remove", "redo-today", "redo-day", "redo-clear"]);
+const redoOf = t => t && D.redo && D.redo[t.key];  // 마감이 지난 일을 하기로 한 날
+const redoTag = t => { const d = redoOf(t); if (!d) return ""; const n = between(ymdOf(new Date()), d);
+  return ` · <span class="plan-tag">${n === 0 ? "오늘 하기" : n === 1 ? "내일 하기" : label(d) + " 하기"}</span>`; };
 function primaryOf(t) {
   if (!t) return null;
   if (MOB) return t.url && t.kind !== "todo" ? { act: "open", label: t.kind === "assignment" ? "Canvas" : "▶ 열기", icon: "열기", name: "열기" }
@@ -488,7 +491,13 @@ function primaryOf(t) {
   return { act: "start", label: "⏱ 시작", icon: "시작", name: "시간 재기 시작" };
 }
 function menuItems(t) {
-  const P = primaryOf(t), isActive = D.active && D.active.key === t.key, g = [[], [], [], []];
+  const P = primaryOf(t), isActive = D.active && D.active.key === t.key, g = [[], [], [], []], late = [];
+  if (isLate(t)) {  // 마감이 지난 일: '지남' 표시는 그대로 두고, 할 날만 정한다
+    const today = ymdOf(new Date());
+    if (redoOf(t) !== today) late.push({ act: "redo-today", label: "오늘 하기", hint: "지남 표시는 그대로", strong: true });
+    late.push({ act: "redo-day", label: "다른 날로…", hint: redoOf(t) ? label(redoOf(t)) + " 예정" : "날짜 고르기" });
+    if (redoOf(t)) late.push({ act: "redo-clear", label: "하기 날짜 취소" });
+  }
   const openName = t.kind === "assignment" ? "Canvas 에서 열기" : t.kind === "lecture" ? "수업 접속" : t.kind === "review" || t.kind === "quiz" ? "퀴즈 풀기" : "열기";
   if (t.url && t.kind !== "todo") g[0].push({ act: "open", label: openName, strong: P.act === "open" });
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) g[0].push({ act: "report", label: "보고서 작성", hint: "설명·자료·지침", strong: P.act === "report" });
@@ -498,7 +507,8 @@ function menuItems(t) {
   g[2].push(isActive ? { act: "stop", label: "기록 멈춤" } : { act: "start", label: "시간 재기 시작", hint: "⏱" });
   g[2].push({ act: "done", label: t.kind === "lecture" ? "들었음" : "완료", hint: "✓" });
   g[3].push(t.source === "inbox" ? { act: "remove", label: "삭제…", hint: "확인 후", danger: true } : { act: "ignore", label: "제외…", hint: "조장만 제출 등", danger: true });
-  return MOB ? g.map(x => x.filter(y => MOB_OK.has(y.act))).filter(x => x.length) : g.filter(x => x.length);
+  const all = [late, ...g];
+  return MOB ? all.map(x => x.filter(y => MOB_OK.has(y.act))).filter(x => x.length) : all.filter(x => x.length);
 }
 const doneWord = t => t.kind === "lecture" ? "들었음" : "완료";
 const isLate = t => t && t.due && dt(t.due) < new Date() && t.status !== "done";
@@ -511,6 +521,9 @@ const rowActs = (t, withPrimary = true) => {
   return `<span class="ra">${withPrimary && P ? `<button class="tbtn" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}" title="${esc(P.name)} (Enter)">${esc(P.label)}</button>
     <button class="icon-btn pico" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}" aria-label="${esc(P.name)}: ${esc(t.title)}">${P.icon}</button>` : ""}${dots(t)}</span>`;
 };
+// 마감이 지난 줄: [오늘 하기] 를 늘 보이게 (휴대폰은 줄을 누르면 시트 맨 위에)
+const lateActs = t => `<span class="ra"><button class="tbtn" data-act="redo-today" data-key="${esc(t.key)}" title="오늘 계획에 넣기 — 마감 지남 표시는 그대로">오늘 하기</button>
+  <button class="icon-btn pico" data-act="redo-today" data-key="${esc(t.key)}" aria-label="오늘 하기: ${esc(t.title)}">오늘</button>${dots(t)}</span>`;
 const rowAttr = t => t ? ` tabindex="0" data-row="${esc(t.key)}"` : "";
 
 // ---- 데이터
@@ -560,7 +573,7 @@ function askPassword(msg) {
 async function phonePost(action, body) {
   if (action === "open-quiz") { window.open(D.quiz.url, "_blank"); return {}; }
   const toOp = { quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
-                 ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), keep: b => ({ op: "keep", key: b.key }), "exam-dismiss": b => ({ op: "exam-dismiss", id: b.id }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }) }[action];
+                 ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), keep: b => ({ op: "keep", key: b.key }), "exam-dismiss": b => ({ op: "exam-dismiss", id: b.id }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }), redo: b => ({ op: "redo", key: b.key, day: b.day || "" }) }[action];
   if (!toOp) throw new Error("이 기능은 PC 대시보드에서만 됩니다");
   const pw = ls.get("pa.pw");
   if (!pw) { location.reload(); throw new Error("비밀번호를 먼저 입력해 주세요"); }  // 비밀번호 없이 잠그면 PC 가 못 푼다
@@ -701,7 +714,7 @@ function todayView(now, today) {
     }
     h += `<div class="row${past}${cur}"${past ? "" : rowAttr(t)}>${tcol}${t ? ck(t) : `<span></span>`}<div class="body" title="${esc(r.why || "")}">
         <div class="ttl">${t ? esc(t.title) : esc(clean(r.summary))}${r.part ? ` <span class="clip">(${r.part})</span>` : ""}${clip(t)}</div>
-        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}</div>` : ""}</div>
+        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}${redoTag(t)}</div>` : ""}</div>
       ${t && !past ? rowActs(t) : "<span></span>"}</div>`;
   }
   if (dayEnd > cursor) h += gap(cursor, dayEnd);
@@ -882,10 +895,10 @@ function duesHtml(now, today) {
   const planned = t => D.plan.find(p => p.key === t.key && ymd(p.start) === today && dt(p.end) > now);
   const row = (t, lateRow) => { const pl = planned(t);
     return `<div class="row nt${lateRow ? " is-late" : ""}"${rowAttr(t)}>${ck(t)}<div class="body"><div class="ttl">${esc(t.title)}${clip(t)}</div>
-    <div class="meta">${lateRow ? `<span class="late">${label(ymd(t.due))} ${hm(t.due)} 지남</span>` : (dt(t.due) - now) < 864e5 ? `<span class="soon num">${hm(t.due)} · ${Math.max(1, Math.round((dt(t.due) - now) / 36e5))}시간 남음</span>` : `<span class="num">${hm(t.due)}</span>`}${t.course ? " · " + esc(t.course) : ""} · ${KIND[t.kind]}${pl ? ` · <span class="plan-tag">오늘 ${hm(pl.start)} 계획</span>` : ""}</div></div>${rowActs(t)}</div>`; };
+    <div class="meta">${lateRow ? `<span class="late">${label(ymd(t.due))} ${hm(t.due)} 지남</span>${redoTag(t)}` : (dt(t.due) - now) < 864e5 ? `<span class="soon num">${hm(t.due)} · ${Math.max(1, Math.round((dt(t.due) - now) / 36e5))}시간 남음</span>` : `<span class="num">${hm(t.due)}</span>`}${t.course ? " · " + esc(t.course) : ""} · ${KIND[t.kind]}${pl ? ` · <span class="plan-tag">오늘 ${hm(pl.start)} 계획</span>` : ""}</div></div>${lateRow && !redoOf(t) && (LIVE || MOB) ? lateActs(t) : rowActs(t)}</div>`; };
   let h = `<section class="sec"><div class="sec-h"><h2>다가오는 마감</h2><span class="aside">${UI.allDues ? "2주" : "앞으로 3일"}</span>
     <button class="link" data-ui="alldues" aria-expanded="${UI.allDues}">${UI.allDues ? "3일만 보기" : hidden ? `2주 보기 (+${hidden})` : "2주 보기"}</button></div><div class="rows">`;
-  if (late.length) h += `<div class="day-h danger" id="late">마감 지남 ${late.length} <span class="d">아직 안 끝남 — 끝냈으면 ○, 안 할 거면 ⋯ → 제외</span></div>` + late.map(t => row(t, true)).join("");
+  if (late.length) h += `<div class="day-h danger" id="late">마감 지남 ${late.length} <span class="d">끝냈으면 ○ · 아직이면 [오늘 하기] 또는 ⋯ → 다른 날로 · 안 할 거면 ⋯ → 제외</span></div>` + late.map(t => row(t, true)).join("");
   let any = false;
   for (let i = 0; i < span; i++) {
     const d = addDays(today, i), all = open.filter(t => ymd(t.due) === d), its = all.filter(t => t.key !== HERO_KEY);
@@ -1392,6 +1405,16 @@ async function quizCopy(key) {
 }
 
 
+function redoSheet(t) {
+  const today = ymdOf(new Date()), d = new Date();
+  const opts = [[0, "오늘"], [1, "내일"], [2, "모레"]];
+  for (const [wd, nm] of [[5, "이번 주 금"], [6, "토"], [0, "일"]]) { const n = (wd - d.getDay() + 7) % 7; if (n > 2) opts.push([n, nm]); }
+  openSheet(sheetTop("언제 할까요?", `${esc(t.title)} · <span class="late">마감 ${label(ymd(t.due))} ${hm(t.due)} 지남</span> — 지남 표시는 그대로 두고 그날 계획에 넣습니다`)
+    + `<div class="lchips" style="margin-top:16px">${opts.map(([n, nm]) => `<button class="chip" data-act="redo-set" data-key="${esc(t.key)}" data-day="${addDays(today, n)}">${nm} ${label(addDays(today, n))}</button>`).join("")}</div>
+    <div class="frow" style="margin-top:12px"><input class="field" type="date" id="redoDate" min="${today}" value="${redoOf(t) || addDays(today, 1)}">
+      <button class="btn primary" data-act="redo-set" data-key="${esc(t.key)}" data-from="redoDate">이날 하기</button></div>`);
+}
+
 // 오류 예방 (닐슨 5): 되돌리기 어려운 것만 확인 창. 기본 버튼은 '취소' 쪽에 포커스.
 function confirmSheet(title, body, okLabel, act, key) {
   openSheet(sheetTop(title) + `<p class="confirm-x">${body}</p>
@@ -1516,6 +1539,7 @@ document.addEventListener("click", async e => {
   if (act === "ignore") { ignoreMenu(key); return; }
   if (act === "ign-all") { closeMenu(false); confirmSheet("앞으로도 제외할까요?", `「${esc(t ? t.title : "")}」 과 <b>같은 이름</b>의 과제가 앞으로 새로 올라와도 계속 숨겨집니다. 아래 '제외한 것'에서 언제든 취소할 수 있습니다.`, "앞으로도 제외", "ign-all-ok", key); return; }
   if (act === "remove") { closeMenu(false); confirmSheet("이 할 일을 삭제할까요?", `「${esc(t ? t.title : "")}」 을(를) inbox.md 에서 지웁니다. 되돌릴 수 없습니다 — 끝낸 거라면 '완료'를 쓰세요.`, "삭제", "remove-ok", key); return; }
+  if (act === "redo-day" && t) { closeMenu(false); closeSheet(); redoSheet(t); return; }
   if (act === "relogin") {
     closeMenu(false);
     confirmSheet("강의 플랫폼에 다시 로그인할까요?", "비서용 로그인 창이 열립니다.<br><br>주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다. 그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.", "로그인 창 열기", "relogin-ok");
@@ -1527,6 +1551,12 @@ document.addEventListener("click", async e => {
   closeMenu(); closeSheet();
   if (act === "undo") { const f = toast.undo; toast.undo = null; $("toast").hidden = true; if (f) await run(f, "되돌렸습니다"); return; }
   if (!LIVE && !MOB) { toast("엔진이 꺼져 있어 보기만 됩니다 — VSCode 에서 '비서: 자동 감시'"); return; }
+  if (act === "redo-today" || act === "redo-set" || act === "redo-clear") {
+    const day = act === "redo-today" ? ymdOf(new Date()) : act === "redo-clear" ? "" : (b.dataset.from ? $(b.dataset.from)?.value : b.dataset.day);
+    if (act === "redo-set" && !day) { toast("날짜를 골라 주세요"); return; }
+    await run(() => post("redo", { key, day }), day ? `${day === ymdOf(new Date()) ? "오늘" : label(day)} 계획에 넣습니다 — 마감 지남 표시는 그대로` : "하기 날짜를 취소했습니다");
+    return;
+  }
   if (MOB && !["done", "ign-one", "ign-all-ok", "remove-ok", "open", "dotoday", "keep", "examadd", "examno", "unign", "ack", "gradeack", "clipnames", "openquiz", "mobset"].includes(act)) {
     toast("이 기능은 PC 대시보드에서만 됩니다"); return;
   }

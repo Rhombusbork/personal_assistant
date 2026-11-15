@@ -4,6 +4,7 @@ GET  /               대시보드 (dashboard/index.html)
 GET  /api/data       지금 시각 기준 대시보드 데이터 (요청마다 새로 계산). ?v=<id> 로 '열려 있음' 신호
 GET  /api/viewers    최근 45초 안에 신호를 보낸 대시보드 탭 수 (VSCode 가 중복으로 열지 않게)
 POST /api/add        할 일 추가 → inbox.md 에 한 줄
+POST /api/redo       마감이 지난 일을 오늘·다른 날 하기 {key, day:'YYYY-MM-DD'|''}
 POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료) / POST /api/undone 되돌리기
 POST /api/ignore     계속 제외 (## 제외). pattern=true 면 같은 이름의 앞으로 생길 과제도
 POST /api/unignore   제외 취소 (## 제외 의 그 줄을 지움)
@@ -170,6 +171,14 @@ class Handler(SimpleHTTPRequestHandler):
                     conn.close()
             elif action == "/api/ignore":
                 inbox.ignore(body["key"]); msg = "제외"
+            elif action == "/api/redo":  # 마감이 지난 일: 오늘·다른 날 하기 (원래 마감은 '지남'으로 남음). day 비우면 취소
+                from pa import plan
+                conn = db.connect()
+                try:
+                    plan.set_redo(conn, body["key"], body.get("day") or None)
+                    msg = f"{body['day']} 에 하기" if body.get("day") else "하기 날짜 취소"
+                finally:
+                    conn.close()
             elif action == "/api/undone":  # 완료 되돌리기
                 conn = db.connect()
                 try:

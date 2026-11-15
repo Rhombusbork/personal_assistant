@@ -217,6 +217,8 @@ def watch():
     run(full=not recent)
     last_full = time.time() if not recent else time.time() - (now() - parse_dt(last)).total_seconds()
     last_plan = last_phone = last_code = time.time()
+    login_file = db.PATH.parent / "browser-state.json"  # 강의 플랫폼 로그인 (사용자가 직접 할 때만 바뀜)
+    login_seen = login_file.stat().st_mtime if login_file.exists() else 0
     while True:
         time.sleep(POLL)
         if time.time() - last_code >= 5:
@@ -238,6 +240,12 @@ def watch():
             log("inbox.md 저장 감지")
             run(full=False)
             last_plan = time.time()
+        lm = login_file.stat().st_mtime if login_file.exists() else 0
+        if lm != login_seen and time.time() - lm > 5:  # 방금 다시 로그인함 → 바로 확인 (경고가 3시간 동안 남아 있지 않게)
+            login_seen = lm
+            log("강의 플랫폼 로그인 감지 — 바로 확인")
+            run(full=True)
+            last_full = last_plan = time.time()
         if time.time() - last_full >= CANVAS_EVERY:
             run(full=True)
             last_full = last_plan = time.time()
