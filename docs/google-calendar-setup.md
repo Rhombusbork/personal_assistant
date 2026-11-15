@@ -10,13 +10,15 @@
 
 ## 실행
 
+`bin/setup` (Windows 는 `bin\setup.cmd`) 을 한 번 실행한 뒤:
+
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m pa.sync_timetable --dry-run   # 미리보기
-python -m pa.sync_timetable             # 수업 시간표 동기화
-bin/pa run --full                       # 전체 동기화: Canvas → 계획 → 마감 캘린더(알림 포함)
+bin/pa sync-timetable --dry-run   # 미리보기
+bin/pa sync-timetable             # 수업 시간표 동기화
+bin/pa run --full                 # 전체 동기화: Canvas → 계획 → 마감 캘린더(알림 포함)
 ```
+
+Windows 에서는 `bin/pa` 대신 `bin\pa.cmd`.
 
 처음 실행 시 터미널에 출력되는 URL 을 브라우저에서 열어 로그인/허용하면
 `token.json` 이 생성되고 이후로는 자동 인증된다.

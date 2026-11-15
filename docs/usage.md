@@ -96,7 +96,10 @@ Windows 로그인할 때 + 매일 07:00·13:00·19:00 에 창 없이 `bin/pa run
 Windows PowerShell 에서 한 번만:
 
 ```powershell
+# 비서가 WSL 안에 있을 때
 powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\<리눅스 사용자>\personal_assistant\scripts\windows\register-task.ps1"
+# 비서가 Windows 폴더에 있을 때 (WSL 없이)
+powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windows\register-task.ps1"
 ```
 
 - 결과는 `data/pa.log`, 실패하면 대시보드·TODAY.md 에 "마지막 동기화 실패"
@@ -242,7 +245,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\<리눅스
 | `bin/pa plan [--dry-run]` | 계획만 다시 |
 | `bin/pa lectures [과목] [--open N]` | 이번 주 강의 목록·열기 |
 | `bin/pa browser login` | 학교 로그인 저장 (LearningX 연결) — 사용자가 직접 할 때만 |
-| `bin/pa google-login` | Google Calendar 다시 로그인 (Windows 브라우저가 열림) |
+| `bin/pa google-login` | Google Calendar 다시 로그인 (브라우저가 열림) |
 
 VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기화` 로도 실행할 수 있다.
 

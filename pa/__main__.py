@@ -19,6 +19,7 @@
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
   bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
   bin/pa google-login         Google Calendar 다시 로그인 (브라우저가 열림)
+  bin/pa sync-timetable [--dry-run]   config/timetable.yaml 의 수업 시간표 → '수업 시간표' 캘린더 (학기 초 한 번)
 """
 import argparse
 import sys
@@ -200,6 +201,10 @@ def main():
         from pa import lectures
         sys.argv = [sys.argv[0]] + sys.argv[2:]
         return lectures.main()
+    if len(sys.argv) > 1 and sys.argv[1] == "sync-timetable":
+        from pa import sync_timetable
+        sys.argv = [sys.argv[0]] + sys.argv[2:]
+        return sync_timetable.main()
 
     p = argparse.ArgumentParser(prog="pa", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -224,6 +229,7 @@ def main():
     sp.add_argument("minutes", type=int)
     sp.set_defaults(fn=cmd_time)
     sub.add_parser("lectures", help="이번 주 강의 목록·열기")
+    sub.add_parser("sync-timetable", help="수업 시간표 → Google 캘린더 (--dry-run)")
     sp = sub.add_parser("notices")
     sp.add_argument("--all", action="store_true")
     sp.set_defaults(fn=cmd_notices)

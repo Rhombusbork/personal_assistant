@@ -5,14 +5,27 @@
 
 ## 처음 설치하기 (다른 사람이 받아 쓸 때)
 
-**필요한 것**: Linux 또는 WSL2(Ubuntu), Python 3.10+, git, 제주대 Canvas 계정, Google 계정.
-선택: [Claude Code](https://claude.com/claude-code) (보고서 초안·자료 요약·채팅 비서), VSCode.
+**필요한 것**: Python 3.10+, git, VSCode, 제주대 Canvas 계정, Google 계정.
+컴퓨터는 **Windows 그대로**, **WSL2(Ubuntu)**, **리눅스** 중 아무거나 된다 (Mac 은 시험하지 않음).
+선택: [Claude Code](https://claude.com/claude-code) (보고서 초안·자료 요약·채팅 비서).
+
+**Windows** (PowerShell 또는 명령 프롬프트, [Python](https://www.python.org/downloads/)·[Git](https://git-scm.com/download/win) 먼저 설치):
+
+```powershell
+git clone https://github.com/Rhombusbork/personal_assistant_release.git $HOME\personal_assistant
+cd $HOME\personal_assistant
+bin\setup.cmd     # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남은 일을 알려 줌
+```
+
+**WSL2·리눅스**:
 
 ```bash
 git clone https://github.com/Rhombusbork/personal_assistant_release.git ~/personal_assistant
 cd ~/personal_assistant
 bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남은 일을 알려 줌
 ```
+
+> 아래 명령의 `bin/pa` 는 Windows 에서 `bin\pa.cmd` 로 쓴다 (예: `bin\pa.cmd run --full`).
 
 받은 저장소에는 **개인 정보가 하나도 없다**. 설정은 모두 견본(`config/*.example.*`)이고, `bin/setup` 이 이를 내 파일로 복사한다.
 내 파일(`.env`, `config/*.yaml`, `config/profile.md`, `credentials.json`, `token.json`, `data/`)은 git 에 올라가지 않는다.
@@ -30,6 +43,7 @@ bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남�
 - `config/timetable.yaml`: 학기 날짜, 대면 수업 시간표, 온라인 수업(Canvas 과목명), 공부 요일·시간·알림
 - `config/courses.yaml`: 과목명 → 자료 폴더 이름 (`~/study_system/materials/<폴더>`)
 - `config/profile.md`: 나는 누구인지, 과목 대응표, 내 백업 저장소 (Claude Code 가 읽음)
+- `~/report/CLAUDE.md`: 보고서 글쓰기 규칙 (setup 이 견본을 복사) — 0-1 절의 `<학번>`·`<이름>` 을 내 것으로
 - Claude Code 를 쓰면 채팅에서 "규칙 바꿔줘"(`rules`)로 해도 된다
 
 ### 원래 저장소와 분리
@@ -43,7 +57,7 @@ bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남�
 ### 실행
 
 ```bash
-python -m pa.sync_timetable   # (.venv 안에서) 수업 시간표를 Google 캘린더에 한 번 넣기
+bin/pa sync-timetable        # 수업 시간표를 Google 캘린더에 한 번 넣기
 bin/pa run --full             # Canvas → 계획 → 마감 캘린더. 처음엔 Google 로그인 창 주소가 뜸
 bin/pa watch                  # 엔진 + 대시보드 http://localhost:8765 (켜 두면 자동 갱신)
 ```
@@ -56,6 +70,7 @@ VSCode 에서 `assistant.code-workspace` 를 열면 엔진과 대시보드가 �
 - 강의 자료 자동 받기는 `bin/pa browser login` 으로 학교 로그인을 한 번 저장해야 된다.
 - 공부 노트·보고서·퀴즈 연동은 `~/study_system`, `~/report`, `~/quiz_system_project/pharmacy` 폴더를 쓴다. 없으면 그 기능만 비어 있다.
 - 내 파일은 절대 공유하지 않는다 (`.env`, `credentials.json`, `token.json`, `data/`).
+- 휴대폰 화면·휴대폰 입력은 `git` 명령을 쓴다 (Windows 는 Git for Windows 설치).
 - 업데이트: `git pull`. 내 설정은 git 밖에 있어서 덮어쓰이지 않는다. 견본에 새 항목이 생기면 `config/*.example.yaml` 과 비교해 옮긴다.
 
 ---
