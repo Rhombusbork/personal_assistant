@@ -8,7 +8,9 @@ import os
 import re
 from pathlib import Path
 
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path("~/quiz_system_project/.tools/pw").expanduser()))
+_PW = os.path.expanduser("~/quiz_system_project/.tools/pw")  # 퀴즈 프로젝트의 브라우저를 같이 씀 (없으면 기본 위치)
+if os.path.isdir(_PW):
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", _PW)
 
 SUB = str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")
 CSS = """@page { size: A4; margin: 13mm 15mm; }

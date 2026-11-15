@@ -20,7 +20,9 @@ PROFILE = ROOT / "data" / "browser-profile"
 STATE = ROOT / "data" / "browser-state.json"  # 세션 쿠키까지 (창을 닫으면 브라우저가 버리는 학교 로그인 쿠키)
 PROBE_DIR = ROOT / "data" / "probe"
 BASE = "https://canvas.jejunu.ac.kr"
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(os.path.expanduser("~/quiz_system_project/.tools/pw")))
+_PW = os.path.expanduser("~/quiz_system_project/.tools/pw")  # 퀴즈 프로젝트의 브라우저를 같이 씀 (없으면 기본 위치)
+if os.path.isdir(_PW):
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", _PW)
 
 
 def _context(p, headless):

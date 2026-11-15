@@ -35,6 +35,12 @@ def cfg():
     return yaml.safe_load((ROOT / "config" / "mobile.yaml").read_text())
 
 
+def enabled():
+    """휴대폰 기능은 .env 에 PA_MOBILE_PASSWORD 가 있을 때만 (처음 받은 사람은 꺼진 채로 시작)."""
+    load_env()
+    return bool(os.environ.get("PA_MOBILE_PASSWORD"))
+
+
 def password():
     load_env()
     pw = os.environ.get("PA_MOBILE_PASSWORD")
@@ -86,6 +92,8 @@ def build():
 
 def publish(force=False):
     """바뀐 게 있고 최소 간격이 지났으면 gh-pages 로 올린다. 올렸으면 True."""
+    if not enabled():
+        return False
     c = cfg()
     conn = db.connect()
     try:
@@ -186,6 +194,8 @@ def apply_entry(op):
 
 def pull_phone_inbox():
     """새 휴대폰 입력을 반영. 반영한 수 반환. (처리한 id 는 기억해서 두 번 하지 않는다)"""
+    if not enabled():
+        return 0
     entries = fetch_phone_entries()
     if not entries:
         return 0
