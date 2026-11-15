@@ -36,6 +36,7 @@
   .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; margin-top: 14px; }
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   .stack { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  .stack > div:empty { display: none; }  /* 비어 있는 칸이 간격만 차지해 오른쪽이 밀려 내려가지 않게 */
   .warn { background: color-mix(in srgb, var(--warn) 12%, var(--card)); border-color: var(--warn); margin-top: 12px; }
   .warn ul { margin: 0; padding-left: 18px; }
 
@@ -226,7 +227,8 @@
   .clip { font-size: 11px; color: var(--muted); margin-left: 4px; cursor: pointer; white-space: nowrap; }
   .clip:hover { color: var(--accent); }
   .mat kbd, .mat code { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-  .dl select { font-size: 12px; padding: 1px 4px; }
+  .dl select { font-size: 12px; padding: 1px 4px; max-width: 96px; }
+  .item .txt { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
