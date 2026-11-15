@@ -1,40 +1,17 @@
-# 수업 시간표 (매주 반복)
-# 2026학년도 2학기 (제주대 학사일정: 9/1 개강, 12/21 종강)
+# 수업 시간표 (매주 반복) — 견본. bin/setup 이 config/timetable.yaml 로 복사한다 (내 파일은 git 에 안 올라감).
+# 학기 시작·끝 (학사일정 보고 바꾸기)
 semester_start: "2026-09-01"
 semester_end: "2026-12-21"
 
+# 대면 수업: day 는 mon tue wed thu fri sat sun
 classes:
-  - name: 유기반응메커니즘
+  - name: 예시과목
     day: mon
     start: "09:00"
-    end: "10:00"
-  - name: 생화학
-    day: mon
-    start: "10:30"
-    end: "11:45"
-  - name: 물리약학
-    day: mon
-    start: "13:30"
-    end: "14:45"
-  - name: 생화학
-    day: wed
-    start: "10:30"
-    end: "11:45"
-  - name: 물리약학
-    day: wed
-    start: "13:30"
-    end: "14:45"
-  - name: 약학실습
-    day: thu
-    start: "15:00"
-    end: "18:00"
+    end: "10:15"
 
-# 온라인 수업 (Canvas에서 수강, 시간 고정 없음 → 정기 할 일로 관리)
-online_classes:
-  - 의약품분석학Ⅱ
-  - 생약학Ⅰ
-  - 유기약화학Ⅱ
-  - 약학윤리학
+# 온라인 수업 (Canvas 과목명과 같게, 시간 고정 없음 → 정기 할 일로 관리)
+online_classes: []
 
 # 학습 계획 설정
 planner:

@@ -1,4 +1,4 @@
-"""휴대폰 보기 (GitHub Pages): https://rhombusbork.github.io/personal_assistant/
+"""휴대폰 보기 (GitHub Pages): config/mobile.yaml 의 pages_url
 
 - gh-pages 브랜치: 대시보드 화면 + 비밀번호로 잠근 데이터(data.enc.json). 올릴 때마다 이력 없이 덮어쓴다.
 - phone-inbox 브랜치: 휴대폰에서 한 입력(추가·완료·제외·오늘 하기)도 잠가서 phone-inbox.json 에 쌓인다.
@@ -17,13 +17,12 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import yaml
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from pa import db, inbox, render
-from pa.config import ROOT, load_env
+from pa.config import ROOT, load_env, load_yaml
 from pa.model import KST, now
 
 ITER = 200_000
@@ -32,13 +31,14 @@ SITE_FILES = ["index.html", "manifest.webmanifest", "icon.svg"]
 
 
 def cfg():
-    return yaml.safe_load((ROOT / "config" / "mobile.yaml").read_text())
+    return load_yaml("mobile")
 
 
 def enabled():
-    """휴대폰 기능은 .env 에 PA_MOBILE_PASSWORD 가 있을 때만 (처음 받은 사람은 꺼진 채로 시작)."""
+    """휴대폰 기능은 config/mobile.yaml 에 내 저장소(repo)를 적고 .env 에 PA_MOBILE_PASSWORD 가 있을 때만.
+    견본은 repo 가 비어 있어, 받은 사람은 꺼진 채로 시작하고 남의 저장소에 올리거나 읽지 않는다."""
     load_env()
-    return bool(os.environ.get("PA_MOBILE_PASSWORD"))
+    return bool(cfg().get("repo")) and bool(os.environ.get("PA_MOBILE_PASSWORD"))
 
 
 def password():

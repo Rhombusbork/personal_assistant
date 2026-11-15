@@ -1,0 +1,8 @@
+# 휴대폰 보기 (GitHub Pages) — 견본. bin/setup 이 config/mobile.yaml 로 복사한다 (내 파일은 git 에 안 올라감).
+# 기본은 꺼짐. 켜려면: 내 GitHub 에 public 저장소를 하나 만들고 아래 두 줄을 채운 뒤 .env 에 PA_MOBILE_PASSWORD.
+# 반드시 '내' 저장소를 적는다 — 엔진이 이 저장소의 gh-pages·phone-inbox 브랜치에 쓴다.
+repo: ""                                    # 예: myname/my_assistant
+pages_url: ""                               # 예: https://myname.github.io/my_assistant/
+inbox_branch: phone-inbox
+inbox_file: phone-inbox.json
+min_interval_minutes: 10                    # 이보다 자주 올리지 않음

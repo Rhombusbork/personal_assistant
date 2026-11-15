@@ -13,10 +13,9 @@ import re
 import time
 from pathlib import Path
 
-import yaml
 
 from pa import db, materials
-from pa.config import ROOT
+from pa.config import ROOT, load_yaml
 from pa.model import now
 
 SCHEMA = """
@@ -33,7 +32,7 @@ _index = {"at": 0.0, "files": None}
 
 
 def cfg():
-    c = yaml.safe_load((ROOT / "config" / "materials.yaml").read_text())
+    c = load_yaml("materials")
     for r in c["roots"]:
         r["path"] = Path(os.path.expanduser(r["path"])).resolve()
         r["ext"] = {"." + e.lower().lstrip(".") for e in r["ext"]}

@@ -90,7 +90,7 @@ Windows 로그인할 때 + 매일 07:00·13:00·19:00 에 창 없이 `bin/pa run
 Windows PowerShell 에서 한 번만:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007\personal_assistant\scripts\windows\register-task.ps1"
+powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\<리눅스 사용자>\personal_assistant\scripts\windows\register-task.ps1"
 ```
 
 - 결과는 `data/pa.log`, 실패하면 대시보드·TODAY.md 에 "마지막 동기화 실패"
@@ -121,7 +121,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 
 ## 휴대폰에서 보기·입력 (GitHub Pages)
 
-주소: **https://rhombusbork.github.io/personal_assistant/** (홈 화면에 추가하면 앱처럼 열림)
+주소: `config/mobile.yaml` 의 `pages_url` (홈 화면에 추가하면 앱처럼 열림)
 
 - PC 엔진이 바뀐 내용을 **최대 10분마다** 올린다 (바뀐 게 없으면 1시간에 한 번). 작업 스케줄러로도 하루 3번.
 - 데이터는 **비밀번호로 잠겨** 올라간다. 비밀번호는 `.env` 의 `PA_MOBILE_PASSWORD` (바꾸면 다음 올릴 때부터 새 비밀번호, 휴대폰에서 다시 입력)
@@ -147,7 +147,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 ### 휴대폰 홈 화면에 앱처럼 두기 (처음 한 번)
 
 **Android (Chrome)**
-1. Chrome 으로 https://rhombusbork.github.io/personal_assistant/ 를 연다
+1. Chrome 으로 휴대폰 화면 주소(`pages_url`)를 연다
 2. 오른쪽 위 ⋮ → **홈 화면에 추가** (또는 "앱 설치") → 추가
 3. 홈 화면의 **비서** 아이콘으로 열면 주소창 없이 앱처럼 열린다
 
@@ -180,7 +180,7 @@ powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007
 
 ## 퀴즈 복습 (R11 — 퀴즈 앱은 고치지 않음)
 
-1. 퀴즈 앱(https://rhombusbork.github.io/Pharmacy/) 첫 화면의 **[기록 내보내기]** → 다운로드 폴더에 `quizapp-backup-날짜.json`
+1. 퀴즈 앱(`config/courses.yaml` 의 `quiz.url`) 첫 화면의 **[기록 내보내기]** → 다운로드 폴더에 `quizapp-backup-날짜.json`
 2. 비서가 가장 새 파일을 자동으로 읽는다 (파일은 옮기지 않음)
 3. 문제마다 간격 반복 — 틀리면 다음 날, 연속으로 맞힐수록 1·3·7·14·30일 뒤
 4. 복습할 문제가 있는 덱마다 **🔁 퀴즈 복습: 덱 이름 (n문제, 틀린 m)** 이 계획에 들어간다 → [▶ 퀴즈 풀기]

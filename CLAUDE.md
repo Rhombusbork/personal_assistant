@@ -2,7 +2,11 @@
 
 이 폴더는 사용자의 개인 비서 허브다. Claude Code 채팅창에서 비서로 동작하며,
 일정·할 일을 관리하고 공부·보고서·퀴즈 작업을 각 프로젝트의 규칙대로 연결한다.
-대화는 한국어로, 쉽게 한다. 사용자는 제주대 약학과 학생이다.
+대화는 한국어로, 쉽게 한다.
+
+사용자 소개·과목 대응표·내 저장소는 `config/profile.md` 에 있다 (git 제외, 견본은 `config/profile.example.md`):
+
+@config/profile.md
 
 ## 연결된 프로젝트 (작업 전 해당 CLAUDE.md 를 반드시 먼저 읽는다)
 
@@ -14,17 +18,6 @@
 
 - 각 프로젝트의 규칙이 이 파일보다 우선한다. 그 프로젝트의 git 규칙(커밋·push 여부)도 그대로 따른다.
 - 강의 자료는 `~/study_system/materials/<영문 과목명>/` 에 모은다 (git 제외).
-
-## 과목 대응표
-
-| Canvas 과목 | study_system notes | materials |
-|---|---|---|
-| 생약학Ⅰ | 생약학 | pharmacognosy |
-| 의약품분석학Ⅱ | 의약품분석학 | analytical_chemistry |
-| 유기약화학Ⅱ | 유기약화학 | organic_chemistry |
-| 약학윤리학 | 약학윤리 | ethics |
-| 약품생화학Ⅰ | 생화학 | biochemistry |
-| 물리약학Ⅱ | 물리약학 | physical_pharmacy |
 
 ## 비서 도구 (자세한 건 docs/usage.md)
 
@@ -60,7 +53,8 @@
 
 ## git
 
-- 코드 백업: `origin` (https://github.com/Rhombusbork/personal_assistant, public) 의 `main` 브랜치. 커밋한 뒤 `git push` 한다.
+- 커밋·push 여부와 내 저장소는 `config/profile.md` 의 '내 저장소'를 따른다. 적혀 있지 않으면 커밋만 하고 push 는 묻는다.
+- 개인 파일(`config/*.yaml`, `config/profile.md`, `.env`, `data/` 등)은 git 에 넣지 않는다. 설정 견본(`*.example.*`)에는 개인 정보를 넣지 않는다.
 - `gh-pages`(휴대폰 화면)·`phone-inbox`(휴대폰 입력) 브랜치는 엔진(`pa/mobile.py`)이 관리한다. 손으로 고치지 않는다.
 
 ## 원칙

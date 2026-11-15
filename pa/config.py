@@ -16,8 +16,16 @@ def load_env():
                 os.environ.setdefault(k.strip(), v.strip())
 
 
+def load_yaml(name):
+    """config/<name>.yaml (내 설정, git 제외). 아직 없으면 저장소의 견본 config/<name>.example.yaml."""
+    p = ROOT / "config" / f"{name}.yaml"
+    if not p.exists():
+        p = ROOT / "config" / f"{name}.example.yaml"
+    return yaml.safe_load(p.read_text()) or {}
+
+
 def load_timetable():
-    return yaml.safe_load((ROOT / "config" / "timetable.yaml").read_text())
+    return load_yaml("timetable")
 
 
 def reminders():

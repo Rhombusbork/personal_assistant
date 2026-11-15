@@ -12,10 +12,9 @@ import os
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
-import yaml
 
 from pa import db, materials
-from pa.config import ROOT
+from pa.config import ROOT, load_yaml
 from pa.model import KST, now, parse_dt
 
 INTERVALS = [1, 3, 7, 14, 30]  # 연속 정답 1·2·3·4·5회 이상 → 다음 복습까지 날짜
@@ -29,9 +28,9 @@ CREATE TABLE IF NOT EXISTS quiz_log (qid TEXT NOT NULL, correct INTEGER NOT NULL
 
 
 def cfg():
-    c = yaml.safe_load((ROOT / "config" / "courses.yaml").read_text()).get("quiz", {})
+    c = load_yaml("courses").get("quiz") or {}
     return {"dir": Path(os.path.expanduser(c.get("dir", "~/quiz_system_project/pharmacy"))),
-            "url": c.get("url", "https://rhombusbork.github.io/Pharmacy/")}
+            "url": c.get("url", "")}
 
 
 def latest_backup():

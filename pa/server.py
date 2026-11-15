@@ -336,6 +336,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return {"ok": True}
             if action == "/api/open-quiz":
                 from pa import quiz
+                if not quiz.cfg()["url"]:
+                    return {"ok": False, "error": "config/courses.yaml 의 quiz.url 이 비어 있습니다"}
                 subprocess.Popen(["explorer.exe", quiz.cfg()["url"]])
                 return {"ok": True}
             if action == "/api/browser-login":

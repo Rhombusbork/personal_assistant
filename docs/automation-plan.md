@@ -279,7 +279,7 @@ Windows 작업 스케줄러는 `wsl.exe` 를 불러 **WSL 을 깨워서** 실행
 ### 설계
 | 항목 | 값 |
 |---|---|
-| 실행 내용 | `wsl.exe -d Ubuntu -u neojun6007 -- /home/neojun6007/personal_assistant/bin/pa run --full` (이미 있는 명령) |
+| 실행 내용 | `wsl.exe -d Ubuntu -- bash -lc "~/personal_assistant/bin/pa run --full"` (이미 있는 명령) |
 | 언제 | ① 로그인할 때 ② 매일 07:00 · 13:00 · 19:00 |
 | 놓친 경우 | "예약된 시작 시간을 놓친 경우 가능한 빨리 실행" 켜기 (노트북이 꺼져 있었을 때) |
 | 제한 | 10분 넘게 걸리면 중지 / 사용자가 로그온한 경우에만 실행 (WSL 은 사용자 세션 필요) |

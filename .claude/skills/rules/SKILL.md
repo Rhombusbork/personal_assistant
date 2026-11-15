@@ -7,7 +7,7 @@ description: 비서의 규칙(계획 요일·하루 최대 시간·알림·시�
 
 1. 무엇을 바꾸려는지 확인하고, 고치기 전에 "지금 값 → 새 값, 그러면 달라지는 것"을 보여 주고 동의를 받는다.
 2. 아래 파일을 고친 뒤 `bin/pa run` (계획·캘린더에 반영. 알림은 다음 동기화 때 모든 일정에 다시 적용됨).
-3. 이 저장소의 파일을 바꿨으면 커밋하고 push 한다 (루트 CLAUDE.md 의 git 규칙).
+3. `config/*.yaml`·`config/profile.md` 는 내 컴퓨터에만 있는 파일이라 커밋하지 않는다. 코드(`pa/`)를 바꿨을 때만 루트 CLAUDE.md 의 git 규칙대로 커밋한다.
 
 | 바꾸고 싶은 것 | 파일 · 항목 |
 |---|---|
@@ -17,7 +17,7 @@ description: 비서의 규칙(계획 요일·하루 최대 시간·알림·시�
 | 저녁 마무리 시각 | `config/timetable.yaml` → `planner.evening_review` |
 | 알림 (계획 몇 분 전, 마감 하루·3시간·1시간 전) | `config/timetable.yaml` → `reminders` |
 | 수업 시간표·학기 시작·끝, 온라인 수업 과목 | `config/timetable.yaml` → `classes`, `semester_*`, `online_classes` |
-| Canvas 과목 ↔ 폴더 (materials·notes) | `config/courses.yaml` (루트 CLAUDE.md 의 과목 대응표도 함께) |
+| Canvas 과목 ↔ 폴더 (materials·notes) | `config/courses.yaml` (config/profile.md 의 과목 대응표도 함께) |
 | 자료 찾기 범위·확장자·빼는 단어, 연결 최대 개수, 다운로드 며칠 | `config/materials.yaml` |
 | 계속 제외할 과제 (이것만 / 같은 이름 앞으로도 / 예외 `!키`) | `inbox.md` → `## 제외` |
 | 휴대폰 화면 (저장소·브랜치) | `config/mobile.yaml` · 비밀번호는 `.env` 의 `PA_MOBILE_PASSWORD` (출력하지 않음) |

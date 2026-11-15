@@ -1,0 +1,12 @@
+# 과목 대응표 — 견본. bin/setup 이 config/courses.yaml 로 복사한다 (내 파일은 git 에 안 올라감).
+# Canvas 과목명(또는 inbox #분류)에 match 가 들어 있으면 그 폴더를 쓴다. 위에서부터 먼저 맞는 것을 쓴다.
+root: ~/study_system
+courses:
+  - match: [예시과목]
+    materials: example_course       # ~/study_system/materials/<이 이름>/  (강의 자료)
+    notes: 예시과목                  # ~/study_system/notes/<이 이름>/      (내 노트)
+
+# 퀴즈 앱 (선택) — 퀴즈 기록 내보내기 파일로 복습 일정
+quiz:
+  dir: ~/quiz_system_project/pharmacy
+  url: ""                           # 퀴즈 앱 주소 (없으면 비워 둠)

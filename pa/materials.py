@@ -12,17 +12,16 @@ import subprocess
 import time
 from pathlib import Path
 
-import yaml
 
 from pa import db
-from pa.config import ROOT
+from pa.config import ROOT, load_yaml
 
 SKIP = re.compile(r"^스크린샷|^Screenshot|\.(png|jpg|jpeg|gif)$", re.I)
 DOC_EXT = {".pdf", ".ppt", ".pptx", ".doc", ".docx", ".hwp", ".hwpx", ".xlsx", ".md", ".txt", ".zip"}
 
 
 def _cfg():
-    c = yaml.safe_load((ROOT / "config" / "courses.yaml").read_text())
+    c = load_yaml("courses")
     c["root"] = Path(os.path.expanduser(c["root"]))
     return c
 

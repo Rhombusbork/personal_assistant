@@ -2,10 +2,10 @@
 #   언제: Windows 로그인할 때 + 매일 07:00, 13:00, 19:00 (컴퓨터가 꺼져 있어 놓치면 켜졌을 때 바로)
 #   무엇: WSL 안의  bin/pa run --full  (VSCode 안의 엔진과 겹쳐도 한 번에 하나만 실행됨)
 #   창:   run-hidden.vbs 로 창 없이 실행
-#   기록: \\wsl.localhost\Ubuntu\home\neojun6007\personal_assistant\data\pa.log
+#   기록: \\wsl.localhost\Ubuntu\home\<리눅스 사용자>\personal_assistant\data\pa.log
 #
 # 실행 (한 번만): Windows 의 PowerShell 에서
-#   powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\neojun6007\personal_assistant\scripts\windows\register-task.ps1"
+#   powershell -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\<리눅스 사용자>\personal_assistant\scripts\windows\register-task.ps1"
 # 지우기: 같은 폴더의 unregister-task.ps1
 
 $Name = "PersonalAssistant-Sync"

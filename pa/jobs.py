@@ -318,7 +318,7 @@ def summary_job(conn, job):
         materials.open_file(out)
         return out
     _update(conn, job["id"], step="요약 쓰는 중 (Claude, 몇 분 걸림)")
-    prompt = f"""약학과 학생이 공부할 강의 자료를 요약한다. 이 파일을 Read 로 읽는다: {pdf}
+    prompt = f"""학생이 공부할 강의 자료를 요약한다. 이 파일을 Read 로 읽는다: {pdf}
 
 마크다운만 출력한다 (인사·설명·코드 블록 표시 없이). 구성:
 # {pdf.stem} 요약

@@ -12,6 +12,10 @@ echo "== 1. 파이썬 환경 (.venv)"
 
 echo "== 2. 개인 파일"
 [ -f .env ] || { cp .env.example .env; echo "   .env 만듦 (CANVAS_TOKEN 을 채우세요)"; }
+for f in config/*.example.*; do
+  real="${f%.example.*}.${f##*.}"
+  [ -f "$real" ] || { cp "$f" "$real"; echo "   $real 만듦 (견본 — 내 것으로 고치기)"; }
+done
 mkdir -p data
 
 echo "== 3. 연결 폴더"
@@ -23,7 +27,6 @@ echo "== 4. 아직 남은 것"
 missing=0
 grep -q '^CANVAS_TOKEN=.\+' .env || { echo "   [ ] .env 에 CANVAS_TOKEN"; missing=1; }
 [ -f credentials.json ] || { echo "   [ ] credentials.json (docs/google-calendar-setup.md)"; missing=1; }
-grep -q 'rhombusbork' config/mobile.yaml && grep -q '^PA_MOBILE_PASSWORD=.\+' .env \
-  && { echo "   [ ] config/mobile.yaml 이 원래 주인 저장소를 가리킴 — 자기 저장소로 바꾸세요"; missing=1; }
-echo "   [ ] config/timetable.yaml·courses.yaml 을 내 시간표·과목으로 (README '내 것으로 바꾸기')"
+grep -q '예시과목' config/timetable.yaml config/courses.yaml config/profile.md 2>/dev/null \
+  && { echo "   [ ] config/timetable.yaml·courses.yaml·profile.md 의 '예시과목'을 내 시간표·과목으로"; missing=1; }
 [ $missing = 0 ] && echo "== 준비 끝: bin/pa run --full" || echo "== 위를 채운 뒤: bin/pa run --full"

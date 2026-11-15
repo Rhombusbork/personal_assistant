@@ -37,3 +37,8 @@ inbox.md
 TODAY.md
 dashboard/data.js
 .pytest_cache/
+
+# 내 설정 (견본은 config/*.example.* — bin/setup 이 복사)
+config/*.yaml
+!config/*.example.yaml
+config/profile.md
