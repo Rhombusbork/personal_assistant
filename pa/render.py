@@ -69,7 +69,7 @@ def today_md(conn):
          ""]
 
     # 주의할 것
-    warns = [w for w in (db.get_meta(conn, "inbox_warnings") or "").split("\n") if w]
+    warns = [w for k in ("inbox_warnings", "repo_warnings") for w in (db.get_meta(conn, k) or "").split("\n") if w]
     failed = [tasks[k] for k in (db.get_meta(conn, "plan_failed") or "").split(",") if k in tasks]
     if warns or failed:
         L += ["## ⚠️ 확인 필요", ""]
@@ -183,7 +183,7 @@ def dashboard_data(conn):
         d = r["ts"][:10]
         done_by_day[d] = done_by_day.get(d, 0) + 1
 
-    warns = [w for w in (db.get_meta(conn, "inbox_warnings") or "").split("\n") if w]
+    warns = [w for k in ("inbox_warnings", "repo_warnings") for w in (db.get_meta(conn, k) or "").split("\n") if w]
     if db.get_meta(conn, "last_error"):
         warns.append(f"마지막 동기화 문제: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
     ack = db.get_meta(conn, "ack_phone") or "0"

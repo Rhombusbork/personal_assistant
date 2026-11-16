@@ -16,6 +16,7 @@
 | 선택 | Windows 작업 스케줄러 | VSCode 를 안 열어도 하루 3번 동기화·휴대폰 화면 갱신 | usage.md "VSCode 를 안 열어도 자동 실행" 의 PowerShell 한 줄 |
 | 배포 전 확인 | 진짜 Windows(WSL 없이)에서 한 번 눌러 보기 | 자동 테스트(GitHub Actions)는 Windows 에서도 통과하지만, 브라우저·탐색기·VSCode 열기, 폴더를 열 때 엔진 자동 시작, 코드가 바뀌었을 때 엔진 재시작(`bin\pa.cmd` 가 다시 띄움)은 실제 화면에서만 확인된다 | Windows 에 Python·Git 설치 → README 의 Windows 설치 → 대시보드 ▶ 열기·📂 위치·📄 자료 열기 |
 | 배포 전 확인 | Codex 로 🤖 버튼 한 번 | `codex exec` 명령 줄은 문서대로 만들고 테스트했지만 이 PC 엔 Codex 가 없어 실제 호출은 안 해 봄 | Codex 설치·로그인 → `.env` 에 `PA_AI=codex` → 공지 정리 버튼 |
+| PC 꺼져 있을 때 쓰려면 | **Claude GitHub App** 설치 | 휴대폰 Claude 앱 › Code 의 클라우드 세션이 study_system·report·Pharmacy 저장소를 열 수 있게 (PC 없이 공부 기록·보고서·퀴즈) | claude.ai/code → GitHub 연결 → 저장소 접근 허용. 휴대폰에 Claude 앱 설치·같은 계정 로그인 |
 | 선택 | 채팅에서 `bin/pa` 허용 | 매번 실행 허락을 묻지 않게 | 채팅에서 `/permissions` → `Bash(bin/pa:*)` 허용 |
 
 지금 엔진은 VSCode 와 별도로 켜져 있다 (기록: `data/engine.out`). 코드가 바뀌면 스스로 다시 시작한다.
@@ -40,7 +41,12 @@ VSCode 를 다시 열면 "이미 다른 창에서 감시 중" 이라고 나오�
 
 ### 다음에 할 만한 것
 - (결정 2026-11-13) 다운로드 자동 정리는 하지 않는다 — 지금처럼 추천 + [옮기기] 한 번
-- 지금 남은 개발 작업 없음. 아래 확인 항목과 보류 항목만
+- 휴대폰 원격 (2026-11-16 사용자가 정한 순서: PC 꺼져 있을 때 먼저 → 켜져 있을 때 원격 조작)
+  - [x] report 를 비공개 GitHub 저장소로, 엔진이 켤 때 저장소 내려받기 (`config/repos.yaml`, `bin/pa pull`)
+  - [ ] 클라우드 세션용 규칙: 각 저장소 CLAUDE.md 에 'PC 경로·자료가 없을 때' 절 (GitHub App 설치 뒤 실제로 한 번 써 보고)
+  - [ ] 휴대폰 화면에 명령 버튼(🔄 동기화·✍ 초안·📄 요약·📢 공지) → phone-inbox 대기열 → PC 켜지면 실행, 결과(초안·요약)를 잠가서 휴대폰 화면에
+  - [ ] (선택) 비공개 저장소의 GitHub Actions 로 PC 없이 Canvas 새 과제·공지 알림 — personal_assistant 는 공개라 Actions 기록도 공개됨, 여기서 돌리지 않는다
+  - [ ] PC 켜져 있을 때: Claude Code Remote Control (설치 없음, 채팅에 `/rc`) · Tailscale 로 대시보드 (서버 Host 허용·PC 화면에 여는 버튼 숨기기·결과 읽기 화면)
 
 ### 확인이 필요한 것
 - [ ] LearningX 다시 로그인 뒤: 약학윤리 등 빠진 자료 받기, 강의 짝 다시 채우기, 수강 완료 자동 체크가 되는지

@@ -392,6 +392,9 @@ def watch():
     log("비서 감시 시작 — inbox.md 저장 시 반영, 15분마다 확인(바뀐 게 있을 때만 다시 계획), "
         + (f"Canvas {every // 3600}시간마다" if every else "Canvas 는 켤 때와 ⟳ 누를 때만"))
     restarted = _was_restart()
+    if not restarted:  # 켤 때 한 번: 휴대폰·클라우드에서 바꾼 기록·보고서를 내려받기 (뒤에서)
+        from pa import repos
+        threading.Thread(target=lambda: _safe(lambda: repos.pull_all(log)), daemon=True).start()
     from pa.model import parse_dt
     conn = db.connect()
     try:

@@ -57,6 +57,7 @@ bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남�
 - `config/timetable.yaml`: 학기 날짜, 대면 수업 시간표, 온라인 수업(Canvas 과목명), 공부 요일·시간·알림
 - `config/courses.yaml`: 과목명 → 자료 폴더 이름 (`~/study_system/materials/<폴더>`)
 - `config/profile.md`: 나는 누구인지, 과목 대응표, 내 백업 저장소 (Claude Code 가 읽음)
+- `config/repos.yaml` (선택): 엔진이 켤 때 GitHub 에서 내려받을 내 git 저장소 (휴대폰·클라우드에서 고친 기록을 PC 로). 비우면 안 받음
 - `~/report/CLAUDE.md`: 보고서 글쓰기 규칙 (setup 이 견본을 복사) — 0-1 절의 `<학번>`·`<이름>` 을 내 것으로
 - Claude Code 를 쓰면 채팅에서 "규칙 바꿔줘"(`rules`)로 해도 된다
 
@@ -137,6 +138,7 @@ bin/pa open                   # 대시보드 열기 (VSCode 안 탭 — 비서 V
 - 내가 해야 할 일들(마감, 학습 계획, 진행 상황)을 한눈에 보이게 시각화한다. → ✅ TODAY.md · HTML 대시보드 ([docs/usage.md](docs/usage.md))
 - 매일의 일정 관리는 Claude 없이 코드로 동작한다 (inbox.md 입력 → 자동 계획·기록·시각화). 설계: [docs/automation-plan.md](docs/automation-plan.md)
 - 휴대폰: GitHub Pages (비밀번호 잠금, 휴대폰 입력 → PC 반영) — `config/mobile.yaml`
+- 켤 때 내 git 저장소(공부 기록·보고서·퀴즈)를 GitHub 과 대조해 내려받기 — `config/repos.yaml`, `bin/pa pull`
 - 종합 설계(욕구 분석·제안 기능·가능/불가능·로드맵): [docs/assistant-master-design.md](docs/assistant-master-design.md)
 
 ## 진행 상황

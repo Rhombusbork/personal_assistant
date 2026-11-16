@@ -3,6 +3,7 @@
   bin/pa watch                자동 감시 (VSCode 를 열면 자동 실행)
   bin/pa run [--full]         한 번 실행: inbox → (Canvas) → 계획 → TODAY.md
   bin/pa today                TODAY.md 다시 만들고 출력
+  bin/pa pull                 내 git 저장소를 GitHub 과 대조해 내려받기 (엔진은 켤 때 한 번 자동)
   bin/pa list                 남은 할 일 (마감 순, 맨 앞이 키)
   bin/pa sync                 Canvas 확인 → 저장소 반영
   bin/pa inbox                inbox.md → 저장소 반영
@@ -70,6 +71,14 @@ def _ask_engine_sync():
 
 def cmd_watch(conn, args):
     pipeline.watch()
+
+
+def cmd_pull(conn, args):
+    from pa import repos
+    if not repos.paths():
+        print("config/repos.yaml 의 pull_on_start 가 비어 있어요")
+    for _, _, msg in repos.pull_all(log=lambda m: None):
+        print(msg)
 
 
 def cmd_today(conn, args):
@@ -272,6 +281,7 @@ def main():
     sp.set_defaults(fn=cmd_run)
     sub.add_parser("watch").set_defaults(fn=cmd_watch)
     sub.add_parser("today").set_defaults(fn=cmd_today)
+    sub.add_parser("pull", help="내 git 저장소를 GitHub 과 대조해 내려받기 (config/repos.yaml)").set_defaults(fn=cmd_pull)
     sub.add_parser("dashboard-check").set_defaults(fn=cmd_dashboard_check)
     sub.add_parser("open").set_defaults(fn=cmd_open)
     sub.add_parser("shortcut").set_defaults(fn=cmd_shortcut)

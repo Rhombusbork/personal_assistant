@@ -38,6 +38,8 @@
   감시기가 꺼져 있을 수 있으니 고친 뒤 `bin/pa run` 을 실행한다.
 - `bin/pa list` 남은 항목과 키 / `bin/pa task <키>` 한 항목의 마감·Canvas 설명·보고서 파일·연결된 자료
 - `bin/pa links [키]` 연결된 자료 (`link`/`unlink <키> <파일>` 로 바꾸기) / `bin/pa notices [--all]` 공지
+- `bin/pa pull` 내 git 저장소(`config/repos.yaml`)를 GitHub 과 대조해 내려받기 — 엔진은 켤 때 한 번 자동.
+  휴대폰·클라우드 세션에서 고친 기록이 PC 로 들어온다. 갈라지면 '⚠️ 확인 필요' → 채팅에서 합친다
 - `bin/pa lectures [과목] [--open N]` 강의 열기 / `bin/pa google-login` Google 캘린더 다시 로그인 (사용자 요청 때만)
 - 데이터: `data/pa.db` (SQLite, events 표가 자동 기록)
 - 대시보드 http://localhost:8765 — 엔진(`bin/pa watch`) 안의 서버. 보고서 초안·자료 요약·공지 정리는

@@ -224,6 +224,20 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - 보고서 작성·내용정리·자료 열기·⏱ 는 PC 대시보드에서만 된다
 - 비밀번호를 바꿨거나 틀렸다고 나오면: ⚙ → "비밀번호도 다시 입력" 확인
 
+## PC 가 꺼져 있을 때 (GitHub 저장소 + Claude 클라우드 세션)
+
+공부 기록(`study_system`)·보고서(`report`)·퀴즈(`pharmacy`)는 각자 GitHub 저장소가 있어서, PC 가 꺼져 있어도
+휴대폰 Claude 앱 › **Code** 에서 저장소를 골라 클라우드 세션으로 작업할 수 있다 (질문·기록·보고서 다듬기·퀴즈 덱).
+
+- 처음 한 번: claude.ai/code 에서 GitHub 연결 → **Claude GitHub App** 설치, 위 저장소들 접근 허용
+- 클라우드는 PC 에만 있는 것(강의 자료 `materials/`, 일정 DB, Canvas)은 못 본다. 사진·파일은 휴대폰에서 첨부
+- 클라우드가 만든 변경은 GitHub 에 올라간다 (브랜치면 휴대폰 GitHub 앱에서 합치기)
+- **PC 엔진이 켜질 때 한 번** `config/repos.yaml` 의 `pull_on_start` 저장소를 GitHub 과 대조해 새 커밋을 받는다
+  (`bin/pa pull` 로 직접도). fast-forward 로만 받고 올리지는 않는다
+- PC 에도 GitHub 에도 새 커밋이 있어 갈라졌거나, 저장 안 한 변경과 겹치면 **건드리지 않고** '⚠️ 확인 필요'에 알린다
+  → 채팅에서 합쳐 달라고 하면 된다
+- PC 에서 고친 것은 각 저장소 규칙대로 커밋·push 해야 클라우드에서도 보인다
+
 ## 퀴즈 복습 (R11 — 퀴즈 앱은 고치지 않음)
 
 1. 퀴즈 앱(`config/courses.yaml` 의 `quiz.url`) 첫 화면의 **[기록 내보내기]** → 다운로드 폴더에 `quizapp-backup-날짜.json`
@@ -286,6 +300,7 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 | `bin/pa lectures [과목] [--open N]` | 이번 주 강의 목록·열기 |
 | `bin/pa browser login` | 학교 로그인 저장 (LearningX 연결) — 사용자가 직접 할 때만 |
 | `bin/pa google-login` | Google Calendar 다시 로그인 (브라우저가 열림) |
+| `bin/pa pull` | 내 git 저장소를 GitHub 과 대조해 내려받기 (`config/repos.yaml`, 엔진은 켤 때 한 번 자동) |
 
 VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기화` 로도 실행할 수 있다.
 
@@ -302,6 +317,7 @@ VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기�
 - 단계마다 따로 실패한다 — Canvas 가 안 돼도 계획·화면은 갱신되고, 무엇이 안 됐는지 ⚠️ 로 알린다
 - Google 로그인이 만료되면 엔진이 멈추지 않고 "Google Calendar 로그인 필요" + [Google 다시 로그인] 버튼
 - `pa/*.py` 코드가 바뀌면 엔진이 새 코드로 스스로 다시 시작한다 (Claude 작업이 진행 중이면 끝난 뒤)
+- 켤 때 한 번 `config/repos.yaml` 의 저장소를 GitHub 과 대조해 새 커밋을 받는다 (아래 'PC 가 꺼져 있을 때')
 - 다운로드 폴더는 30초마다 맨 위만 한 번 본다. 그 목록을 📄 자료 창의 📥 가 그대로 쓴다
 - 1년 넘은 자동 기록(events)은 하루 한 번 전체 동기화 때 지운다
 
