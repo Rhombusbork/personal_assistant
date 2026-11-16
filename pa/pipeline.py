@@ -44,7 +44,11 @@ def run(full=False, force_plan=False, quick=False):
     db.PATH.parent.mkdir(exist_ok=True)
     with open(db.PATH.parent / "run.lock", "a", encoding="utf-8") as lock:
         osutil.lock(lock)
-        _run(full, force_plan or full, quick)
+        STATE["full"] = full
+        try:
+            _run(full, force_plan or full, quick)
+        finally:
+            STATE["full"] = False
 
 
 def _run(full, force_plan, quick=False):
@@ -199,6 +203,22 @@ def canvas_every():
     return _canvas_memo["v"]
 
 
+STARTUP_WAIT = 60   # 켤 때: 대시보드 창이 뜰 때까지 최대 이만큼 기다렸다가 최신화 시작
+WINDOW_GRACE = 3    # 창이 뜬 뒤 이만큼 더 (그려지는 동안 겹치지 않게)
+STATE = {"full": False}  # 대시보드 상태 줄 '최신화 중' 표시용
+
+
+def _wait_for_window():
+    """창이 먼저: 대시보드 탭이 신호를 보낼 때까지(최대 STARTUP_WAIT초) 기다린 뒤 최신화를 시작한다.
+    VSCode 없이 켰으면 창이 없으니 STARTUP_WAIT 뒤에 그냥 시작."""
+    end = time.time() + STARTUP_WAIT
+    while time.time() < end:
+        if server.viewer_count():
+            time.sleep(WINDOW_GRACE)
+            return
+        time.sleep(1)
+
+
 def _was_restart():
     """코드가 바뀌어 스스로 다시 시작한 것인가 (2분 안에 남긴 표시). 표시는 지운다."""
     try:
@@ -270,7 +290,8 @@ def watch():
         seen["mtime"] = _mtime()  # inbox 저장 감지로 또 돌지 않게
         seen["dirty"] = True
 
-    if server.start(after_input, on_sync=lambda: run(full=True)):
+    serving = server.start(after_input, on_sync=lambda: run(full=True))
+    if serving:
         log(f"대시보드: http://localhost:{server.PORT}")
     else:
         log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
@@ -290,6 +311,9 @@ def watch():
     # 켤 때는 항상 Canvas 까지 (창은 서버가 먼저 떠서 바로 보이고, 이건 뒤에서 돈다. 로그인이 끊겼으면 여기서 자동 로그인).
     # 코드가 바뀌어 스스로 다시 시작한 때만 방금 확인했으면 건너뛴다.
     full = not (restarted and age is not None and age < (every or 3 * 3600))
+    if full and serving:
+        STATE["full"] = True  # 창이 뜨자마자 '최신화 중' (기다리는 동안도) → 화면이 5초마다 새로 읽음
+        _wait_for_window()
     _safe(lambda: run(full=full))
     last_full = time.time() if full else time.time() - age
     last_plan = last_phone = last_code = last_quick = time.time()

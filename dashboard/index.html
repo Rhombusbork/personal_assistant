@@ -634,7 +634,7 @@ async function load() {
   try { const r = await fetch("/api/data?v=" + VIEWER, { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
   catch { LIVE = false; D = D || window.PA_DATA || null; }
   render();
-  if ((D?.jobs || []).some(j => j.status === "queued" || j.status === "running")) { clearTimeout(load.t); load.t = setTimeout(load, 5000); }  // 진행 중이면 자주
+  if (D?.syncing || (D?.jobs || []).some(j => j.status === "queued" || j.status === "running")) { clearTimeout(load.t); load.t = setTimeout(load, 5000); }  // 진행 중이면 자주
 }
 async function api(action, body) {  // 엔진에 요청만 (화면 다시 읽기 없음)
   const r = await fetch("/api/" + action, { method: "POST", headers: { "Content-Type": "application/json", "X-PA": "1" }, body: JSON.stringify(body || {}) });
@@ -666,7 +666,8 @@ function statusHtml(now) {
     : st === "live" ? `<span title="엔진에 연결됨 · 30초마다 새로 읽음">실시간 · ${hm(D.generated)} 갱신</span>`
     : st === "stale" ? `<span class="st-warn" title="엔진이 데이터를 새로 만들지 않고 있음">엔진 응답 없음 · ${ago(D.generated)} 데이터</span>`
     : `<span class="st-bad" title="엔진이 꺼져 있음 — 아래 빨간 줄 참고">엔진 꺼짐 · ${ago(D.generated)} 데이터</span>`));
-  p.push(`<span title="Canvas 마지막 확인 ${stamp(D.canvasSynced)} · 계획 ${stamp(D.plannedAt)}">Canvas ${ago(D.canvasSynced)}</span>`);
+  p.push(D.syncing ? `<span class="job" title="Canvas·강의 플랫폼(로그인·수강 확인)·공지·자료를 최신으로 — 끝나면 화면이 저절로 바뀜"><span class="spin" aria-hidden="true"></span>최신화 중</span>`
+    : `<span title="Canvas 마지막 확인 ${stamp(D.canvasSynced)} · 계획 ${stamp(D.plannedAt)}">Canvas ${ago(D.canvasSynced)}</span>`);
   const run = (D.jobs || []).filter(j => j.status === "running" || j.status === "queued");
   if (run.length) p.push(`<button class="job" data-ui="jobs" title="${esc(run.map(j => j.title + " — " + (j.step || "")).join("\n"))}"><span class="spin" aria-hidden="true"></span>작업 ${run.length} 진행 중</button>`);
   if (D.active) p.push(`<button class="tmr" data-ui="tohero" aria-label="기록 중인 일로 가기">⏱ <span id="elapsed2">0:00:00</span> 기록 중</button>`);

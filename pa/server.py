@@ -184,6 +184,8 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 conn.close()
             data["duplicate"] = bool(vid) and is_duplicate(vid)
+            from pa import pipeline  # 같은 프로세스의 엔진 상태 (켤 때·⟳ 최신화 중인지)
+            data["syncing"] = pipeline.STATE["full"]
             return self._json(200, data)
         return super().do_GET()
 
