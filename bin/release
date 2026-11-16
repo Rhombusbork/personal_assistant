@@ -16,8 +16,8 @@ DRY=0; [ "$1" = "--dry-run" ] && DRY=1
 
 # 2. 개인 정보 검사 (아이디, 학번 문장, 학번_이름 파일명, 집 경로)
 PERSONAL='neojun|학번은 [0-9]|[0-9]{10}_|/home/[a-z0-9_]+/(personal|report|study)'
-if git grep -qIiE "$PERSONAL" HEAD -- . ':!bin/release' ':!docs/release.md'; then
-  echo "개인 정보로 보이는 줄이 있어 멈춥니다:"; git grep -nIiE "$PERSONAL" HEAD -- . ':!bin/release' ':!docs/release.md'; exit 1
+if git grep -qIiE "$PERSONAL" HEAD -- . ':!bin/release'; then
+  echo "개인 정보로 보이는 줄이 있어 멈춥니다:"; git grep -nIiE "$PERSONAL" HEAD -- . ':!bin/release'; exit 1
 fi
 
 # 3. 테스트 (Windows·리눅스 공통 코드가 깨지지 않았는지)
