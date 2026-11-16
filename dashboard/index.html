@@ -258,6 +258,17 @@
   .done-l { margin-top: 4px; }
   .done-l div { text-decoration: line-through; color: var(--text3); font-size: 14px; }
 
+  /* ---- 기본 할 일: 폴더 입력 보조 */
+  .dirbox { position: relative; display: flex; }
+  .dirbox input { flex: 1; min-width: 0; }
+  .dirlist { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; max-height: 280px; overflow: auto;
+    background: var(--bg, #fff); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.12); padding: 4px; }
+  .dirlist button { display: flex; width: 100%; justify-content: space-between; gap: 8px; border: 0; background: none; text-align: left;
+    padding: 8px 10px; border-radius: 6px; font: inherit; font-size: 14px; color: var(--text); cursor: pointer; }
+  .dirlist button.on, .dirlist button:hover { background: var(--fill2); }
+  .dirlist small { color: var(--text3); white-space: nowrap; }
+  .dirlist .none { padding: 8px 10px; color: var(--text3); font-size: 13px; }
+
   /* ---- 주차별 */
   .wk-nav { display: flex; align-items: center; gap: var(--s1); flex-wrap: wrap; }
   .wk-nav b { font-size: 17px; }
@@ -1027,6 +1038,7 @@ function moreHtml(now, today) {
   return h;
 }
 // 기본 할 일 관리 (PC): 이름 · VSCode 폴더 또는 링크 · 순서 (맨 위 것이 먼저 보임)
+const DD = { title: "", kind: "vscode", target: "" };  // 추가 칸에 쓰던 값 (다시 그려도 유지)
 function defaultsHtml() {
   if (!LIVE) return "";
   const L = D.defaults || [];
@@ -1036,11 +1048,60 @@ function defaultsHtml() {
         <button class="icon-btn" data-act="defmove" data-id="${esc(d.id)}" data-step="1" ${i === L.length - 1 ? "disabled" : ""} aria-label="아래로">↓</button>
         <button class="tbtn" data-act="defdel" data-id="${esc(d.id)}" data-label="지우기" aria-label="지우기: ${esc(d.title)}">✕</button></span></div>`).join("") || `<p class="empty">아직 없음 — 아래에서 추가</p>`}
     <form class="inline wl-form" data-form="defaults">
-      <input class="field" name="title" type="text" placeholder="이름 — 예) 퀴즈 앱 개발" aria-label="이름" required>
-      <select class="field" name="kind" aria-label="종류" style="flex:0 1 160px"><option value="vscode">VSCode 폴더</option><option value="link">링크</option></select>
-      <input class="field" name="target" type="text" placeholder="~/quiz_system_project 또는 https://…" aria-label="폴더 경로 또는 링크" required style="flex:1 1 240px">
+      <input class="field" name="title" type="text" placeholder="이름 — 예) 퀴즈 앱 개발" aria-label="이름" required value="${esc(DD.title)}">
+      <select class="field" name="kind" aria-label="종류" style="flex:0 1 160px"><option value="vscode">VSCode 폴더</option><option value="link" ${DD.kind === "link" ? "selected" : ""}>링크</option></select>
+      <div class="dirbox" style="flex:1 1 240px"><input class="field" name="target" type="text" autocomplete="off" spellcheck="false" required value="${esc(DD.target)}"
+        placeholder="${DD.kind === "link" ? "https://…" : "~/폴더 — 누르면 후보, 치면서 Tab 으로 완성"}" aria-label="폴더 경로 또는 링크" aria-autocomplete="list" aria-controls="dirList">
+        <div class="dirlist" id="dirList" role="listbox" hidden></div></div>
       <button class="btn" type="submit" style="height:36px">추가</button></form></div></details>`;
 }
+// 폴더 입력 보조: 빈 칸을 누르면 후보(VSCode 최근 폴더·git 저장소), 치면 그 위치의 하위 폴더, Tab 으로 완성
+const DIR = { items: [], sel: -1, seq: 0 };
+const dirInput = () => document.querySelector('form[data-form="defaults"] input[name=target]');
+function dirDraw() {
+  const L = $("dirList"); if (!L) return;
+  L.hidden = !DIR.open;
+  L.innerHTML = DIR.items.length ? DIR.items.map((x, i) => `<button type="button" role="option" class="${i === DIR.sel ? "on" : ""}" data-dirpick="${esc(x.path)}"
+    aria-selected="${i === DIR.sel}"><span>${esc(x.path)}</span>${x.why ? `<small>${esc(x.why)}</small>` : ""}</button>`).join("")
+    : `<div class="none">${DIR.loading ? "찾는 중…" : "맞는 폴더 없음"}</div>`;
+}
+async function dirFetch(text) {
+  const f = dirInput()?.form; if (!f || f.kind.value !== "vscode") { DIR.open = false; dirDraw(); return; }
+  const n = ++DIR.seq; DIR.loading = true; DIR.open = true; dirDraw();
+  try {
+    const j = text.trim() ? await api("folders", { text }) : await api("folder-suggest", {});
+    if (n !== DIR.seq) return;  // 더 최근 입력이 있음
+    DIR.items = j.items.map(x => typeof x === "string" ? { path: x } : x);
+  } catch { DIR.items = []; }
+  DIR.loading = false; DIR.sel = -1; dirDraw();
+}
+const commonPrefix = a => a.reduce((p, s) => { let i = 0; while (i < p.length && i < s.length && p[i] === s[i]) i++; return p.slice(0, i); });
+function dirPick(path) { const inp = dirInput(); if (!inp) return; inp.value = path + "/"; DD.target = inp.value; inp.focus(); dirFetch(inp.value); }
+document.addEventListener("focusin", e => { if (e.target === dirInput()) dirFetch(e.target.value); });
+document.addEventListener("input", e => {
+  const f = e.target.form; if (!f || f.dataset.form !== "defaults") return;
+  Object.assign(DD, { title: f.title.value, kind: f.kind.value, target: f.target.value });
+  if (e.target.name === "kind") { f.target.placeholder = f.kind.value === "link" ? "https://…" : "~/폴더 — 누르면 후보, 치면서 Tab 으로 완성"; DIR.open = false; dirDraw(); }
+  if (e.target.name === "target") { clearTimeout(DIR.t); DIR.t = setTimeout(() => dirFetch(e.target.value), 120); }
+});
+document.addEventListener("change", e => { if (e.target.form?.dataset.form === "defaults" && e.target.name === "kind") e.target.dispatchEvent(new Event("input", { bubbles: true })); });
+document.addEventListener("keydown", e => {
+  const inp = dirInput(); if (e.target !== inp || !DIR.open) return;
+  const n = DIR.items.length;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); if (n) { DIR.sel = e.key === "ArrowDown" ? (DIR.sel + 1) % n : DIR.sel <= 0 ? n - 1 : DIR.sel - 1; dirDraw(); } return; }
+  if (e.key === "Enter" && DIR.sel >= 0) { e.preventDefault(); dirPick(DIR.items[DIR.sel].path); return; }
+  if (e.key === "Escape") { DIR.open = false; dirDraw(); return; }
+  if (e.key === "Tab" && !e.shiftKey && n) {  // 터미널처럼: 하나면 그 폴더로, 여럿이면 공통 앞부분까지
+    e.preventDefault();
+    if (DIR.sel >= 0 || n === 1) { dirPick(DIR.items[Math.max(0, DIR.sel)].path); return; }
+    const p = commonPrefix(DIR.items.map(x => x.path));
+    if (p.length > inp.value.length) { inp.value = p; DD.target = p; dirFetch(p); }
+  }
+}, true);
+document.addEventListener("mousedown", e => {  // 목록 안을 누를 때 칸이 포커스를 잃어 목록이 닫히지 않게
+  const b = e.target.closest("[data-dirpick]"); if (b) { e.preventDefault(); dirPick(b.dataset.dirpick); return; }
+  if (DIR.open && !e.target.closest(".dirbox")) { DIR.open = false; dirDraw(); }
+});
 // 한 일 기록: 무엇을 · 얼마나 (직접 적기) + ⏱ 로 잰 것, 날짜별로 묶어 합계
 function worklogHtml(today) {
   const W = D.worklog || [], days = [...new Set(W.map(w => w.day))];
@@ -1558,7 +1619,7 @@ document.addEventListener("submit", async e => {
   e.preventDefault();
   const f = e.target, item = { title: f.title.value.trim(), kind: f.kind.value, target: f.target.value.trim() };
   UI.open.add("defaults");
-  if (await run(() => post("defaults", { items: [...(D.defaults || []), item] }), "기본 할 일을 추가했습니다")) f.reset();
+  if (await run(() => post("defaults", { items: [...(D.defaults || []), item] }), "기본 할 일을 추가했습니다")) { Object.assign(DD, { title: "", target: "" }); f.reset(); render(); }
 });
 document.addEventListener("submit", async e => {
   if (e.target.dataset.form !== "worklog") return;

@@ -29,11 +29,14 @@ def load_timetable():
 
 
 def reminders():
-    """{'plan': 분, 'deadline': [분, …]} — 숫자 하나나 목록 모두 받는다."""
+    """{'plan': 분, 'deadline': [분, …], 'dense_from': 분, 'dense_every': 분} — 숫자 하나나 목록 모두 받는다.
+    dense: 마감 dense_from 분 전부터 dense_every 분마다 (0 이면 끔). 같은 때 마감은 알림 하나로 합친다."""
     r = load_timetable().get("reminders") or {}
     dl = r.get("deadline_minutes_before", [])
+    every = max(1, int(r.get("dense_every_minutes", 2) or 2))
     return {"plan": int(r.get("plan_minutes_before", 0)),
-            "deadline": [int(x) for x in (dl if isinstance(dl, list) else [dl]) if int(x) > 0]}
+            "deadline": [int(x) for x in (dl if isinstance(dl, list) else [dl]) if int(x) > 0],
+            "dense_from": max(0, min(60, int(r.get("dense_from_minutes", 0) or 0))), "dense_every": every}
 
 
 def popup(minutes):

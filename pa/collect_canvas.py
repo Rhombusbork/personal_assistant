@@ -164,6 +164,46 @@ def save_grades(conn, grades):
         db.set_meta(conn, "ack_grades", now().isoformat())
 
 
+QUICK_AHEAD = timedelta(hours=48)  # 빠른 확인 대상: 이 안에 마감인 것 (+ 지난 하루)
+
+
+def quick_targets(conn, t_now=None):
+    t_now = t_now or now()
+    return [t for t in db.tasks(conn, "status = 'open' AND source = 'canvas' AND due IS NOT NULL")
+            if t_now - timedelta(days=1) <= t.due <= t_now + QUICK_AHEAD]
+
+
+def quick_done(conn):
+    """곧 마감인 Canvas 과제·퀴즈는 내 제출 상태만, 강의는 LearningX 수강 완료만 읽어 끝낸 것을 완료로.
+    (전체 Canvas 확인은 3시간마다라 그 사이에 낸 것도 몇 분 안에 사라지게.) 완료로 바꾼 수 반환."""
+    targets = quick_targets(conn)
+    if not targets:
+        return 0
+    ids = {c["name"]: c["id"] for c in canvas.active_courses()}
+    done = 0
+    lect = {}
+    for t in targets:
+        cid = ids.get(t.course)
+        if not cid:
+            continue
+        if t.kind in ("assignment", "quiz") and t.key.startswith("a"):
+            sub = canvas.get(f"/courses/{cid}/assignments/{t.key[1:]}/submissions/self")
+            sub = sub[0] if isinstance(sub, list) else sub
+            if sub and (sub.get("submitted_at") or sub.get("workflow_state") in ("submitted", "graded")):
+                done += db.set_status(conn, t.key, "done", "auto") or 0
+        elif t.kind == "lecture":
+            from pa import learningx
+            if cid not in lect:
+                try:
+                    lect[cid] = learningx.lecture_info(cid)
+                except Exception:  # 로그인 문제 등 — 다음 전체 확인에서
+                    lect[cid] = {}
+            if (lect[cid].get(t.key) or {}).get("done"):
+                done += db.set_status(conn, t.key, "done", "auto") or 0
+    conn.commit()
+    return done
+
+
 def online_courses():
     online = load_timetable().get("online_classes", [])
     return [c for c in canvas.active_courses() if any(n in c["name"] for n in online)]

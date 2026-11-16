@@ -60,3 +60,14 @@ def test_slot_and_due_are_separate():
     assert it["due"].day == 18
     only = inbox.parse_line("독서 >11-17 23:00-24:00", today, 60)
     assert only["due"] is None and only["slot_end"].day == 18 and only["minutes"] == 60
+
+
+def test_folder_complete(tmp_path, monkeypatch):
+    from pa import folders
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    for d in ("quiz_system_project/pharmacy", "quiz_system_project/pharmacy-work", "quiet", ".hidden"):
+        (tmp_path / d).mkdir(parents=True)
+    assert folders.complete("~/qui") == ["~/quiet", "~/quiz_system_project"]
+    assert folders.complete("~/quiz_system_project/ph") == ["~/quiz_system_project/pharmacy", "~/quiz_system_project/pharmacy-work"]
+    assert ".hidden" not in " ".join(folders.complete("~/")) and folders.complete("~/.h") == ["~/.hidden"]

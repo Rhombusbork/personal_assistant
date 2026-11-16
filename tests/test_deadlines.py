@@ -92,3 +92,19 @@ def test_all_kinds_get_reminders_and_done_items_removed(conn):
 
 def test_ahead_label():
     assert [deadlines.ahead_label(m) for m in (1440, 4320, 180, 60, 30)] == ["하루 전", "3일 전", "3시간 전", "1시간 전", "30분 전"]
+
+
+def test_dense_ticks_merge_into_one_alarm_per_interval():
+    from pa.model import Task
+    t_now = now().replace(hour=12, minute=0)
+    due = t_now.replace(hour=23, minute=59)
+    mk = lambda k, kind, d: Task(key=k, kind=kind, course="", title=k, due=d, minutes=30)
+    tasks = [mk("출결", "lecture", due.replace(second=59)), mk("퀴즈", "quiz", due), mk("PPT", "todo", due + timedelta(minutes=11))]
+    ticks = deadlines.dense_ticks(tasks, t_now, 20, 2)
+    times = sorted(ticks)
+    assert all((b - a) >= timedelta(minutes=1.5) for a, b in zip(times, times[1:]))   # 2분에 하나 (가까운 건 합침)
+    first = deadlines.dense_body(times[0], ticks[times[0]])["summary"]
+    assert first == "⏰ 20분 전 · 마감 2개 · 🎬 출결, ❓ 퀴즈"                         # 같은 때 마감은 한 알림에
+    assert deadlines.dense_ticks(tasks, t_now, 0, 2) == {}                             # 0 이면 끔
+    far = [mk("먼 과제", "assignment", t_now + timedelta(days=3))]
+    assert deadlines.dense_ticks(far, t_now, 20, 2) == {}                              # 30시간 안 마감만

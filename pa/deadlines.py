@@ -112,15 +112,67 @@ def needed(conn, max_age_hours=6):
             or not last or now() - last >= timedelta(hours=max_age_hours))
 
 
+DENSE_WINDOW = timedelta(hours=30)  # 촘촘한 알림은 이 안의 마감만 (6시간마다 맞추므로 늘 24시간 전에는 생겨 있음)
+
+
+def dense_ticks(tasks, t_now, frm, every):
+    """마감 frm 분 전부터 every 분마다 울릴 시각 → 그때 남은 마감들 [(마감 분, 할 일)].
+    여러 마감의 시각이 가까우면(every 의 3/4 안) 하나로 합친다 → 마감이 몇 개든 every 분에 알림 하나."""
+    if frm <= 0:
+        return {}
+    dues = [(t.due.replace(second=0, microsecond=0), t) for t in tasks if t_now < t.due <= t_now + DENSE_WINDOW]
+    raw = sorted({d - timedelta(minutes=m) for d, _ in dues for m in range(every, frm + 1, every)})
+    kept = []
+    for tk in raw:
+        if tk > t_now and not (kept and tk - kept[-1] < timedelta(minutes=every * 0.75)):
+            kept.append(tk)
+    out = {}
+    for tk in kept:
+        hit = sorted([(d, t) for d, t in dues if timedelta(0) < d - tk <= timedelta(minutes=frm)], key=lambda x: (x[0], x[1].title))
+        if hit:
+            out[tk] = hit
+    return out
+
+
+def dense_body(tk, hit):
+    from pa.plan import is_exam
+    groups = {}
+    for d, t in hit:
+        groups.setdefault(d, []).append(f"{'📝' if is_exam(t) else ICON[t.kind]} {t.title}")
+    parts = []
+    for d, names in groups.items():
+        m = int((d - tk).total_seconds() // 60)
+        parts.append(f"{m}분 전 · " + (names[0] if len(names) == 1 else f"마감 {len(names)}개 · " + ", ".join(names)))
+    summary = "⏰ " + " | ".join(parts)
+    if len(summary) > 140:
+        summary = summary[:139] + "…"
+    at = tk.isoformat()
+    return {
+        "summary": summary,
+        "start": {"dateTime": at, "timeZone": TZ},
+        "end": {"dateTime": at, "timeZone": TZ},
+        "description": "\n".join(f"{t.title} — 마감 {t.due:%m/%d %H:%M} {t.url}".strip() for _, t in hit),
+        "transparency": "transparent",
+        "extendedProperties": {"private": {"pa_source": "remind", "pa_key": f"dense|{at}"}},
+        "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 0}]},
+    }
+
+
 def sync_reminders(service, tasks, t_now):
-    """'마감 알림' 캘린더: 앞으로 울릴 알림만 둔다 (울린 것·끝낸 일의 알림은 지움)."""
+    """'마감 알림' 캘린더: 앞으로 울릴 알림만 둔다 (울린 것·끝낸 일의 알림은 지움).
+    마감마다 정해 둔 알림(하루 전 등) + 마감 직전 촘촘한 알림(합쳐서, 30시간 안 마감만)."""
     cal = get_or_create_calendar(service, REMIND_NAME, TZ)
     existing = _list(service, cal, "remind")
+    rem = reminders()
     wanted = {}
     for t in tasks:
-        for m in reminders()["deadline"]:
+        for m in rem["deadline"]:
+            if m <= rem["dense_from"]:  # 촘촘한 알림이 그 시간을 덮음 → 겹쳐 울리지 않게
+                continue
             if t.due - timedelta(minutes=m) > t_now:
                 wanted[f"{t.key}|{m}"] = remind_body(t, m)
+    for tk, hit in dense_ticks(tasks, t_now, rem["dense_from"], rem["dense_every"]).items():
+        wanted[f"dense|{tk.isoformat()}"] = dense_body(tk, hit)
     created = updated = removed = 0
     for k, body in wanted.items():
         ev = existing.get(k)

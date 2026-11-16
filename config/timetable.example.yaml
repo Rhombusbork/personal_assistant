@@ -37,3 +37,6 @@ planner:
 reminders:
   plan_minutes_before: 10           # '학습 계획' 블록 시작 몇 분 전 (0 이면 알림 없음)
   deadline_minutes_before: [1440, 180, 60]   # '과제' 마감 하루 전 · 3시간 전 · 1시간 전 (최대 5개)
+  # 마감 직전 촘촘한 알림: N분 전부터 M분마다 (0 이면 끔, 최대 60분). 같은 때 마감은 알림 하나로 합친다
+  dense_from_minutes: 0
+  dense_every_minutes: 2

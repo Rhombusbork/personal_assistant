@@ -6,6 +6,7 @@ GET  /api/viewers    최근 45초 안에 신호를 보낸 대시보드 탭 수 (
 POST /api/add        할 일 추가 → inbox.md 에 한 줄
 POST /api/defaults   기본 할 일 목록 저장 {items:[{id?, title, kind:'vscode'|'link', target}]}
 POST /api/default-open {id}  기본 할 일 열기 (VSCode 새 창 / 평소 브라우저)
+POST /api/folders {text} → 하위 폴더 추천 · POST /api/folder-suggest → VSCode 최근 폴더·git 저장소
 POST /api/redo       마감이 지난 일을 오늘·다른 날 하기 {key, day:'YYYY-MM-DD'|''}
 POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료) / POST /api/undone 되돌리기
 POST /api/ignore     계속 제외 (## 제외). pattern=true 면 같은 이름의 앞으로 생길 과제도
@@ -91,6 +92,9 @@ def parse_add(body):
         "course": str(body.get("course", "")).strip(),
         "every": [int(d) for d in body.get("every", [])] or None,
     }
+
+
+_suggest_cache = {}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -224,7 +228,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/defaults", "/api/default-open"):
+                            "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -308,6 +312,15 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("열 수 있는 링크가 없음")
                 osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
                 return {"ok": True}
+            if action == "/api/folders":  # 기본 할 일 폴더 입력: 하위 폴더 추천 (Tab 완성)
+                from pa import folders
+                return {"ok": True, "items": folders.complete(body.get("text", ""))}
+            if action == "/api/folder-suggest":  # 칸을 눌렀을 때 후보: VSCode 최근 폴더 + git 저장소 (5분 기억)
+                from pa import folders
+                hit = _suggest_cache.get("v")
+                if not hit or time.time() - hit[0] > 300:
+                    hit = _suggest_cache["v"] = (time.time(), folders.suggestions())
+                return {"ok": True, "items": hit[1]}
             if action == "/api/defaults":  # 기본 할 일 목록 전체 저장 (순서 = 보이는 순서)
                 return {"ok": True, "defaults": render.set_defaults(conn, body.get("items") or [])}
             if action == "/api/default-open":  # 기본 할 일 열기: VSCode 새 창(폴더) 또는 평소 브라우저(링크)

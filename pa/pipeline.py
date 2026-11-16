@@ -10,15 +10,17 @@ watch()    시작할 때 full 실행 후, inbox.md 가 저장될 때마다 빠�
 import threading
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, osutil, plan, quiz, render, server
 from pa.canvas import CanvasAuthError
 from pa.config import ROOT
 from pa.gcal import GoogleAuthError, get_service
+from pa.model import now
 
 CANVAS_EVERY = 3 * 60 * 60  # 초
-PLAN_EVERY = 15 * 60        # 이때마다 '다시 계획할 필요가 있나' 확인 (필요할 때만 Google 에 요청)
+PLAN_EVERY = 15 * 60        # 이때마다 '다시 계획할 필요가 있나' 확인 (필요할 때만 Google 에 요청) + 곧 마감인 것 제출 확인
+QUICK_SOON = 3 * 60         # 30분 안에 마감이 있으면 이때마다 제출·수강 확인 (끝낸 일의 촘촘한 알림을 빨리 지우게)
 PHONE_EVERY = 3 * 60
 DOWNLOADS_EVERY = 30
 POLL = 1.0
@@ -38,15 +40,15 @@ def log(msg):
         pass
 
 
-def run(full=False, force_plan=False):
+def run(full=False, force_plan=False, quick=False):
     # 실행은 한 번에 하나만 (감시기·수동 실행·작업 스케줄러가 겹쳐도 캘린더에 중복으로 쓰지 않게)
     db.PATH.parent.mkdir(exist_ok=True)
     with open(db.PATH.parent / "run.lock", "a", encoding="utf-8") as lock:
         osutil.lock(lock)
-        _run(full, force_plan or full)
+        _run(full, force_plan or full, quick)
 
 
-def _run(full, force_plan):
+def _run(full, force_plan, quick=False):
     conn = db.connect()
     steps, errors = [], []
 
@@ -70,6 +72,10 @@ def _run(full, force_plan):
         n = step("퀴즈 기록", lambda: quiz.sync(conn))
         if n:
             steps.append(f"퀴즈 기록 +{n}")
+        if quick and not full:  # 곧 마감인 것만 제출·수강 확인 (몇 번의 짧은 요청)
+            n = step("제출 확인", lambda: collect_canvas.quick_done(conn))
+            if n:
+                steps.append(f"제출·수강 확인 → 완료 {n}")
         if full:
             n = step("Canvas", lambda: collect_canvas.sync(conn))
             if n is not None:
@@ -111,6 +117,23 @@ def _run(full, force_plan):
     except Exception as e:  # 인터넷·GitHub 문제로 나머지가 멈추지 않게
         steps.append(f"휴대폰 화면 올리기 실패: {str(e)[:80]}")
     log(" · ".join(steps))
+
+
+_quick_memo = {"at": 0, "v": None}
+
+
+def _quick_every():
+    """제출·수강 빠른 확인 간격(초): 30분 안에 마감인 Canvas 일이 있으면 3분, 아니면 15분(=PLAN_EVERY 때 같이).
+    감시 루프가 자주 부르므로 1분 동안은 기억한 값을 쓴다."""
+    if time.time() - _quick_memo["at"] < 60 and _quick_memo["v"]:
+        return _quick_memo["v"]
+    conn = db.connect()
+    try:
+        soon = [t for t in collect_canvas.quick_targets(conn) if timedelta(0) < t.due - now() <= timedelta(minutes=30)]
+    finally:
+        conn.close()
+    _quick_memo.update(at=time.time(), v=QUICK_SOON if soon else PLAN_EVERY)
+    return _quick_memo["v"]
 
 
 def _pull_phone():
@@ -212,7 +235,7 @@ def watch():
     recent = last and (now() - parse_dt(last)).total_seconds() < CANVAS_EVERY
     run(full=not recent)
     last_full = time.time() if not recent else time.time() - (now() - parse_dt(last)).total_seconds()
-    last_plan = last_phone = last_code = time.time()
+    last_plan = last_phone = last_code = last_quick = time.time()
     login_file = db.PATH.parent / "browser-state.json"  # 강의 플랫폼 로그인 (사용자가 직접 할 때만 바뀜)
     login_seen = login_file.stat().st_mtime if login_file.exists() else 0
     while True:
@@ -246,5 +269,8 @@ def watch():
             run(full=True)
             last_full = last_plan = time.time()
         elif time.time() - last_plan >= PLAN_EVERY:
-            run(full=False)  # 바뀐 게 없으면 Google 에 요청하지 않고 화면만 갱신
-            last_plan = time.time()
+            run(full=False, quick=True)  # 바뀐 게 없으면 Google 에 요청하지 않고 화면만 갱신
+            last_plan = last_quick = time.time()
+        elif time.time() - last_quick >= _quick_every():  # 마감이 30분 안이면 3분마다 제출 확인
+            run(full=False, quick=True)
+            last_quick = time.time()
