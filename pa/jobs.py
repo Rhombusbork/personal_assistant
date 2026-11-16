@@ -3,7 +3,7 @@
 보고서 작업 단계
   1. 과제 읽기     Canvas 과제 설명 (Canvas 과제일 때)
   2. 자료 모으기   materials 의 관련 자료, study_system/notes 의 내 노트
-  3. 파일 만들기   ~/report/<학번>_<이름>_<과목>_<종류>_<번호>.md  (report/CLAUDE.md 규칙)
+  3. 파일 만들기   ~/report/<과목>/<학번>_<이름>_<과목>_<종류>_<번호>.md  (report/CLAUDE.md 규칙)
   4. 초안 쓰기     내 구독의 AI (pa/ai.py: `claude -p` 또는 `codex exec`, report 폴더에서 실행 → report 규칙 적용)
   5. 열기          VSCode 편집기 탭
 
@@ -110,7 +110,7 @@ def report_path(task, conn=None):
             row = conn.execute("SELECT result FROM jobs WHERE key = ? AND kind LIKE 'report%' AND status = 'done' "
                                "ORDER BY id DESC LIMIT 1", (task["key"],)).fetchone()
             known = row["result"] if row else None
-        if known and Path(known).exists() and Path(known).parent == REPORT_DIR:
+        if known and Path(known).exists() and REPORT_DIR in Path(known).parents:
             return Path(known)
     sid, name = student()
     subj, kind = subject(task), doc_kind(task["title"])
@@ -119,9 +119,11 @@ def report_path(task, conn=None):
     if nums:
         num = nums[0]  # Ch22 배움노트 → 22
     else:
-        used = [int(m.group(1)) for f in REPORT_DIR.glob(prefix + "*.md") if (m := re.search(r"_(\d+)\.md$", f.name))]
+        used = [int(m.group(1)) for f in REPORT_DIR.rglob(prefix + "*.md") if (m := re.search(r"_(\d+)\.md$", f.name))]
         num = max(used, default=0) + 1
-    return REPORT_DIR / f"{prefix}{num}.md"
+    fname = f"{prefix}{num}.md"
+    found = next(REPORT_DIR.rglob(fname), None)  # 옮겨 둔 파일도 찾는다
+    return found or REPORT_DIR / subj / fname  # 새 파일은 과목 폴더에
 
 
 def assignment_text(task):
@@ -166,6 +168,7 @@ def blank_report(conn, key):
         raise ValueError("할 일을 찾지 못함")
     path = report_path(dict(task), conn)
     if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(_template(task), encoding="utf-8")
         db.set_meta(conn, "report_file:" + key, str(path))
         materials.reveal(path)  # 새 보고서 파일 → 탐색기에서 위치 보여 주기
@@ -247,6 +250,7 @@ def report_job(conn, job, force=False):
     text = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", text.strip())
     if not text.startswith("#"):
         raise ValueError("초안 형식이 이상함: " + text[:120])
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text + "\n", encoding="utf-8")
 
     _update(conn, job["id"], step="5/5 열기")
