@@ -396,7 +396,10 @@ def watch():
                 run(full=False)
                 last_plan = time.time()
             lm = login_file.stat().st_mtime if login_file.exists() else 0
-            if lm != login_seen and time.time() - lm > 5:  # 방금 다시 로그인함 → 바로 확인
+            from pa import browser
+            if lm != login_seen and abs(lm - browser.AUTO["at"]) < 30:  # 엔진이 스스로 로그인한 것 → 이미 그 확인 안에서 반영됨
+                login_seen = lm
+            if lm != login_seen and time.time() - lm > 5:  # 사용자가 방금 다시 로그인함 → 바로 확인
                 login_seen = lm
                 log("강의 플랫폼 로그인 감지 — 바로 확인")
                 run(full=True)

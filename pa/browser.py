@@ -73,6 +73,7 @@ def login(timeout_min=10):
 
 
 PORTAL = "https://portal.jejunu.ac.kr/login.htm?gateURL=https://jnuclass.jejunu.ac.kr/sso/business.php"
+AUTO = {"at": 0}  # 엔진이 스스로 로그인(저장)한 시각 — 감시 루프가 '사용자가 다시 로그인함'으로 착각하지 않게
 _AUTO_GAP = 30 * 60  # 자동 로그인은 30분에 한 번까지 (비밀번호가 틀렸을 때 계정 잠김 방지)
 
 
@@ -108,6 +109,7 @@ def auto_login():
                 if not logged_in(ctx):
                     return False
             _finish(ctx)
+            AUTO["at"] = time.time()
             stamp.unlink(missing_ok=True)  # 성공하면 다음에 끊겼을 때 바로 다시 시도
             return True
         finally:
