@@ -82,6 +82,8 @@ def auto_login():
     사용자가 정한 것 (2026-11-16): 로그인이 끊기면 비서가 스스로 다시 로그인한다.
     평소 브라우저의 학교 로그인이 끊길 수 있음을 알고 고른 것이다.
     """
+    from pa.config import load_env
+    load_env()  # 켜 둔 뒤에 .env 에 넣은 계정도 읽게
     uid, pw = os.environ.get("PA_SCHOOL_ID"), os.environ.get("PA_SCHOOL_PW")
     if not uid or not pw:
         return False
