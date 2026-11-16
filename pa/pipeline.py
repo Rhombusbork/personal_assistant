@@ -12,7 +12,7 @@ import time
 import traceback
 from datetime import datetime, timedelta
 
-from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, osutil, plan, quiz, render, server
+from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, osutil, plan, portal, quiz, render, server
 from pa.canvas import CanvasAuthError
 from pa.config import ROOT
 from pa.gcal import GoogleAuthError, get_service
@@ -90,13 +90,23 @@ def _run(full, force_plan, quick=False):
                 got = step("강의 자료", lambda: learningx.sync(conn, collect_canvas.online_courses()))
                 if got:
                     steps.append(f"자료 +{got[0]}" + (f" ⚠️{got[1]}" if got[1] else ""))
+            got = step("포털 시간표", lambda: portal.weekly(conn))  # 그 주의 첫 전체 확인에서 한 번
+            if got:
+                steps.append(f"포털 시간표 {got[0]}건" + (f" ⚠️새 과목 {len(got[1])}" if got[1] else ""))
             last = db.get_meta(conn, "events_pruned_at")
             if not last or last[:10] != datetime.now().strftime("%Y-%m-%d"):  # 하루 한 번: 1년 넘은 기록 정리
                 step("기록 정리", lambda: db.prune_events(conn))
         need_plan = force_plan or step("계획 확인", lambda: plan.needed(conn))
         need_deadlines = force_plan or step("마감 확인", lambda: deadlines.needed(conn))
-        if need_plan or need_deadlines:
+        tt_new = db.get_meta(conn, "portal_classes") and portal.cfg()["enabled"] and \
+            db.get_meta(conn, "portal_calendar_hash") != portal.digest(conn)
+        if need_plan or need_deadlines or tt_new:
             service = step("Google", get_service)
+            if service and tt_new:  # 수업 시간표가 바뀌면 계획보다 먼저 캘린더에 (계획이 수업을 피하게)
+                res = step("수업 시간표", lambda: portal.sync_calendar(conn, service))
+                if res:
+                    steps.append(f"수업 시간표 +{res[0]} -{res[1]}")
+                    need_plan = True
             if service and need_plan:
                 res = step("계획", lambda: plan.run(conn, service))
                 if res:

@@ -35,6 +35,8 @@ def main():
     args = parser.parse_args()
 
     cfg = load_timetable()
+    if (cfg.get("portal") or {}).get("enabled") and not args.dry_run:
+        raise SystemExit("포털에서 매주 시간표를 받아 오고 있어 이 명령은 쓰지 않습니다 (겹쳐 생김). bin/pa timetable 을 쓰세요")
     sem_start = date.fromisoformat(cfg["semester_start"])
     sem_end = date.fromisoformat(cfg["semester_end"])
     events = [build_event(c, sem_start, sem_end) for c in cfg["classes"]]

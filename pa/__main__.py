@@ -20,7 +20,8 @@
   bin/pa lectures [과목] [--open N]   이번 주 강의 목록·열기
   bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
   bin/pa google-login         Google Calendar 다시 로그인 (브라우저가 열림)
-  bin/pa sync-timetable [--dry-run]   config/timetable.yaml 의 수업 시간표 → '수업 시간표' 캘린더 (학기 초 한 번)
+  bin/pa sync-timetable [--dry-run]   config/timetable.yaml 의 수업 시간표 → '수업 시간표' 캘린더 (포털을 안 쓸 때만)
+  bin/pa timetable [--dry-run]        학교 포털(하영드리미)의 내 시간표를 지금 읽어 대면 수업만 캘린더에 (엔진은 매주 자동)
   bin/pa open                 대시보드 열기: VSCode 안 탭 (VSCode 가 꺼져 있으면 VSCode 를 엶) 또는 앱 창 (dashboard.mode)
   bin/pa shortcut             바탕화면에 '비서' 바로가기 (누르면 VSCode 로 비서 폴더 → 엔진·대시보드 자동)
   bin/pa vscode-ext           비서 VSCode 확장 설치 (대시보드를 VSCode 안 탭으로 — 창 늘 하나·다시 열기)
@@ -266,6 +267,9 @@ def main():
         from pa import lectures
         sys.argv = [sys.argv[0]] + sys.argv[2:]
         return lectures.main()
+    if len(sys.argv) > 1 and sys.argv[1] == "timetable":
+        from pa import portal
+        return portal.main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "sync-timetable":
         from pa import sync_timetable
         sys.argv = [sys.argv[0]] + sys.argv[2:]
