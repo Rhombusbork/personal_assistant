@@ -59,6 +59,22 @@ DASH = ROOT / "dashboard"
 ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}"}
 VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
 FIRST_SEEN = {}  # 대시보드 탭 id → 처음 신호 시각 (먼저 열린 창이 '원래 창')
+VSCODE = {}      # VSCode 창 id (비서 확장) → 마지막 신호 시각
+VSCODE_NEW = {"at": 0}            # 새 VSCode 창이 처음 신호를 보낸 시각 (켤 때 안 탭을 바로 열게)
+OPEN_REQ = {"at": 0, "served": 0}  # 안 탭 열기 요청 (확장 하나가 가져가면 끝)
+
+
+def vscode_alive(window=30):
+    cutoff = time.time() - window
+    return any(t >= cutoff for t in VSCODE.values())
+
+
+def request_open():
+    """VSCode 안 탭을 열어 달라고 확장에게 (방금 열었으면 무시 — 탭이 신호를 보낼 시간을 줌)."""
+    if time.time() - OPEN_REQ["served"] > 20:
+        OPEN_REQ["at"] = time.time()
+        return True
+    return False
 # 엔진이 다시 시작해도 로그인 창 프로세스는 남게
 _DETACH = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if osutil.IS_WINDOWS else {"start_new_session": True}
 
@@ -172,7 +188,17 @@ class Handler(SimpleHTTPRequestHandler):
             finally:
                 conn.close()
         if self.path.startswith("/api/viewers"):
-            return self._json(200, {"count": viewer_count()})
+            return self._json(200, {"count": viewer_count(), "vscode": vscode_alive()})
+        if self.path.startswith("/api/vscode"):  # 비서 VSCode 확장: 살아 있음 + '열어야 하나?'
+            w = parse_qs(urlparse(self.path).query).get("w", [""])[0][:40]
+            if w and w not in VSCODE:
+                VSCODE_NEW["at"] = time.time()
+            if w:
+                VSCODE[w] = time.time()
+            go = OPEN_REQ["at"] > OPEN_REQ["served"]
+            if go:
+                OPEN_REQ["served"] = time.time()
+            return self._json(200, {"open": go})
         if self.path.startswith(("/api/ping", "/api/bye")):  # 창 신호 (입력 중·메뉴 열림과 상관없이 30초마다) / 창 닫힘
             vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid and self.path.startswith("/api/ping"):
@@ -194,7 +220,7 @@ class Handler(SimpleHTTPRequestHandler):
             data["duplicate"] = bool(vid) and is_duplicate(vid)
             from pa import pipeline  # 같은 프로세스의 엔진 상태 (켤 때·⟳ 최신화 중인지)
             data["syncing"] = pipeline.STATE["full"]
-            data["reopen"] = {"minutes": pipeline.reopen_minutes(), "paused": pipeline.dash_paused()}
+            data["reopen"] = {"minutes": pipeline.reopen_minutes(), "paused": pipeline.dash_paused(), "mode": pipeline.dash_mode()}
             return self._json(200, data)
         return super().do_GET()
 
@@ -250,7 +276,8 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause"):
+                            "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause",
+                            "/api/open-request"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -334,6 +361,11 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("열 수 있는 링크가 없음")
                 osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
                 return {"ok": True}
+            if action == "/api/open-request":  # bin/pa open: VSCode 안 탭 (확장이 있으면)
+                alive = vscode_alive()
+                if alive:
+                    request_open()
+                return {"ok": True, "vscode": alive}
             if action == "/api/dash-pause":  # 창 자동으로 다시 열기: 오늘은 끄기 / 다시 켜기
                 from pa.model import now as _now
                 db.set_meta(conn, "dash_pause", _now().date().isoformat() if body.get("pause") else "")

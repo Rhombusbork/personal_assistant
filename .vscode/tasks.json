@@ -20,15 +20,12 @@
     },
     {
       "label": "비서: 대시보드 열기",
-      "detail": "대시보드를 앱 창(Edge)으로 http://localhost:8765 (이미 열려 있으면 건너뜀)",
+      "detail": "대시보드 열기 — VSCode 안 탭(비서 확장, config dashboard.mode: vscode) 또는 앱 창(app). 이미 열려 있으면 건너뜀. VSCode 를 열 때는 확장이 알아서 연다",
       "type": "shell",
       "command": "${workspaceFolder}/bin/pa open",
       "windows": { "command": "${workspaceFolder}\\bin\\pa.cmd", "args": ["open"], "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
       "dependsOn": "비서: 서버 대기",
       "problemMatcher": [],
-      "runOptions": {
-        "runOn": "folderOpen"
-      },
       "presentation": {
         "reveal": "never",
         "panel": "shared",

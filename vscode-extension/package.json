@@ -1,0 +1,22 @@
+{
+  "name": "pa-dashboard",
+  "displayName": "개인 비서 대시보드",
+  "description": "비서 엔진이 열라고 할 때 대시보드를 VSCode 안 탭(Simple Browser)으로 연다. 판단은 엔진이 한다.",
+  "version": "0.1.0",
+  "publisher": "personal-assistant",
+  "license": "MIT",
+  "engines": { "vscode": "^1.80.0" },
+  "extensionKind": ["ui"],
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [{ "command": "paDashboard.open", "title": "비서: 대시보드 열기 (VSCode 안)" }],
+    "configuration": {
+      "title": "개인 비서",
+      "properties": {
+        "paDashboard.url": { "type": "string", "default": "http://localhost:8765/", "description": "비서 대시보드 주소" }
+      }
+    }
+  }
+}

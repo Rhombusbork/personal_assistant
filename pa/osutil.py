@@ -65,6 +65,36 @@ def _ps(script):
     return r.returncode == 0, (r.stdout + r.stderr).strip()
 
 
+def _vscode_target(folder):
+    """(PowerShell 에서 Code.exe 를 찾는 코드, 넘길 인자) — 바로가기·VSCode 열기 공통."""
+    folder = Path(folder).resolve()
+    if IS_WSL:
+        args = f"--folder-uri vscode-remote://wsl+{os.environ.get('WSL_DISTRO_NAME', 'Ubuntu')}{folder.as_posix()}"
+    else:
+        args = f'"{folder}"'
+    find = """
+$code = (Get-Command code.cmd -ErrorAction SilentlyContinue).Source
+if ($code) { $exe = Join-Path (Split-Path (Split-Path $code)) 'Code.exe' }
+if (-not $exe -or -not (Test-Path $exe)) { $exe = Join-Path $env:LOCALAPPDATA 'Programs/Microsoft VS Code/Code.exe' }
+if (-not (Test-Path $exe)) { throw 'VSCode(Code.exe)를 찾지 못했습니다' }
+"""
+    return find, args
+
+
+def launch_vscode(folder):
+    """VSCode 로 이 폴더를 연다 (이미 열려 있으면 그 창이 앞으로)."""
+    if IS_WSL or IS_WINDOWS:
+        find, args = _vscode_target(folder)
+        ok, out = _ps("$ErrorActionPreference = 'Stop'\n" + find + f"Start-Process -FilePath $exe -ArgumentList '{args}'")
+        if not ok:
+            raise RuntimeError(out.splitlines()[-1] if out else "VSCode 를 열지 못했습니다")
+        return
+    import shutil
+    if not shutil.which("code"):
+        raise RuntimeError("VSCode 명령(code)을 찾지 못했습니다")
+    _spawn(["code", str(Path(folder).resolve())])
+
+
 def desktop_shortcut(folder, name="비서"):
     """바탕화면에 'VSCode 로 이 폴더 열기' 바로가기. 만든 파일 경로를 돌려준다.
     WSL: VSCode(Windows) 가 WSL 폴더를 원격으로 연다 (--folder-uri vscode-remote://wsl+<배포판>/…)."""

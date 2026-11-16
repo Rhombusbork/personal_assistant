@@ -58,7 +58,12 @@ def main():
                                               encoding="utf-8")
             print(f"   {folder / 'AGENTS.md'} 만듦 (Codex 용 안내 — 규칙은 CLAUDE.md)")
 
-    print("== 4. 아직 남은 것")
+    print("== 4. VSCode 확장 (대시보드를 VSCode 안 탭으로)")
+    r = subprocess.run([str(VENV_PY), "-m", "pa", "vscode-ext"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    print("   " + (r.stdout.strip().splitlines() or ["설치됨"])[-1] if r.returncode == 0 else
+          f"   ⚠️ 못 함 (VSCode 가 없거나 'code' 명령이 없음) — 나중에: {PA} vscode-ext")
+
+    print("== 5. 아직 남은 것")
     todo = []
     if not any(l.startswith("CANVAS_TOKEN=") and l.strip() != "CANVAS_TOKEN=" for l in read(Path(".env")).splitlines()):
         todo.append(".env 에 CANVAS_TOKEN")

@@ -223,6 +223,18 @@ def reopen_minutes():
     return _reopen_memo["v"]
 
 
+def dash_mode():
+    """대시보드를 어디에: 'vscode' (VSCode 안 탭, 비서 확장이 엶) | 'app' (Edge 앱 창). config dashboard.mode"""
+    from pa.config import load_timetable
+    m = (load_timetable().get("dashboard") or {}).get("mode", "vscode")
+    return m if m in ("vscode", "app") else "vscode"
+
+
+def start_vscode_ok():
+    from pa.config import load_timetable
+    return bool((load_timetable().get("dashboard") or {}).get("start_vscode", True))
+
+
 def dash_paused():
     """대시보드에서 '오늘은 다시 열지 않기' 를 눌렀나."""
     conn = db.connect()
@@ -237,6 +249,12 @@ WIN = {"missing_since": None, "tick": time.time()}
 
 
 def open_dashboard(reason=""):
+    """mode=vscode: VSCode 가 켜져 있으면 안 탭(확장에게 요청). 꺼져 있으면 아무것도 안 함 (닫은 뜻 존중).
+    mode=app: Edge 앱 창."""
+    if dash_mode() == "vscode":
+        if server.vscode_alive() and server.request_open():
+            log(f"대시보드 탭 열기 (VSCode 안){' — ' + reason if reason else ''}")
+        return
     log(f"대시보드 창 열기{' — ' + reason if reason else ''}")
     osutil.open_app(f"http://localhost:{server.PORT}/")
 
@@ -248,6 +266,11 @@ def _keep_window(serving):
     gap, WIN["tick"] = t - WIN["tick"], t
     mins = reopen_minutes()
     if not serving or not mins:
+        return
+    if (dash_mode() == "vscode" and time.time() - server.VSCODE_NEW["at"] < 60 and not server.viewer_count()
+            and t - server.VSCODE_NEW["at"] > 8 and not dash_paused()):  # VSCode 를 막 열었는데 탭이 없음 → 바로
+        server.VSCODE_NEW["at"] = 0
+        open_dashboard("VSCode 를 열어서")
         return
     if gap > 60 or server.viewer_count(VIEWER_WINDOW):
         WIN["missing_since"] = None if server.viewer_count(VIEWER_WINDOW) else t
@@ -269,7 +292,15 @@ def _wait_for_window():
             return
         time.sleep(1)
     if reopen_minutes() and not dash_paused():  # VSCode 없이 켬(로그온) → 창을 직접 연다
-        open_dashboard("켤 때 창이 없어서")
+        if dash_mode() == "vscode" and not server.vscode_alive():
+            if start_vscode_ok():
+                log("켤 때 VSCode 가 없어서 비서 폴더로 VSCode 를 엽니다 (대시보드는 그 안 탭으로)")
+                try:
+                    osutil.launch_vscode(ROOT)
+                except Exception as e:
+                    log(f"⚠️ VSCode 열기 실패: {e}")
+        else:
+            open_dashboard("켤 때 창이 없어서")
 
 
 def _was_restart():
