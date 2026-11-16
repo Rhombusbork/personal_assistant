@@ -99,3 +99,4 @@ python3 -m venv .venv && .venv/bin/pip -q install -r requirements.txt && .venv/b
 | 2026-11-16 | 6ac9813 | 켤 때마다 Canvas 확인(창 먼저), canvas.check_every_hours 설정, 엔진 오류 내성(덜 고친 코드로 재시작 안 함), 대시보드 중복 창 안내 |
 | 2026-11-16 | ea189b5 | 켤 때 창이 뜬 뒤 최신화 시작, 상태 줄 '최신화 중' |
 | 2026-11-16 | 9319b82 | 창 늘 하나(없으면 3분 뒤 앱 창, 오늘은 끄기), 로그인할 때 엔진(작업 스케줄러 Engine), bin/pa open·shortcut, 자동 로그인 직전 .env 다시 읽기 |
+| 2026-11-16 | 2427800 | 대시보드 VSCode 안 탭(비서 확장, dashboard.mode), 로그인 때 VSCode 열기, 테스트가 진짜 로그인하지 않게, 하루 3번 실행은 켜진 엔진에 맡김 |
