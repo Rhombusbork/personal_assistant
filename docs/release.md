@@ -65,6 +65,7 @@ bin/release                 # 올림
 
 ### 6. 시험
 - [ ] `.venv/bin/python -m pytest -q tests` 통과 (새 문법·계산은 테스트 한 개 이상 추가).
+- [ ] 테스트는 진짜 외부 서비스(학교 로그인·Canvas·Google·GitHub)를 부르지 않는다 — 새로 그런 코드를 넣으면 `tests/conftest.py` 에서 막는다.
 - [ ] 대시보드를 바꿨으면 브라우저 콘솔에 오류가 없는지. node 가 없으면 Playwright 로:
   `dashboard/index.html` 을 `file://` 로 열고 `pageerror` 를 모아 보기 (data.js 는 `bin/pa run` 으로 새로).
 - [ ] 엔진(`bin/pa watch`)을 다시 켜서 실제로 한 번 눌러 보기 — 서버 코드는 다시 켜야 반영된다.
@@ -85,6 +86,7 @@ python3 -m venv .venv && .venv/bin/pip -q install -r requirements.txt && .venv/b
 |---|---|---|
 | 2026-11-16 | 배포마다 기록 없는 새 커밋을 **강제 push** → 받은 사람의 `git pull` 이 "unrelated histories" 로 실패 | 이전 배포 커밋 위에 쌓고 일반 push. 예전에 받은 사람은 한 번 `git fetch origin && git reset --hard origin/main` |
 | 2026-11-16 | f-string 안 백슬래시 — 개발 PC(3.12)에서는 되지만 3.10 에서 문법 오류 | 정규식은 함수로 빼서 씀 (`render._plain`). 점검 목록 3 |
+| 2026-11-16 | 자동 로그인을 넣은 뒤, '로그인 끊김'을 흉내 내는 테스트가 `.env` 의 실제 계정으로 **진짜 학교 로그인**을 함 (테스트 돌릴 때마다) | `tests/conftest.py` 가 모든 테스트에서 자동 로그인을 막고, `browser.auto_login` 도 테스트 중이면 거부 |
 | 2026-11-16 | 개발 중 파일을 두 번에 나눠 고치는 사이 엔진이 덜 고친 코드로 스스로 다시 시작 → 감시 루프 오류로 엔진이 꺼짐 | 다시 시작 전 새 코드를 다른 프로세스에서 import 해 보고, 루프는 오류가 나도 계속 (`pipeline._new_code_ok`) |
 | 2026-11-16 | 보고서 폴더를 과목별로 나눴더니 대시보드가 기존 보고서를 못 찾음 | `jobs.report_path` 가 `~/report` 아래 전체에서 찾음. 견본 `templates/report-CLAUDE.md` 에도 규칙 추가 |
 
