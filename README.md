@@ -86,6 +86,16 @@ bin/pa watch                  # 엔진 + 대시보드 http://localhost:8765 (켜
 
 VSCode 에서 `assistant.code-workspace` 를 열면 엔진과 대시보드가 자동으로 켜진다 ([docs/usage.md](docs/usage.md)).
 
+편하게 쓰기 (선택):
+
+```bash
+bin/pa shortcut               # 바탕화면 '비서' 바로가기 — 누르면 VSCode 로 비서 폴더 (엔진·대시보드 자동)
+bin/pa open                   # 대시보드를 주소창 없는 앱 창으로
+```
+
+- **VSCode 없이 늘 켜 두기 (Windows)**: `scripts/windows/register-task.ps1` 을 한 번 실행하면 로그인할 때 엔진이 창 없이 켜지고
+  대시보드 앱 창이 뜬다. 창을 닫아도 3분 뒤 다시 열린다 (`config/timetable.yaml` 의 `dashboard.reopen_minutes`, 대시보드 아래 '오늘은 끄기').
+
 ### 알아 둘 것
 
 - 제주대 전용이다 (`canvas.jejunu.ac.kr`). 다른 학교는 `pa/canvas.py`·`pa/browser.py` 의 주소를 바꿔야 하고, 강의 자료 받기(LearningX)는 동작하지 않을 수 있다.

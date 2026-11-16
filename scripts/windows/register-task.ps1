@@ -11,7 +11,7 @@
 #   Windows: powershell -ExecutionPolicy Bypass -File "<비서 폴더>\scripts\windows\register-task.ps1"
 # 지우기: 같은 폴더의 unregister-task.ps1
 
-$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).ProviderPath
+$Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))  # ..\.. 를 풀어 둔 경로 (\\wsl.localhost\… 도)
 $Dir = Join-Path $env:LOCALAPPDATA "PersonalAssistant"
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 
@@ -22,7 +22,7 @@ function Hidden-Wsl($name, $cmd) {
     $linux = '/' + (($parts | Select-Object -Skip 2) -join '/')
     $vbs = Join-Path $Dir $name
     $line = 'CreateObject("WScript.Shell").Run "wsl.exe -d ' + $distro + ' -- bash -lc ""cd ''' + $linux + ''' && ' + $cmd + '""", 0, True'
-    Set-Content -Path $vbs -Value ("' 개인 비서 (작업 스케줄러가 창 없이 실행). register-task.ps1 이 만듦.`r`n" + $line) -Encoding ASCII
+    Set-Content -Path $vbs -Value ("' Personal assistant: run hidden from Task Scheduler (made by register-task.ps1)`r`n" + $line) -Encoding ASCII
     return (New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbs`"")
 }
 

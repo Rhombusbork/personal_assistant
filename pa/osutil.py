@@ -58,6 +58,7 @@ def open_app(url):
 def _ps(script):
     """Windows PowerShell 한 덩어리 실행 (WSL·Windows). (성공, 출력)"""
     exe = "powershell.exe" if IS_WSL else "powershell"
+    script = "[Console]::OutputEncoding = [Text.Encoding]::UTF8\n" + script  # 한글 출력이 깨지지 않게
     r = subprocess.run([exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
                        **({"cwd": "/mnt/c"} if IS_WSL else {}))
