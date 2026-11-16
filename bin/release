@@ -1,22 +1,44 @@
 #!/bin/sh
-# 친구용 배포: bin/release
-# 지금 커밋(HEAD)의 파일만 기록 없이 한 커밋으로 묶어 배포 저장소의 main 에 올린다.
-# git 에 들어 있는 것만 나가므로 내 설정(config/*.yaml, profile.md, .env, data/)은 절대 안 나간다.
+# 친구용 배포: bin/release [--dry-run]
+# 지금 커밋(HEAD)의 파일을 배포 저장소 main 의 '이전 배포 커밋 위에' 한 커밋으로 올린다.
+#  - 내 개발 기록(커밋 메시지·옛 버전)은 안 나간다: 배포 저장소에는 배포 때마다 커밋 하나씩만 쌓인다.
+#  - 이전 배포 위에 쌓으므로 받은 사람은 'git pull' 로 업데이트된다 (강제 push 안 함).
+#  - git 에 들어 있는 것만 나가므로 내 설정(config/*.yaml, profile.md, .env, data/)은 절대 안 나간다.
+# 절차·점검 목록: docs/release.md
 set -e
 cd "$(dirname "$0")/.."
+SRC=$(pwd)
 REPO=${PA_RELEASE_REPO:-https://github.com/Rhombusbork/personal_assistant_release.git}
+DRY=0; [ "$1" = "--dry-run" ] && DRY=1
+
+# 1. 커밋 안 된 변경이 없어야 한다 (HEAD 만 나가므로)
 [ -z "$(git status --porcelain)" ] || { echo "커밋 안 된 변경이 있습니다 — 먼저 커밋하세요"; exit 1; }
-PERSONAL='neojun|학번은 [0-9]|[0-9]{10}_'  # 아이디, 학번 문장, 학번_이름 파일명
-if git grep -qIiE "$PERSONAL" HEAD -- . ':!bin/release'; then
-  echo "개인 정보로 보이는 줄이 있어 멈춥니다:"; git grep -nIiE "$PERSONAL" HEAD -- . ':!bin/release'; exit 1
+
+# 2. 개인 정보 검사 (아이디, 학번 문장, 학번_이름 파일명, 집 경로)
+PERSONAL='neojun|학번은 [0-9]|[0-9]{10}_|/home/[a-z0-9_]+/(personal|report|study)'
+if git grep -qIiE "$PERSONAL" HEAD -- . ':!bin/release' ':!docs/release.md'; then
+  echo "개인 정보로 보이는 줄이 있어 멈춥니다:"; git grep -nIiE "$PERSONAL" HEAD -- . ':!bin/release' ':!docs/release.md'; exit 1
 fi
+
+# 3. 테스트 (Windows·리눅스 공통 코드가 깨지지 않았는지)
+PY=.venv/bin/python; [ -x "$PY" ] || PY=python3
+"$PY" -m pytest -q tests >/dev/null 2>&1 || { echo "테스트 실패 — '$PY -m pytest -q tests' 로 확인하세요"; exit 1; }
+
+# 4. 배포 저장소를 받아 그 위에 지금 파일을 덮는다
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-git archive HEAD | tar -x -C "$TMP"
-rm -f "$TMP/bin/release"
-cd "$TMP"
-git init -q -b main
+if git clone -q --depth 1 "$REPO" "$TMP/r" 2>/dev/null && git -C "$TMP/r" rev-parse -q --verify HEAD >/dev/null; then
+  git -C "$TMP/r" rm -rq --ignore-unmatch .   # 지난 배포의 파일을 모두 지우고 (없어진 파일도 반영되게)
+else
+  rm -rf "$TMP/r"; mkdir "$TMP/r"; git -C "$TMP/r" init -q -b main
+fi
+git archive HEAD | tar -x -C "$TMP/r"
+rm -f "$TMP/r/bin/release"
+cd "$TMP/r"
 git add -A
-git -c user.name="$(git -C "$OLDPWD" config user.name)" -c user.email="$(git -C "$OLDPWD" config user.email)" \
-  commit -qm "Release $(date +%Y-%m-%d) ($(git -C "$OLDPWD" rev-parse --short HEAD))"
-git push -q -f "$REPO" main
+if git diff --cached --quiet; then echo "바뀐 것이 없어 올리지 않습니다"; exit 0; fi
+echo "바뀌는 파일:"; git diff --cached --stat | tail -15
+[ $DRY = 1 ] && { echo "(--dry-run: 올리지 않음)"; exit 0; }
+git -c user.name="$(git -C "$SRC" config user.name)" -c user.email="$(git -C "$SRC" config user.email)" \
+  commit -qm "Release $(date +%Y-%m-%d) ($(git -C "$SRC" rev-parse --short HEAD))"
+git push -q "$REPO" HEAD:main
 echo "올림: $REPO"

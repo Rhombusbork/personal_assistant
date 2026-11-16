@@ -700,7 +700,7 @@ const det = k => UI.open.has(k) ? "open" : "";
 function todayView(now, today) {
   const rows = [
     ...D.busy.filter(b => ymd(b.start) === today).map(b => ({ busy: true, start: b.start, end: b.end, title: b.label })),
-    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ start: p.start, end: p.end, t: findTask(p.key), summary: p.summary, kind: p.kind, why: p.why,
+    ...D.plan.filter(p => ymd(p.start) === today).map(p => ({ pk: p.key, start: p.start, end: p.end, t: findTask(p.key), summary: p.summary, kind: p.kind, why: p.why,
       part: (p.summary.match(/\((\d+\/\d+)\)$/) || [])[1] })),
   ].sort((a, b) => dt(a.start) - dt(b.start));
   const H = hero(rows, now, today);
@@ -725,7 +725,7 @@ function todayView(now, today) {
     }
     h += `<div class="row${past}${cur}"${past ? "" : rowAttr(t)}>${tcol}${t ? ck(t) : `<span></span>`}<div class="body" title="${esc(r.why || "")}">
         <div class="ttl">${t ? esc(t.title) : esc(clean(r.summary))}${r.part ? ` <span class="clip">(${r.part})</span>` : ""}${clip(t)}</div>
-        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}${redoTag(t)}</div>` : ""}</div>
+        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}${redoTag(t)}</div>` : ""}${ovNote(r.pk)}</div>
       ${t && !past ? rowActs(t) : "<span></span>"}</div>`;
   }
   if (dayEnd > cursor) h += gap(cursor, dayEnd);
@@ -746,13 +746,16 @@ function dueMeta(t, now, today) {
   return `마감 ${ddayText(t.due, today)} ${hm(t.due)}`;
 }
 
+// 직접 정한 할 시간이 수업·다른 블록과 겹치면 회색 한 줄로만 알린다 (막지 않음)
+const ovNote = (pk, cls = "meta") => { const o = pk && D.overlaps && D.overlaps[pk];
+  return o && o.length ? `<div class="${cls}">겹침 · ${esc(o.join(", "))}</div>` : ""; };
 const URGENT_MS = 3 * 36e5;  // 이 안에 마감이 있으면 기본 할 일 대신 그 일을 맨 위에
 // 기본 할 일: 급한 게 없을 때 맨 위에 이름만 (VSCode 폴더 열기 / 링크 열기). 위 작은 줄에 다음 계획을 알려 준다.
 function defaultHero(defs, next, now) {
   const i = ((UI.defIdx || 0) % defs.length + defs.length) % defs.length, d = defs[i];
   const eyebrow = next ? `다음 <span class="sep">·</span> <span class="num">${hm(next.start)}</span> ${esc(next.t ? next.t.title : clean(next.summary))} <span class="sep">·</span> ${dur(Math.round((dt(next.start) - now) / 6e4))} 뒤`
                        : `오늘 남은 계획 없음`;
-  const where = d.kind === "link" ? (() => { try { return new URL(d.target).host; } catch { return d.target; } })() : d.target.replace(/^\/home\/[^/]+/, "~");
+  const where = d.kind === "link" ? (() => { try { return new URL(d.target).host; } catch { return d.target; } })() : d.target.replace(/^\/home\/[^/]+|^[A-Za-z]:\\Users\\[^\\]+/, "~");
   return { key: null, row: null, html: `<section class="hero" id="hero"><div class="eyebrow">${eyebrow}</div>
     <div class="hero-head"><span></span><div class="hero-body"><h2 class="hero-title">${esc(d.title)}</h2>
       <div class="hero-meta">${d.kind === "link" ? "링크" : "VSCode"} · ${esc(where)}${defs.length > 1 ? ` · <span class="num">${i + 1}/${defs.length}</span>` : ""}</div>
@@ -799,7 +802,7 @@ function hero(rows, now, today) {
       <div class="hero-acts"><button class="btn primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>
         ${P.act !== "start" && !MOB ? `<button class="btn plain" data-act="start" data-key="${esc(t.key)}" data-label="시간 재기 시작">⏱ 시간 재기</button>` : ""}
         <button class="icon-btn" data-menu="${esc(t.key)}" title="다른 동작 (.)" aria-label="다른 동작: ${esc(t.title)}" aria-haspopup="menu" aria-expanded="false">⋯</button></div>
-      ${pick && pick.why ? `<p class="why">왜 지금? ${esc(pick.why)}</p>` : ""}</div></div></section>` };
+      ${pick && pick.why ? `<p class="why">왜 지금? ${esc(pick.why)}</p>` : ""}${pick ? ovNote(pick.pk, "why") : ""}</div></div></section>` };
 }
 
 // ---- 심각도 분류: 2 = 지금 행동해야 함(빨강) · 1 = 행동 필요하지만 급하지 않음(주황) · 0 = '확인할 것' 안에 접어 둠

@@ -3,6 +3,17 @@
 제주대 Canvas 과제·온라인 강의·시간표를 모아 Google 캘린더에 학습 계획을 짜 주고,
 대시보드(http://localhost:8765)로 오늘 할 일을 보여 주는 개인 비서. Claude Code 와 함께 쓰면 공부·보고서 초안도 돕는다.
 
+## 할 수 있는 것
+
+- **할 일 모으기**: Canvas 과제·퀴즈·온라인 강의(실제 길이·출석 마감)를 자동으로, 내 할 일은 대시보드 입력칸이나 `inbox.md` 로
+- **자동 계획**: 마감 순으로 빈 시간에 배치해 Google 캘린더 '학습 계획'에 넣는다 (수업·약속은 피함, 하루 한도, 큰 일은 나눔)
+- **할 시간 따로 정하기**: `발표 준비 >내일 15-18시 @금` — 15~18시에 하고 마감은 금요일. 수업과 겹치면 회색 안내만 (막지 않음)
+- **맨 위 '지금 할 일'**: 진행 중인 계획 > 3시간 안 마감 > **기본 할 일**(급한 게 없을 때 VSCode 폴더나 링크를 버튼 하나로)
+- **강의 자료 자동 받기**·수강 완료 자동 체크 (LearningX), 공지·새 점수·시험 일정 후보 모아 보기
+- **보고서 초안·자료 요약·공지 정리** (Claude Code 또는 Codex, 버튼을 누를 때만)
+- **휴대폰 화면**(비밀번호 잠금, GitHub Pages)·휴대폰 입력
+- 빠른 입력·inbox 문법 전체: [docs/usage.md](docs/usage.md)
+
 ## 처음 설치하기 (다른 사람이 받아 쓸 때)
 
 **필요한 것**: Python 3.10+, git, VSCode, 제주대 Canvas 계정, Google 계정.
@@ -37,6 +48,7 @@ bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남�
 | `.env` | Canvas 토큰 | Canvas → 계정 → 설정 → **새 액세스 토큰** → `.env` 의 `CANVAS_TOKEN=` 뒤에 붙여 넣기 |
 | `credentials.json` | Google 캘린더 앱 열쇠 | [docs/google-calendar-setup.md](docs/google-calendar-setup.md) 1~5단계 (내 Google 계정으로) |
 | `token.json` | Google 로그인 | 따로 만들지 않음 — 처음 실행할 때 뜨는 주소로 로그인하면 생김 |
+| `.env` (선택) | 학교 포털 계정 | `PA_SCHOOL_ID=`·`PA_SCHOOL_PW=` — 강의 플랫폼 로그인이 끊기면 엔진이 자동으로 다시 로그인 (30분에 한 번까지). 평소 브라우저의 강의 로그인이 끊길 수 있음 |
 
 ### 2. 내 것으로 채우기 (`예시과목` 을 바꾸기)
 
@@ -75,11 +87,14 @@ VSCode 에서 `assistant.code-workspace` 를 열면 엔진과 대시보드가 �
 ### 알아 둘 것
 
 - 제주대 전용이다 (`canvas.jejunu.ac.kr`). 다른 학교는 `pa/canvas.py`·`pa/browser.py` 의 주소를 바꿔야 하고, 강의 자료 받기(LearningX)는 동작하지 않을 수 있다.
-- 강의 자료 자동 받기는 `bin/pa browser login` 으로 학교 로그인을 한 번 저장해야 된다.
+- 강의 자료 자동 받기는 `bin/pa browser login` 으로 학교 로그인을 한 번 저장해야 된다. `.env` 에 학교 계정을 넣어 두면 끊길 때 자동으로 다시 로그인한다.
 - 공부 노트·보고서·퀴즈 연동은 `~/study_system`, `~/report`, `~/quiz_system_project/pharmacy` 폴더를 쓴다. 없으면 그 기능만 비어 있다.
 - 내 파일은 절대 공유하지 않는다 (`.env`, `credentials.json`, `token.json`, `data/`).
 - 휴대폰 화면·휴대폰 입력은 `git` 명령을 쓴다 (Windows 는 Git for Windows 설치).
-- 업데이트: `git pull`. 내 설정은 git 밖에 있어서 덮어쓰이지 않는다. 견본에 새 항목이 생기면 `config/*.example.yaml` 과 비교해 옮긴다.
+- 업데이트: `git pull` → 엔진(대시보드)을 껐다 켠다. 내 설정은 git 밖에 있어서 덮어쓰이지 않는다.
+  견본에 새 항목이 생기면 `config/*.example.yaml`·`.env.example` 과 비교해 옮긴다. 데이터베이스(`data/pa.db`)는 엔진이 알아서 고친다.
+- `git pull` 이 "unrelated histories"·"diverged" 로 실패하면 (예전 배포 방식으로 받은 경우) 한 번만:
+  `git fetch origin && git reset --hard origin/main` — 내 설정·데이터는 git 밖이라 지워지지 않는다. 단 직접 고친 코드는 사라진다.
 
 ---
 
