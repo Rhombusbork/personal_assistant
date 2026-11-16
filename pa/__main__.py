@@ -47,7 +47,24 @@ def cmd_inbox(conn, args):
 
 
 def cmd_run(conn, args):
+    if args.full and _ask_engine_sync():
+        print("엔진이 켜져 있어 엔진에게 최신화를 맡겼습니다 (data/pa.log)")
+        return
     pipeline.run(full=args.full)
+
+
+def _ask_engine_sync():
+    """엔진(bin/pa watch)이 켜져 있으면 그 안에서 최신화하게 부탁한다 — 작업 스케줄러의 하루 3번 실행이
+    엔진과 따로 돌며 로그인 상태를 바꾸거나 같은 일을 두 번 하지 않게. 엔진이 없으면 False."""
+    import json as _json
+    import urllib.request
+    from pa import server
+    req = urllib.request.Request(f"http://localhost:{server.PORT}/api/sync", data=b"{}", method="POST",
+                                 headers={"X-PA": "1", "Content-Type": "application/json", "Host": f"localhost:{server.PORT}"})
+    try:
+        return bool(_json.loads(urllib.request.urlopen(req, timeout=5).read()).get("ok"))
+    except (OSError, ValueError):
+        return False
 
 
 def cmd_watch(conn, args):

@@ -86,7 +86,7 @@ def auto_login():
     from pa.config import load_env
     load_env()  # 켜 둔 뒤에 .env 에 넣은 계정도 읽게
     uid, pw = os.environ.get("PA_SCHOOL_ID"), os.environ.get("PA_SCHOOL_PW")
-    if not uid or not pw:
+    if not uid or not pw or "PYTEST_CURRENT_TEST" in os.environ:  # 테스트 중에는 절대 진짜 로그인하지 않음
         return False
     stamp = ROOT / "data" / "auto-login.last"
     if stamp.exists() and time.time() - stamp.stat().st_mtime < _AUTO_GAP:
