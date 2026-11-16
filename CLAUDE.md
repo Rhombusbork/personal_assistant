@@ -66,8 +66,9 @@
 - 커밋·push 여부와 내 저장소는 `config/profile.md` 의 '내 저장소'를 따른다. 적혀 있지 않으면 커밋만 하고 push 는 묻는다.
 - 개인 파일(`config/*.yaml`, `config/profile.md`, `.env`, `data/` 등)은 git 에 넣지 않는다. 설정 견본(`*.example.*`)에는 개인 정보를 넣지 않는다.
 - `gh-pages`(휴대폰 화면)·`phone-inbox`(휴대폰 입력) 브랜치는 엔진(`pa/mobile.py`)이 관리한다. 손으로 고치지 않는다.
-- 친구용 배포(`personal_assistant_release`, Windows·WSL·리눅스 공용)는 `bin/release`. 기능을 바꿀 때마다 `docs/release.md` 의 점검 목록
-  (개인 정보·견본 설정·OS 공통·Python 3.10·DB 자동 수정·테스트)을 지키고, 배포 뒤 그 문서의 '배포 기록'에 한 줄 남긴다.
+- 친구용 배포(`personal_assistant_release`, Windows·WSL·리눅스 공용)는 `bin/release`. **사용자가 배포하라고 할 때만** 한다
+  (2026-11-16 사용자가 정함 — 평소엔 내 저장소에 커밋·push 만, 배포는 모아서 한 번에). 대신 기능을 바꿀 때마다 `docs/release.md` 의
+  점검 목록(개인 정보·견본 설정·OS 공통·Python 3.10·DB 자동 수정·테스트)은 지켜서 언제 배포해도 되는 상태로 두고, 배포 뒤 '배포 기록'에 한 줄.
 
 ## 원칙
 
