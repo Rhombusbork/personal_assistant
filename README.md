@@ -90,11 +90,12 @@ VSCode 에서 `assistant.code-workspace` 를 열면 엔진과 대시보드가 �
 
 ```bash
 bin/pa shortcut               # 바탕화면 '비서' 바로가기 — 누르면 VSCode 로 비서 폴더 (엔진·대시보드 자동)
-bin/pa open                   # 대시보드를 주소창 없는 앱 창으로
+bin/pa open                   # 대시보드 열기 (VSCode 안 탭 — 비서 VSCode 확장, setup 이 설치 / 없으면 bin/pa vscode-ext)
 ```
 
 - **VSCode 없이 늘 켜 두기 (Windows)**: `scripts/windows/register-task.ps1` 을 한 번 실행하면 로그인할 때 엔진이 창 없이 켜지고
-  대시보드 앱 창이 뜬다. 창을 닫아도 3분 뒤 다시 열린다 (`config/timetable.yaml` 의 `dashboard.reopen_minutes`, 대시보드 아래 '오늘은 끄기').
+  VSCode 가 비서 폴더로 열리며 대시보드가 그 안 탭으로 뜬다. 탭을 닫아도 3분 뒤 다시 열린다
+  (`config/timetable.yaml` 의 `dashboard`: `mode: vscode`·`app`, `reopen_minutes`, `start_vscode` / 대시보드 아래 '오늘은 끄기').
 
 ### 알아 둘 것
 

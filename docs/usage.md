@@ -105,11 +105,17 @@
   켜 둔 동안은 `config/timetable.yaml` 의 `canvas.check_every_hours` 마다(기본 3, 0 이면 끔) + 대시보드 ⟳ 를 누를 때.
 - **15분마다** (가벼움 — 한 번에 몇 초, 대부분 인터넷 대기): 휴대폰 입력 가져오기, 퀴즈 기록, 곧 마감인 것의 제출·수강 확인,
   계획·마감 캘린더는 바뀐 게 있을 때만 Google 에 반영, 휴대폰 화면. 30분 안에 마감이 있으면 제출 확인만 3분마다.
-- **창은 늘 하나**: 대시보드는 주소창 없는 **앱 창**(Edge `--app`)으로 연다. 열린 창이 **3분 동안 없으면 엔진이 다시 연다**
-  (`config/timetable.yaml` 의 `dashboard.reopen_minutes`, 0 이면 안 함). 잠깐 닫아 두려면 대시보드 맨 아래 **'오늘은 끄기'** (내일 다시 켜짐).
+- **창은 늘 하나, VSCode 안 탭으로** (`config/timetable.yaml` 의 `dashboard.mode: vscode`): 비서 VSCode 확장(`bin/pa vscode-ext`, setup 이 설치)이
+  10초마다 엔진에 물어보고, 엔진이 열라고 하면 VSCode 안 탭(Simple Browser)으로 연다. 바깥 창은 열지 않는다.
+  - VSCode 를 열면 몇 초 안에 안 탭이 뜬다. 탭이 **3분 동안 없으면 다시 연다** (`dashboard.reopen_minutes`, 0 이면 안 함)
+  - VSCode 를 직접 닫으면 다시 열지 않는다. PC 로그인 때(엔진은 작업 스케줄러로 켜짐) VSCode 가 없으면 1분 뒤 VSCode 를 비서 폴더로 연다 (`start_vscode`)
+  - 탭을 VSCode 밖에 따로 띄우려면 탭 우클릭 → **새 창으로 이동** (VSCode 의 일부라 VSCode 를 닫으면 같이 닫힘)
+  - `mode: app` 이면 대신 주소창 없는 Edge 앱 창으로 (VSCode 없이도)
+  - 잠깐 닫아 두려면 대시보드 맨 아래 **'오늘은 끄기'** (내일 다시 켜짐).
   창은 입력 중이어도 30초마다 엔진에 신호를 보내고, 닫으면 닫았다고 알린다. PC 가 잠들었다 깬 직후에는 창이 다시 신호를 보낼 때까지 기다린다.
   VSCode 를 열 때 이미 창이 있으면 새로 열지 않고, 그래도 겹치면 나중 창에 회색 안내 "다른 대시보드 창이 이미 열려 있어요".
-- **직접 열기**: 아무 브라우저에서 http://localhost:8765 · 터미널 `bin/pa open` · VSCode `Ctrl+Shift+P` → `Tasks: Run Task` → **비서: 대시보드 열기**
+- **직접 열기**: VSCode `Ctrl+Shift+P` → **비서: 대시보드 열기 (VSCode 안)** · 터미널 `bin/pa open` (VSCode 가 꺼져 있으면 VSCode 를 엶) ·
+  아무 브라우저에서 http://localhost:8765
 - **바탕화면 '비서' 바로가기**: `bin/pa shortcut` 으로 한 번 만든다 → 누르면 VSCode 가 비서 폴더로 열리고 엔진·대시보드가 자동으로 켜진다
 - **엔진이 꺼졌을 때** (주소가 안 열림): Windows 작업 스케줄러에 등록했으면 다음 로그인 때 저절로 (아래), 지금 켜려면
   `Ctrl+Shift+P` → `Tasks: Run Task` → **비서: 자동 감시**, 바탕화면 '비서', 또는 PowerShell `Start-ScheduledTask -TaskName PersonalAssistant-Engine`
