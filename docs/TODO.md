@@ -49,6 +49,7 @@ VSCode 를 다시 열면 "이미 다른 창에서 감시 중" 이라고 나오�
   - [ ] (선택) 비공개 저장소의 GitHub Actions 로 PC 없이 Canvas 새 과제·공지 알림 — personal_assistant 는 공개라 Actions 기록도 공개됨, 여기서 돌리지 않는다
   - [x] Remote Control: 모든 세션 자동 연결 + 휴대폰 알림 (사용자 설정)
   - [x] Tailscale 로 대시보드: 엔진이 Tailscale 이름을 알아내 허용, 휴대폰에서 PC 화면 동작 대신 링크·파일 열기
+  - [x] 수업 시간표를 학교 포털에서 매주 읽기 (대면만, 휴강·보강 반영) — 2026-11-16
   - [ ] **사용자**: Tailscale 설치·로그인 (usage.md 'Tailscale' 1~5) → 휴대폰에서 한 번 열어 보기
 
 ### 확인이 필요한 것

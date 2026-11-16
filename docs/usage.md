@@ -331,6 +331,7 @@ PC 에서 도는 Claude Code 세션을 휴대폰 Claude 앱 › **Code** 에서 
 | `bin/pa lectures [과목] [--open N]` | 이번 주 강의 목록·열기 |
 | `bin/pa browser login` | 학교 로그인 저장 (LearningX 연결) — 사용자가 직접 할 때만 |
 | `bin/pa google-login` | Google Calendar 다시 로그인 (브라우저가 열림) |
+| `bin/pa timetable [--dry-run]` | 학교 포털(하영드리미)의 내 시간표를 지금 읽어 대면 수업만 '수업 시간표' 캘린더에 (엔진은 매주 자동) |
 | `bin/pa pull` | 내 git 저장소를 GitHub 과 대조해 내려받기 (`config/repos.yaml`, 엔진은 켤 때 한 번 자동) |
 
 VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기화` 로도 실행할 수 있다.
@@ -348,6 +349,10 @@ VSCode 에서 `Ctrl+Shift+P → 작업 실행 → 비서: 지금 전체 동기�
 - 단계마다 따로 실패한다 — Canvas 가 안 돼도 계획·화면은 갱신되고, 무엇이 안 됐는지 ⚠️ 로 알린다
 - Google 로그인이 만료되면 엔진이 멈추지 않고 "Google Calendar 로그인 필요" + [Google 다시 로그인] 버튼
 - `pa/*.py` 코드가 바뀌면 엔진이 새 코드로 스스로 다시 시작한다 (Claude 작업이 진행 중이면 끝난 뒤)
+- **매주 첫 전체 확인 때** 학교 포털(하영드리미)의 내 시간표를 읽어, 이번 주 월요일부터 계획 기간까지의 **대면 수업**을
+  '수업 시간표' 캘린더에 날짜별로 맞춘다 (휴강 빼고 보강 넣음, 이어지는 교시는 한 일정). 계획은 그 시간을 피한다.
+  대면 과목은 `config/timetable.yaml` 의 `portal.offline` 에 적은 것만 — 처음 보는 과목은 '⚠️ 확인 필요'로 묻는다.
+  로그인은 `.env` 의 학교 계정 (주 1회 정도, 실패하면 6시간 뒤 다시). 예전 `bin/pa sync-timetable` (매주 반복 일정)은 이것을 켜면 쓰지 않는다
 - 켤 때 한 번 `config/repos.yaml` 의 저장소를 GitHub 과 대조해 새 커밋을 받는다 (아래 'PC 가 꺼져 있을 때')
 - 다운로드 폴더는 30초마다 맨 위만 한 번 본다. 그 목록을 📄 자료 창의 📥 가 그대로 쓴다
 - 1년 넘은 자동 기록(events)은 하루 한 번 전체 동기화 때 지운다

@@ -57,6 +57,7 @@ bin/setup          # 파이썬 환경, .env 견본, 빈 폴더를 만들고 남�
 - `config/timetable.yaml`: 학기 날짜, 대면 수업 시간표, 온라인 수업(Canvas 과목명), 공부 요일·시간·알림
 - `config/courses.yaml`: 과목명 → 자료 폴더 이름 (`~/study_system/materials/<폴더>`)
 - `config/profile.md`: 나는 누구인지, 과목 대응표, 내 백업 저장소 (Claude Code 가 읽음)
+- `config/timetable.yaml` 의 `portal` (선택, 제주대): 학교 포털 시간표를 매주 읽어 대면 수업만 캘린더에 — 대면 과목 이름을 `offline` 에
 - `config/repos.yaml` (선택): 엔진이 켤 때 GitHub 에서 내려받을 내 git 저장소 (휴대폰·클라우드에서 고친 기록을 PC 로). 비우면 안 받음
 - `~/report/CLAUDE.md`: 보고서 글쓰기 규칙 (setup 이 견본을 복사) — 0-1 절의 `<학번>`·`<이름>` 을 내 것으로
 - Claude Code 를 쓰면 채팅에서 "규칙 바꿔줘"(`rules`)로 해도 된다
