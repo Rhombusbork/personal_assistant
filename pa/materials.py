@@ -121,6 +121,14 @@ def reveal(path):
         return False
 
 
+def vscode_folder(folder):
+    """사용자가 기본 할 일로 정해 둔 폴더를 VSCode 새 창으로 (위치 제한 없음 — 사용자가 직접 넣은 경로). 실패하면 False."""
+    folder = Path(folder).expanduser().resolve()
+    if not folder.is_dir():
+        raise ValueError(f"폴더가 없습니다: {folder}")
+    return _vscode_open(folder, args=["--new-window", str(folder)])
+
+
 def open_window(folder, file=None):
     """VSCode 새 창으로 작업 폴더를 연다 (그 창의 AI 채팅은 그 폴더의 규칙 파일을 따름). 파일이 있으면 함께."""
     folder = Path(folder).resolve()

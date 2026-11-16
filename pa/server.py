@@ -4,6 +4,8 @@ GET  /               대시보드 (dashboard/index.html)
 GET  /api/data       지금 시각 기준 대시보드 데이터 (요청마다 새로 계산). ?v=<id> 로 '열려 있음' 신호
 GET  /api/viewers    최근 45초 안에 신호를 보낸 대시보드 탭 수 (VSCode 가 중복으로 열지 않게)
 POST /api/add        할 일 추가 → inbox.md 에 한 줄
+POST /api/defaults   기본 할 일 목록 저장 {items:[{id?, title, kind:'vscode'|'link', target}]}
+POST /api/default-open {id}  기본 할 일 열기 (VSCode 새 창 / 평소 브라우저)
 POST /api/redo       마감이 지난 일을 오늘·다른 날 하기 {key, day:'YYYY-MM-DD'|''}
 POST /api/done       완료 (inbox 할 일은 체크, 그 밖은 ## 완료) / POST /api/undone 되돌리기
 POST /api/ignore     계속 제외 (## 제외). pattern=true 면 같은 이름의 앞으로 생길 과제도
@@ -42,7 +44,7 @@ import json
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -70,9 +72,21 @@ def parse_add(body):
     if body.get("date"):
         t = body.get("time") or "23:59"
         due = datetime.fromisoformat(f"{body['date']}T{t}").replace(tzinfo=KST)
+    earliest = slot_end = None
+    if body.get("sdate") and body.get("sfrom"):  # 할 시간 (마감과 따로)
+        earliest = datetime.fromisoformat(f"{body['sdate']}T{body['sfrom']}").replace(tzinfo=KST)
+        if body.get("sto"):
+            hh, mm = map(int, body["sto"].split(":"))
+            slot_end = earliest.replace(hour=0, minute=0) + timedelta(hours=hh, minutes=mm)
+            if slot_end <= earliest:  # 23:00-01:00 처럼 자정을 넘김
+                slot_end += timedelta(days=1)
+            if slot_end - earliest > timedelta(hours=12):
+                raise ValueError("할 시간이 너무 깁니다 (12시간까지)")
     return {
         "title": str(body.get("title", "")),
         "due": due,
+        "earliest": earliest,
+        "slot_end": slot_end,
         "minutes": int(body["minutes"]) if body.get("minutes") else None,
         "course": str(body.get("course", "")).strip(),
         "every": [int(d) for d in body.get("every", [])] or None,
@@ -209,7 +223,8 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/move-download", "/api/dismiss-download", "/api/job/report", "/api/job/notices", "/api/job/summary", "/api/job/summary-for",
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
-                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal"):
+                            "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
+                            "/api/defaults", "/api/default-open"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -292,6 +307,17 @@ class Handler(SimpleHTTPRequestHandler):
                 if not row or not row["url"]:
                     raise ValueError("열 수 있는 링크가 없음")
                 osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
+                return {"ok": True}
+            if action == "/api/defaults":  # 기본 할 일 목록 전체 저장 (순서 = 보이는 순서)
+                return {"ok": True, "defaults": render.set_defaults(conn, body.get("items") or [])}
+            if action == "/api/default-open":  # 기본 할 일 열기: VSCode 새 창(폴더) 또는 평소 브라우저(링크)
+                it = next((x for x in render.defaults(conn) if x["id"] == body.get("id")), None)
+                if not it:
+                    raise ValueError("없는 기본 할 일")
+                if it["kind"] == "link":
+                    osutil.open_url(it["target"])
+                elif not materials.vscode_folder(it["target"]):
+                    raise ValueError("VSCode 를 찾지 못했습니다 — VSCode 창이 하나라도 열려 있어야 합니다")
                 return {"ok": True}
             if action == "/api/report-brief":
                 jobs.save_brief(conn, body["key"], body.get("text", ""), body.get("blanks", True))

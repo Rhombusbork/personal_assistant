@@ -71,21 +71,25 @@ def modules(course_id, token=None, max_age=300):
     return mods, token
 
 
-def _modules(course_id, token=None):
-    """(모듈 목록, 쓴 토큰). 토큰이 없거나 만료되면 NeedLogin — 비서가 스스로 다시 로그인하지 않는다.
-
-    (비서가 따로 로그인하면 학교가 평소 브라우저의 통합 로그인을 끊어, 평소 브라우저에서
-     영상·자료가 안 열린 일이 있었다. 그래서 다시 로그인은 사용자가 버튼을 눌렀을 때만.)
+def _modules(course_id, token=None, retry=True):
+    """(모듈 목록, 쓴 토큰). 토큰이 없거나 만료되면 .env 의 학교 계정으로 한 번 자동 로그인하고 다시 읽는다.
+    계정이 없거나 자동 로그인이 실패하면 NeedLogin (대시보드 [다시 로그인] 버튼).
     """
     url = f"{BASE}/learningx/api/v1/courses/{course_id}/modules?include_detail=true"
-    token = token or _token()
-    if not token:
-        raise NeedLogin("LearningX 로그인 필요 (저장된 토큰 없음)")
     try:
-        return _get(url, token), token
-    except urllib.error.HTTPError as e:
-        if e.code in (400, 401, 403):  # 토큰이 무효면 LearningX 는 400 'Invalid request' 를 준다
-            raise NeedLogin(f"LearningX 로그인 만료 ({e.code})")
+        token = token or _token()
+        if not token:
+            raise NeedLogin("LearningX 로그인 필요 (저장된 토큰 없음)")
+        try:
+            return _get(url, token), token
+        except urllib.error.HTTPError as e:
+            if e.code in (400, 401, 403):  # 토큰이 무효면 LearningX 는 400 'Invalid request' 를 준다
+                raise NeedLogin(f"LearningX 로그인 만료 ({e.code})")
+            raise
+    except NeedLogin:
+        from pa import browser
+        if retry and browser.auto_login():
+            return _modules(course_id, None, retry=False)
         raise
 
 

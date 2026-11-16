@@ -194,6 +194,9 @@ def set_redo(conn, key, day):
     conn.commit()
 
 
+FIXED = "#고정"  # 직접 정한 할 시간 블록의 계획 키 꼬리 (예: i:PPT#고정)
+
+
 def _apply_redo(tasks, redo, t_now):
     """지난 마감 + '이날 하기' → 그날 23:59 까지로 계획 (그날이 내일 이후면 그날 0시부터)."""
     out = []
@@ -210,8 +213,8 @@ def _apply_redo(tasks, redo, t_now):
 def signature(conn):
     """계획에 영향을 주는 것들의 지문 — 할 일·예상 시간·설정·날짜·⏱ 기록. 같으면 다시 계획할 필요가 없다."""
     import hashlib
-    rows = conn.execute("SELECT key, due, earliest, minutes, minutes_override FROM tasks "
-                        "WHERE status = 'open' AND due IS NOT NULL ORDER BY key").fetchall()
+    rows = conn.execute("SELECT key, due, earliest, slot_end, minutes, minutes_override FROM tasks "
+                        "WHERE status = 'open' AND (due IS NOT NULL OR slot_end IS NOT NULL) ORDER BY key").fetchall()
     tt = load_timetable()
     ses = conn.execute("SELECT COUNT(*), COALESCE(SUM(minutes), 0) FROM sessions").fetchone()
     raw = json.dumps([[tuple(r) for r in rows], now().date().isoformat(), tt.get("planner"), tt.get("reminders"),
@@ -260,6 +263,8 @@ def run(conn, service=None, write=True):
     old = {r["key"]: r for r in conn.execute("SELECT * FROM plan").fetchall()}
     pinned, pinned_task, missed = {}, {}, []
     for k, r in old.items():
+        if k.endswith(FIXED):  # 직접 정한 할 시간은 아래에서 tasks 의 slot_end 로 다시 넣는다
+            continue
         base = k.split("#")[0]
         s, e = parse_dt(r["start"]), parse_dt(r["end"])
         if base in by_key and s <= t_now < e:
@@ -270,6 +275,20 @@ def run(conn, service=None, write=True):
         elif base in by_key and e <= t_now:
             missed.append((k, r["start"]))
 
+    # 직접 정한 할 시간: 고정 블록. 다른 일은 피해 가고, 그 일은 자동 배치하지 않는다 (예상 시간 = 그 길이).
+    # 마감 없이 시간만 정한 일도 넣는다. 시간이 지나면: 마감이 있으면 자동 배치로, 없으면 '하고 싶은 일'로.
+    for t in db.tasks(conn, "status = 'open' AND slot_end IS NOT NULL AND earliest IS NOT NULL"):
+        if t.slot_end <= t_now:
+            if t.key in by_key:
+                by_key[t.key].earliest = None
+            continue
+        s = t.earliest  # 이미 시작했어도 블록은 정한 그대로 보인다
+        pinned[t.key + FIXED] = (s, t.slot_end)
+        pinned_task[t.key + FIXED] = replace(by_key.get(t.key, t), key=t.key + FIXED,
+                                             minutes=int((t.slot_end - s).total_seconds() // 60))
+        if t.key in by_key:  # 남은 양 = 0 → 자동 배치 안 함
+            by_key[t.key].minutes = pinned_task[t.key + FIXED].minutes
+
     # --- 통신 (DB 쓰기 없음)
     service = service or get_service()
     # 수업·약속은 이번 주 월요일부터 (주차별 화면에서 지난 요일도 보이게). 계획은 지금부터만.
@@ -278,7 +297,7 @@ def run(conn, service=None, write=True):
     plan, failed, why = make_plan(items, busy, cfg, t_now, pinned)
     plan += [(pinned_task[k], s, e) for k, (s, e) in pinned.items()]
     for k in pinned:
-        why[k] = "이미 시작한 블록이라 그대로 둠"
+        why[k] = "직접 정한 시간" if k.endswith(FIXED) else "이미 시작한 블록이라 그대로 둠"
     plan.sort(key=lambda x: x[1])
     week_end = t_now + timedelta(days=7)
     slack = {"capacity": capacity(t_now, cfg, busy),

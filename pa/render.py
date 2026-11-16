@@ -1,7 +1,10 @@
 """출력 블록: TODAY.md (VSCode 미리보기용), dashboard/data.js (HTML 대시보드용)."""
 import json
+import os
+import uuid
 import re
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from pa import ai, calibrate, db, jobs, materials, quiz
 from pa.config import ROOT, load_timetable
@@ -87,7 +90,7 @@ def today_md(conn):
     L.append("")
 
     # 기한 없는 할 일
-    someday = [t for t in tasks.values() if t.status == "open" and not t.due]
+    someday = [t for t in tasks.values() if t.status == "open" and not t.due and not (t.slot_end and t.slot_end > t_now)]
     if someday:
         L += ["## 📌 기한 없는 할 일", ""] + [f"- {label(t)}" for t in someday] + [""]
 
@@ -133,7 +136,8 @@ def dashboard_data(conn):
     def task_json(t):
         return {"key": t.key, "kind": t.kind, "course": short_course(t.course), "title": t.title,
                 "due": t.due.isoformat() if t.due else None, "status": t.status, "minutes": t.minutes,
-                "source": t.source, "url": t.url}
+                "source": t.source, "url": t.url,
+                "slot": [t.earliest.isoformat(), t.slot_end.isoformat()] if t.slot_end else None}
 
     upcoming = [task_json(t) for t in all_tasks
                 if t.status == "open" and t.due and t_now - timedelta(days=1) <= t.due <= t_now + timedelta(days=21)]
@@ -193,7 +197,8 @@ def dashboard_data(conn):
         "tasks": upcoming, "plan": plan, "busy": busy, "warnings": warns,
         "progress": [{"course": c, **v} for c, v in sorted(progress.items())],
         "doneByDay": done_by_day,
-        "someday": [task_json(t) for t in all_tasks if t.status == "open" and not t.due],
+        "someday": [task_json(t) for t in all_tasks if t.status == "open" and not t.due and not (t.slot_end and t.slot_end > t_now)],
+        "slotted": [task_json(t) for t in all_tasks if t.status == "open" and not t.due and t.slot_end and t.slot_end > t_now],
         "plannedAt": db.get_meta(conn, "planned_at"),
         "courses": sorted({short_course(t.course) for t in all_tasks if t.course}),
         "active": active_json(conn, by_key),
@@ -204,6 +209,7 @@ def dashboard_data(conn):
         "exams": _exam_suggestions(conn),
         "grades": new_grades(conn),
         "redo": _redo(conn),
+        "defaults": defaults(conn),
         "weekReview": week_review(conn, t_now),
         "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),
@@ -283,6 +289,30 @@ def semester_weeks(all_tasks, t_now):
                       "minutes": sum(t.minutes for t in all_tasks if t.due and d <= t.due.date() < nxt and t.status == "open")})
         d = nxt
     return weeks
+
+
+def defaults(conn):
+    """기본 할 일 [{id, title, kind: 'vscode'|'link', target}] — 급한 일이 없을 때 맨 위에 (대시보드에서 관리)."""
+    return json.loads(db.get_meta(conn, "default_tasks") or "[]")
+
+
+def set_defaults(conn, items):
+    """목록 전체를 저장 (순서 = 보이는 순서). 형식이 이상하면 ValueError."""
+    out = []
+    for it in items:
+        title, kind, target = str(it.get("title", "")).strip(), it.get("kind"), str(it.get("target", "")).strip()
+        if not title or kind not in ("vscode", "link") or not target:
+            raise ValueError("이름·종류·경로(링크)를 모두 넣어 주세요")
+        if kind == "link" and not re.match(r"https?://", target):
+            raise ValueError("링크는 http:// 또는 https:// 로 시작해야 합니다")
+        if kind == "vscode":
+            target = str(Path(os.path.expanduser(target)))
+            if not Path(target).is_dir():
+                raise ValueError(f"폴더가 없습니다: {target}")
+        out.append({"id": it.get("id") or uuid.uuid4().hex[:8], "title": title, "kind": kind, "target": target})
+    db.set_meta(conn, "default_tasks", json.dumps(out, ensure_ascii=False))
+    conn.commit()
+    return out
 
 
 def _redo(conn):

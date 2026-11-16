@@ -72,6 +72,46 @@ def login(timeout_min=10):
         return False
 
 
+PORTAL = "https://portal.jejunu.ac.kr/login.htm?gateURL=https://jnuclass.jejunu.ac.kr/sso/business.php"
+_AUTO_GAP = 30 * 60  # 자동 로그인은 30분에 한 번까지 (비밀번호가 틀렸을 때 계정 잠김 방지)
+
+
+def auto_login():
+    """.env 의 PA_SCHOOL_ID·PA_SCHOOL_PW 로 안 보이는 브라우저에서 포털 로그인 → 토큰 저장. 성공하면 True.
+
+    사용자가 정한 것 (2026-11-16): 로그인이 끊기면 비서가 스스로 다시 로그인한다.
+    평소 브라우저의 학교 로그인이 끊길 수 있음을 알고 고른 것이다.
+    """
+    uid, pw = os.environ.get("PA_SCHOOL_ID"), os.environ.get("PA_SCHOOL_PW")
+    if not uid or not pw:
+        return False
+    stamp = ROOT / "data" / "auto-login.last"
+    if stamp.exists() and time.time() - stamp.stat().st_mtime < _AUTO_GAP:
+        return False
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.touch()
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        ctx = _context(p, headless=True)
+        try:
+            if not logged_in(ctx):
+                page = ctx.new_page()
+                page.goto(PORTAL, wait_until="networkidle", timeout=60000)
+                page.fill("#userId", uid)
+                page.fill("#userPswd", pw)
+                page.click("button[type=submit]")
+                end = time.time() + 60
+                while time.time() < end and not logged_in(ctx):
+                    page.wait_for_timeout(2000)
+                if not logged_in(ctx):
+                    return False
+            _finish(ctx)
+            stamp.unlink(missing_ok=True)  # 성공하면 다음에 끊겼을 때 바로 다시 시도
+            return True
+        finally:
+            ctx.close()
+
+
 def _finish(ctx):
     """로그인 직후 (사용자가 연 창 안에서) LearningX 토큰까지 받아 저장한다."""
     from pa import collect_canvas, learningx

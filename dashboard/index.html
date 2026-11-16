@@ -412,12 +412,15 @@
 
   <form class="quick" id="quickForm" autocomplete="off">
     <span class="plus" aria-hidden="true">+</span>
-    <input id="quickInput" type="text" placeholder="새 할 일 — 예) 린스타트업 발표 @금 18시 ~2h #창업" aria-label="새 할 일">
+    <input id="quickInput" type="text" placeholder="새 할 일 — 예) 발표 준비 >내일 15-18시 @금 #창업  (> 할 시간 · @ 마감)" aria-label="새 할 일">
     <button type="button" class="link muted" id="fullToggle">자세히</button>
     <kbd title="/ 또는 Ctrl+K 로 바로 입력" aria-hidden="true">/</kbd>
   </form>
   <form class="full" id="addForm" hidden autocomplete="off">
     <div class="frow"><input class="field" name="title" type="text" placeholder="제목" style="flex:1 1 240px"></div>
+    <div class="frow"><span class="lbl">할 시간</span><input class="field" name="sdate" type="date" aria-label="할 날짜"><input class="field" name="sfrom" type="time" aria-label="시작">
+      <span aria-hidden="true">–</span><input class="field" name="sto" type="time" aria-label="끝">
+      <button type="button" class="chip" data-sday="0">오늘</button><button type="button" class="chip" data-sday="1">내일</button><button type="button" class="chip" data-sday="clear">안 정함</button></div>
     <div class="frow"><span class="lbl">마감</span><input class="field" name="date" type="date"><input class="field" name="time" type="time" title="비우면 23:59">
       <button type="button" class="chip" data-day="0">오늘</button><button type="button" class="chip" data-day="1">내일</button>
       <button type="button" class="chip" data-day="fri">이번 주 금</button><button type="button" class="chip" data-day="clear">기한 없음</button></div>
@@ -472,7 +475,7 @@ const clean = s => String(s || "").replace(/^\[[^\]]+\]\s*/, "");
 function findTask(k) {
   if (!k || !D) return null;
   k = String(k).split("#")[0];
-  return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k)
+  return D.tasks.find(t => t.key === k) || D.someday.find(t => t.key === k) || (D.slotted || []).find(t => t.key === k)
     || (D.semester || []).flatMap(w => w.items).find(t => t.key === k) || null;
 }
 const links = t => (t && D.links && D.links[t.key]) || [];
@@ -736,12 +739,27 @@ function todayView(now, today) {
 }
 // 마감 표기 — 지남은 빨강·굵게, 24시간 안은 굵게 (전주의 속성: 색 + 굵기, 둘 다 '급함'에만 쓴다)
 function dueMeta(t, now, today) {
+  if (!t.due) return t.slot ? `할 시간 ${hm(t.slot[0])}–${hm(t.slot[1])} · 마감 없음` : "";
   const h = (dt(t.due) - now) / 36e5;
   if (h < 0) return `<span class="late">마감 지남 ${label(ymd(t.due))} ${hm(t.due)}</span>`;
   if (h < 24) return `<span class="soon">마감 ${Math.max(1, Math.round(h))}시간 남음</span>`;
   return `마감 ${ddayText(t.due, today)} ${hm(t.due)}`;
 }
 
+const URGENT_MS = 3 * 36e5;  // 이 안에 마감이 있으면 기본 할 일 대신 그 일을 맨 위에
+// 기본 할 일: 급한 게 없을 때 맨 위에 이름만 (VSCode 폴더 열기 / 링크 열기). 위 작은 줄에 다음 계획을 알려 준다.
+function defaultHero(defs, next, now) {
+  const i = ((UI.defIdx || 0) % defs.length + defs.length) % defs.length, d = defs[i];
+  const eyebrow = next ? `다음 <span class="sep">·</span> <span class="num">${hm(next.start)}</span> ${esc(next.t ? next.t.title : clean(next.summary))} <span class="sep">·</span> ${dur(Math.round((dt(next.start) - now) / 6e4))} 뒤`
+                       : `오늘 남은 계획 없음`;
+  const where = d.kind === "link" ? (() => { try { return new URL(d.target).host; } catch { return d.target; } })() : d.target.replace(/^\/home\/[^/]+/, "~");
+  return { key: null, row: null, html: `<section class="hero" id="hero"><div class="eyebrow">${eyebrow}</div>
+    <div class="hero-head"><span></span><div class="hero-body"><h2 class="hero-title">${esc(d.title)}</h2>
+      <div class="hero-meta">${d.kind === "link" ? "링크" : "VSCode"} · ${esc(where)}${defs.length > 1 ? ` · <span class="num">${i + 1}/${defs.length}</span>` : ""}</div>
+      <div class="hero-acts"><button class="btn primary" data-act="defopen" data-id="${esc(d.id)}" data-label="${d.kind === "link" ? "링크 열기" : "VSCode 열기"}">${d.kind === "link" ? "↗ 열기" : "VSCode 열기"}</button>
+        ${defs.length > 1 ? `<button class="icon-btn" data-act="defstep" data-step="-1" aria-label="이전 기본 할 일">‹</button><button class="icon-btn" data-act="defstep" data-step="1" aria-label="다음 기본 할 일">›</button>` : ""}
+        ${LIVE ? `<button class="btn plain" data-ui="defmanage">관리</button>` : ""}</div></div></div></section>` };
+}
 function hero(rows, now, today) {
   if (D.active) {  // ⏱ 기록 중이면 그게 '지금'
     const a = D.active, t = findTask(a.key);
@@ -752,9 +770,15 @@ function hero(rows, now, today) {
   }
   const cur = rows.find(r => !r.busy && dt(r.start) <= now && now < dt(r.end));
   const next = rows.find(r => !r.busy && dt(r.start) > now);
-  const pick = cur || next;
-  let t = pick && pick.t, eyebrow, progress = "";
-  if (t) {
+  // 순서: 지금 하는 계획 블록 > 3시간 안 마감 > 기본 할 일 (없으면 예전처럼 다음 블록)
+  const urgent = cur ? null : D.tasks.filter(x => x.due && dt(x.due) > now && dt(x.due) - now <= URGENT_MS).sort((a, b) => dt(a.due) - dt(b.due))[0];
+  const defs = D.defaults || [];
+  if (!cur && !urgent && defs.length) return defaultHero(defs, next, now);
+  const pick = cur || (urgent ? rows.find(r => r.t && r.t.key === urgent.key && dt(r.end) > now) || null : next);
+  let t = urgent && !pick ? urgent : pick && pick.t, eyebrow, progress = "";
+  if (urgent && !pick) {
+    eyebrow = `마감 <span class="num">${hm(t.due)}</span> <span class="sep">·</span> <span class="soon">${dur(Math.max(1, Math.round((dt(t.due) - now) / 6e4)))} 남음</span>`;
+  } else if (t) {
     const left = Math.round((dt(pick.end) - now) / 6e4), until = Math.round((dt(pick.start) - now) / 6e4);
     eyebrow = cur ? `지금 <span class="sep">·</span> <span class="num">${hm(pick.start)}–${hm(pick.end)}</span> <span class="sep">·</span> ${dur(left)} 남음`
                   : `다음 <span class="sep">·</span> <span class="num">${hm(pick.start)}</span> 시작 <span class="sep">·</span> ${dur(until)} 뒤`;
@@ -770,7 +794,7 @@ function hero(rows, now, today) {
   return { key: t.key, row: t && pick && pick.t === t ? pick : null, html: `<section class="hero" id="hero"><div class="eyebrow">${eyebrow}</div>
     <div class="hero-head">${ck(t)}<div class="hero-body">
       <h2 class="hero-title">${esc(t.title)}${pick && pick.part ? ` <span class="clip">(${pick.part})</span>` : ""}</h2>
-      <div class="hero-meta">${[KIND[t.kind], t.course && esc(t.course), `마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})`, links(t).length && `자료 ${links(t).length}`].filter(Boolean).join(" · ")}</div>
+      <div class="hero-meta">${[KIND[t.kind], t.course && esc(t.course), t.due ? `마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})` : "마감 없음", links(t).length && `자료 ${links(t).length}`].filter(Boolean).join(" · ")}</div>
       ${progress}
       <div class="hero-acts"><button class="btn primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>
         ${P.act !== "start" && !MOB ? `<button class="btn plain" data-act="start" data-key="${esc(t.key)}" data-label="시간 재기 시작">⏱ 시간 재기</button>` : ""}
@@ -791,7 +815,7 @@ function critHtml(now) {
   for (const w of WARN) {
     const v = sevOf(w); if (!v) continue;
     const plain = w.replace(/\s*\[(ack|keep)[:=][^\]]+\]/g, "");
-    if (/LearningX|강의 플랫폼/.test(w)) L.push({ sev: v, t: "강의 플랫폼(LearningX) 로그인 만료", s: "새 강의·자료를 받지 못하는 중 · 비서는 스스로 다시 로그인하지 않음",
+    if (/LearningX|강의 플랫폼/.test(w)) L.push({ sev: v, t: "강의 플랫폼(LearningX) 로그인 만료", s: "새 강의·자료를 받지 못하는 중 · 자동 로그인 실패 또는 학교 계정 미설정(.env)",
       b: `<button class="tbtn" data-act="relogin" data-label="다시 로그인 (직접 누를 때만)">다시 로그인</button>` });
     else if (/Google Calendar/.test(w)) L.push({ sev: v, t: "Google 캘린더 로그인 필요", s: "캘린더에 일정이 올라가지 않는 중",
       b: `<button class="tbtn" data-act="glogin" data-label="Google 다시 로그인">Google 로그인</button>` });
@@ -986,6 +1010,7 @@ function moreHtml(now, today) {
     <div class="rows">${sd.map(t => `<div class="row nt"${rowAttr(t)}>${ck(t)}<div class="body"><div class="ttl">${esc(t.title)}</div>${t.course ? `<div class="meta">${esc(t.course)}</div>` : ""}</div>
       <span class="ra">${t.source === "inbox" ? `<button class="tbtn" data-act="dotoday" data-key="${esc(t.key)}" data-label="오늘 빈 시간에 넣기">오늘 하기</button>` : ""}${dots(t)}</span></div>`).join("") || `<p class="empty">아직 없음</p>`}</div>
     <form class="inline" data-form="someday"><input class="field" type="text" placeholder="하고 싶은 일 추가" aria-label="하고 싶은 일 추가"><button class="btn" type="submit" style="height:36px">추가</button></form></div></details>`;
+  h += defaultsHtml();
   h += worklogHtml(today);
   if (ex.length) h += `<details data-k="excluded" ${det("excluded")}><summary><span class="ttl">제외한 것</span><span class="hint">${ex.length}개 · 취소하면 다시 나타남</span><span class="chev">›</span></summary><div class="inner">
     ${ex.map(x => `<div class="citem"><span class="tx">${esc(x.keep ? "예외(계속 보이기): " + (x.titles[0] || x.text) : x.text)}<small>${x.keep ? "단어 규칙에 걸려도 보이게" : (x.pattern ? "앞으로 같은 이름도 계속" : "이 과제만") + ` · 걸린 과제 ${x.count}개`}</small></span>
@@ -997,6 +1022,21 @@ function moreHtml(now, today) {
     <p class="small">Canvas 에 이미 제출한 과제는 다음 Canvas 확인 때 다시 '완료'가 됩니다 (제출을 취소했다면 그대로 남음).</p></div></details>`;
   h += `<details data-k="stats" ${det("stats")}><summary><span class="ttl">통계</span><span class="hint">학습량 · 과목별 진행 · 완료 추이 · 걸린 시간 · 돌아보기</span><span class="chev">›</span></summary><div class="inner">${statsHtml(today)}</div></details>`;
   return h;
+}
+// 기본 할 일 관리 (PC): 이름 · VSCode 폴더 또는 링크 · 순서 (맨 위 것이 먼저 보임)
+function defaultsHtml() {
+  if (!LIVE) return "";
+  const L = D.defaults || [];
+  return `<details data-k="defaults" id="defaultsBox" ${det("defaults")}><summary><span class="ttl">기본 할 일</span><span class="hint">${L.length}개 · 급한 일이 없을 때 맨 위에</span><span class="chev">›</span></summary><div class="inner">
+    ${L.map((d, i) => `<div class="citem"><span class="tx">${esc(d.title)}<small>${d.kind === "link" ? "링크" : "VSCode 폴더"} · ${esc(d.target)}</small></span>
+      <span class="ac"><button class="icon-btn" data-act="defmove" data-id="${esc(d.id)}" data-step="-1" ${i === 0 ? "disabled" : ""} aria-label="위로">↑</button>
+        <button class="icon-btn" data-act="defmove" data-id="${esc(d.id)}" data-step="1" ${i === L.length - 1 ? "disabled" : ""} aria-label="아래로">↓</button>
+        <button class="tbtn" data-act="defdel" data-id="${esc(d.id)}" data-label="지우기" aria-label="지우기: ${esc(d.title)}">✕</button></span></div>`).join("") || `<p class="empty">아직 없음 — 아래에서 추가</p>`}
+    <form class="inline wl-form" data-form="defaults">
+      <input class="field" name="title" type="text" placeholder="이름 — 예) 퀴즈 앱 개발" aria-label="이름" required>
+      <select class="field" name="kind" aria-label="종류" style="flex:0 1 160px"><option value="vscode">VSCode 폴더</option><option value="link">링크</option></select>
+      <input class="field" name="target" type="text" placeholder="~/quiz_system_project 또는 https://…" aria-label="폴더 경로 또는 링크" required style="flex:1 1 240px">
+      <button class="btn" type="submit" style="height:36px">추가</button></form></div></details>`;
 }
 // 한 일 기록: 무엇을 · 얼마나 (직접 적기) + ⏱ 로 잰 것, 날짜별로 묶어 합계
 function worklogHtml(today) {
@@ -1478,7 +1518,7 @@ async function noteAfter(key, title, undo) {
 }
 
 // ---- 입력
-if (matchMedia("(max-width: 600px)").matches) $("quickInput").placeholder = "새 할 일 — 예) 발표 @금 18시 ~2h";
+if (matchMedia("(max-width: 600px)").matches) $("quickInput").placeholder = "새 할 일 — 예) 발표 >내일 15-18시 @금";
 $("days").innerHTML = ["월", "화", "수", "목", "금", "토", "일"].map((d, i) => `<label><input type="checkbox" value="${i}"><span>${d}</span></label>`).join("");
 $("fullToggle").addEventListener("click", () => { const f = $("addForm"); f.hidden = !f.hidden; $("fullToggle").textContent = f.hidden ? "자세히" : "접기"; });
 document.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => {
@@ -1486,6 +1526,11 @@ document.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click",
   if (v === "clear") { f.date.value = ""; f.time.value = ""; return; }
   if (v === "fri") d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7)); else d.setDate(d.getDate() + +v);
   f.date.value = ymdOf(d);
+}));
+document.querySelectorAll("[data-sday]").forEach(b => b.addEventListener("click", () => {
+  const f = $("addForm"), v = b.dataset.sday, d = new Date();
+  if (v === "clear") { f.sdate.value = ""; f.sfrom.value = ""; f.sto.value = ""; return; }
+  d.setDate(d.getDate() + +v); f.sdate.value = ymdOf(d);
 }));
 $("quickForm").addEventListener("submit", async e => {
   e.preventDefault();
@@ -1498,9 +1543,19 @@ $("addForm").addEventListener("submit", async e => {
   e.preventDefault();
   const f = e.target;
   if (!f.title.value.trim()) { f.title.focus(); return; }
+  if ((f.sfrom.value || f.sto.value) && !f.sdate.value) { toast("할 날짜를 골라 주세요"); f.sdate.focus(); return; }
+  if (f.sdate.value && !f.sfrom.value) { toast("시작 시각을 넣어 주세요"); f.sfrom.focus(); return; }
   const body = { title: f.title.value, date: f.date.value, time: f.time.value, minutes: f.minutes.value, course: f.course.value,
+                 sdate: f.sdate.value, sfrom: f.sfrom.value, sto: f.sto.value,
                  every: [...f.querySelectorAll("#days input:checked")].map(x => x.value) };
   if (await run(() => post("add", body), "추가했습니다")) f.reset();
+});
+document.addEventListener("submit", async e => {
+  if (e.target.dataset.form !== "defaults") return;
+  e.preventDefault();
+  const f = e.target, item = { title: f.title.value.trim(), kind: f.kind.value, target: f.target.value.trim() };
+  UI.open.add("defaults");
+  if (await run(() => post("defaults", { items: [...(D.defaults || []), item] }), "기본 할 일을 추가했습니다")) f.reset();
 });
 document.addEventListener("submit", async e => {
   if (e.target.dataset.form !== "worklog") return;
@@ -1546,6 +1601,7 @@ document.addEventListener("click", async e => {
     if (u === "tolate") { e.preventDefault(); if (view !== "today") { view = "today"; render(); } (document.querySelector(".crit") || $("late"))?.scrollIntoView({ block: "start" }); return; }
     if (u === "sheetclose") { closeSheet(); return; }
     if (u === "keys") { keysSheet(); return; }
+    if (u === "defmanage") { UI.open.add("defaults"); render(); $("defaultsBox")?.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
     if (u === "tohero") { $("hero")?.scrollIntoView({ block: "start" }); return; }
     if (u === "jobs") { UI.open.add("check"); if (view !== "today") view = "today"; render(); $("jobs")?.scrollIntoView({ block: "center" }); return; }
     if (u === "alldues") UI.allDues = !UI.allDues;
@@ -1565,6 +1621,19 @@ document.addEventListener("click", async e => {
   if (b.hasAttribute("data-vanish")) { const line = b.closest(".cline"); if (line) line.remove(); }
   // 자료 창·보고서 창 안의 동작 (시트를 닫지 않음)
   if (await panelAct(act, b, key)) return;
+  if (act === "defstep") { UI.defIdx = (UI.defIdx || 0) + +b.dataset.step; render(); return; }
+  if (act === "defopen") {
+    const d = (D.defaults || []).find(x => x.id === b.dataset.id);
+    if (MOB) { if (d && d.kind === "link") window.open(d.target, "_blank", "noopener"); else toast("VSCode 열기는 PC 에서만 됩니다"); return; }
+    await run(() => api("default-open", { id: b.dataset.id }), d && d.kind === "link" ? "브라우저로 열었습니다" : "VSCode 창을 열었습니다"); return;
+  }
+  if (act === "defmove" || act === "defdel") {
+    const L = [...(D.defaults || [])], i = L.findIndex(x => x.id === b.dataset.id), j = i + +(b.dataset.step || 0);
+    if (i < 0) return;
+    if (act === "defdel") L.splice(i, 1); else if (j >= 0 && j < L.length) [L[i], L[j]] = [L[j], L[i]]; else return;
+    UI.open.add("defaults");
+    await run(() => post("defaults", { items: L }), act === "defdel" ? "지웠습니다" : "순서를 바꿨습니다"); return;
+  }
   if (act === "ignore") { ignoreMenu(key); return; }
   if (act === "ign-all") { closeMenu(false); confirmSheet("앞으로도 제외할까요?", `「${esc(t ? t.title : "")}」 과 <b>같은 이름</b>의 과제가 앞으로 새로 올라와도 계속 숨겨집니다. 아래 '제외한 것'에서 언제든 취소할 수 있습니다.`, "앞으로도 제외", "ign-all-ok", key); return; }
   if (act === "remove") { closeMenu(false); confirmSheet("이 할 일을 삭제할까요?", `「${esc(t ? t.title : "")}」 을(를) inbox.md 에서 지웁니다. 되돌릴 수 없습니다 — 끝낸 거라면 '완료'를 쓰세요.`, "삭제", "remove-ok", key); return; }

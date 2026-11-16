@@ -44,7 +44,8 @@ TEMPLATE = """# 📥 inbox — 할 일 입력 (저장하면 자동 반영)
 DAY_MAP = {**{d: i for i, d in enumerate("월화수목금토일")},
            **{d: i for i, d in enumerate(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])}}
 RE_DUE = re.compile(r"@(?:(\d{4})-)?(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?")
-RE_START = re.compile(r"(?<!\S)>(?:(\d{4})-)?(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?")  # >11-15 09:00 = 이때부터 하기
+RE_START = re.compile(r"(?<!\S)>(?:(\d{4})-)?(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?:-(\d{1,2}):(\d{2}))?)?")
+# >11-15 09:00 = 이때부터 하기 · >11-17 15:00-18:00 = 그 시간에 하기 (고정 블록, 마감 @ 와 따로)
 RE_MIN = re.compile(r"~(\d+(?:\.\d+)?)\s*(h|m|시간|분)")
 RE_COURSE = re.compile(r"#(\S+)")
 RE_EVERY = re.compile(r"(?:매주|every):(\S+)")
@@ -72,14 +73,23 @@ def exam_reviews(key, base, exam, cfg, t_now):
 
 def parse_line(text, today, default_minutes):
     """할 일 한 줄 → dict. 잘못된 부분이 있으면 ValueError."""
-    item = {"due": None, "minutes": default_minutes, "course": "", "every": None, "earliest": None}
+    original = text
+    item = {"due": None, "minutes": default_minutes, "course": "", "every": None, "earliest": None, "slot_end": None}
     m = RE_START.search(text)
     if m:
-        y, mo, d, hh, mm = m.groups()
+        y, mo, d, hh, mm, eh, em = m.groups()
         try:
             item["earliest"] = datetime(int(y) if y else today.year, int(mo), int(d), int(hh or 0), int(mm or 0), tzinfo=KST)
+            if eh:
+                end = item["earliest"].replace(hour=0, minute=0) + timedelta(hours=int(eh), minutes=int(em))  # 24:00 도 됨
+                if end <= item["earliest"]:
+                    raise ValueError
+                item["slot_end"] = end
         except ValueError:
-            raise ValueError(f"시작 날짜가 올바르지 않음: {m.group(0)}")
+            raise ValueError(f"할 시간이 올바르지 않음: {m.group(0)}")
+        if not y and item["earliest"].date() < today - timedelta(days=60):  # 연도 생략 + 먼 과거 → 내년
+            item["earliest"] = item["earliest"].replace(year=item["earliest"].year + 1)
+            item["slot_end"] = item["slot_end"] and item["slot_end"].replace(year=item["slot_end"].year + 1)
         text = text.replace(m.group(0), " ")
     m = RE_DUE.search(text)
     if m:
@@ -112,6 +122,8 @@ def parse_line(text, today, default_minutes):
     item["title"] = " ".join(text.split())
     if not item["title"]:
         raise ValueError("제목이 없음")
+    if item["slot_end"] and not RE_MIN.search(original):  # 할 시간을 정했으면 예상 시간 = 그 길이
+        item["minutes"] = int((item["slot_end"] - item["earliest"]).total_seconds() // 60)
     return item
 
 
@@ -144,18 +156,26 @@ SECTION_HEAD = {"todo": "## 할 일", "done": "## 완료", "ignore": "## 제외"
 KO_DAYS = "월화수목금토일"
 
 
-def format_line(title, due=None, minutes=None, course="", every=None):
-    """입력값 → inbox 한 줄. due: datetime, every: 요일 번호 목록(0=월)."""
+def format_line(title, due=None, minutes=None, course="", every=None, earliest=None, slot_end=None):
+    """입력값 → inbox 한 줄. due: datetime, every: 요일 번호 목록(0=월), earliest~slot_end: 할 시간."""
     # 제목 안의 기호가 문법으로 읽히지 않게 비슷한 전각 문자로 바꾼다
     title = " ".join(title.replace("@", "＠").replace("~", "∼").replace("#", "＃").split())
     if not title:
         raise ValueError("제목이 없음")
+    title = title.replace(">", "＞")
     parts = [f"- [ ] {title}"]
+    if earliest:
+        day = f">{earliest:%m-%d}" if earliest.year == now().year else f">{earliest:%Y-%m-%d}"
+        span = f" {earliest:%H:%M}"
+        if slot_end:
+            em = int((slot_end - earliest.replace(hour=0, minute=0)).total_seconds() // 60)
+            span += f"-{em // 60:02d}:{em % 60:02d}"
+        parts.append(day + ("" if span == " 00:00" else span))
     if due:
         # 올해가 아니면 연도까지 (연도 없는 날짜는 올해/내년으로 짐작하므로)
         day = f"@{due:%m-%d}" if due.year == now().year else f"@{due:%Y-%m-%d}"
         parts.append(day + ("" if (due.hour, due.minute) == (23, 59) else f" {due:%H:%M}"))
-    if minutes:
+    if minutes and not slot_end:  # 할 시간이 있으면 길이는 거기서 나온다
         parts.append(f"~{minutes}m")
     if course:
         parts.append("#" + "_".join(course.split()))
@@ -184,23 +204,43 @@ RE_DUE_WORD = re.compile(r"@(오늘|내일|모레|[월화수목금토일])(?:요
 RE_HOUR_SI = re.compile(r"(@\d{1,2}-\d{1,2}\s+)(\d{1,2})시")
 
 
+RE_SLOT_IN = re.compile(r"(?<!\S)>(오늘|내일|모레|[월화수목금토일](?:요일)?|(?:\d{4}-)?\d{1,2}-\d{1,2})"
+                        r"(?:\s+(\d{1,2})(?::(\d{2}))?시?(?:\s*-\s*(\d{1,2})(?::(\d{2}))?시?)?)?(?!\S)")
+
+
+def _day_word(w, today):
+    w = w.replace("요일", "")
+    if w in ("오늘", "내일", "모레"):
+        return today + timedelta(days=("오늘", "내일", "모레").index(w))
+    return today + timedelta(days=(DAY_MAP[w] - today.weekday()) % 7)
+
+
 def quick_line(text, today=None):
     """빠른 입력 한 줄 → inbox 줄. '@내일 18시', '@금' 같은 말은 날짜로 바꿔 적는다
-    (inbox 에 '내일'을 그대로 두면 날이 바뀔 때 뜻이 달라지므로)."""
+    (inbox 에 '내일'을 그대로 두면 날이 바뀔 때 뜻이 달라지므로).
+    할 시간: '>내일 15-18시', '>수 15:30-17:00', '>11-17 15시' (시작만 = 이때부터)."""
     today = today or now().date()
 
     def word_to_date(m):
         w, hh, mm = m.groups()
-        if w in ("오늘", "내일", "모레"):
-            d = today + timedelta(days=("오늘", "내일", "모레").index(w))
-        else:
-            d = today + timedelta(days=(DAY_MAP[w] - today.weekday()) % 7)
+        d = _day_word(w, today)
         out = f"@{d:%m-%d}"
         return out + (f" {int(hh):02d}:{mm or '00'}" if hh else "")
 
+    def slot(m):
+        w, sh, sm, eh, em = m.groups()
+        d = _day_word(w, today) if not w[0].isdigit() else None
+        out = ">" + (f"{d:%m-%d}" if d else w)
+        if sh:
+            out += f" {int(sh):02d}:{sm or '00'}"
+            if eh:
+                out += f"-{int(eh):02d}:{em or '00'}"
+        return out
+
+    text = RE_SLOT_IN.sub(slot, text)
     text = RE_HOUR_SI.sub(lambda m: f"{m.group(1)}{int(m.group(2)):02d}:00", RE_DUE_WORD.sub(word_to_date, text))
     it = parse_line(text, today, None)
-    return format_line(it["title"], it["due"], it["minutes"], it["course"], it["every"])
+    return format_line(it["title"], it["due"], it["minutes"], it["course"], it["every"], it["earliest"], it["slot_end"])
 
 
 def add_task(**fields):
@@ -377,7 +417,8 @@ def sync(conn):
             continue
         key = f"i:{it['title']}"
         items.append({**base, "key": key, "due": it["due"].isoformat() if it["due"] else None,
-                      "earliest": it["earliest"].isoformat() if it["earliest"] else None})
+                      "earliest": it["earliest"].isoformat() if it["earliest"] else None,
+                      "slot_end": it["slot_end"].isoformat() if it["slot_end"] else None})
         if it["due"] and RE_EXAM.search(it["title"]) and not is_checked:
             items += exam_reviews(key, base, it["due"], cfg, now())
         if is_checked:

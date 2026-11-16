@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title TEXT NOT NULL,
   due TEXT,
   earliest TEXT,
+  slot_end TEXT,                         -- 직접 정한 '할 시간'의 끝 (earliest ~ slot_end 고정 블록)
   minutes INTEGER NOT NULL,
   minutes_override INTEGER,
   url TEXT NOT NULL DEFAULT '',
@@ -90,7 +91,7 @@ CREATE TABLE IF NOT EXISTS worklog (            -- 한 일 기록 (직접 적은
 );
 """
 
-FIELDS = ("kind", "course", "title", "due", "earliest", "minutes", "url")
+FIELDS = ("kind", "course", "title", "due", "earliest", "slot_end", "minutes", "url")
 
 
 def connect():
@@ -98,6 +99,8 @@ def connect():
     conn = sqlite3.connect(PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    if "slot_end" not in {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}:  # 예전 DB
+        conn.execute("ALTER TABLE tasks ADD COLUMN slot_end TEXT")
     return conn
 
 
@@ -166,7 +169,8 @@ def to_task(row):
     return Task(
         key=row["key"], kind=row["kind"], course=row["course"], title=row["title"],
         due=parse_dt(row["due"]), minutes=row["minutes_override"] or row["minutes"], url=row["url"],
-        earliest=parse_dt(row["earliest"]), source=row["source"], status=row["status"])
+        earliest=parse_dt(row["earliest"]), source=row["source"], status=row["status"],
+        slot_end=parse_dt(row["slot_end"]) if "slot_end" in row.keys() else None)
 
 
 def tasks(conn, where="1", params=()):

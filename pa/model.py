@@ -20,6 +20,7 @@ class Task:
     earliest: datetime | None = None  # 이 시각 이전에는 배치하지 않음 (반복 할 일)
     source: str = "canvas"  # canvas | inbox | quiz
     status: str = "open"  # open | done | ignored | gone
+    slot_end: datetime | None = None  # 직접 정한 할 시간 earliest ~ slot_end (계획기가 옮기지 않음)
 
 
 def parse_dt(s):

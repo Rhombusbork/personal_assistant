@@ -47,3 +47,16 @@ def test_quick_line_words():
     assert quick_line("회의 @수 9:30", TODAY) == "- [ ] 회의 @11-11 09:30"
     assert quick_line("정리 @11-20 9시", TODAY) == "- [ ] 정리 @11-20 09:00"
     assert quick_line("논문 읽기", TODAY) == "- [ ] 논문 읽기"
+
+
+def test_slot_and_due_are_separate():
+    from datetime import date
+    from pa import inbox
+    today = date(2026, 11, 16)
+    line = inbox.quick_line("PPT 만들기 >내일 15-18시 @수", today)
+    assert line == "- [ ] PPT 만들기 >11-17 15:00-18:00 @11-18"
+    it = inbox.parse_line(line[6:], today, 60)
+    assert (it["earliest"].hour, it["slot_end"].hour, it["minutes"]) == (15, 18, 180)
+    assert it["due"].day == 18
+    only = inbox.parse_line("독서 >11-17 23:00-24:00", today, 60)
+    assert only["due"] is None and only["slot_end"].day == 18 and only["minutes"] == 60
