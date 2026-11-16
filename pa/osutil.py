@@ -37,6 +37,70 @@ def open_url(url):
         webbrowser.open(url)
 
 
+def open_app(url):
+    """대시보드를 주소창 없는 '앱 창'으로 연다 (Edge/Chrome 의 --app). 없으면 보통 브라우저 탭."""
+    if IS_WSL or IS_WINDOWS:
+        cmd = ["cmd.exe" if IS_WSL else "cmd", "/c", "start", "", "msedge", f"--app={url}"]
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=20, **({"cwd": "/mnt/c"} if IS_WSL else {}))
+            if r.returncode == 0:
+                return
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return open_url(url)
+    import shutil
+    for b in ("microsoft-edge", "google-chrome", "chromium", "chromium-browser"):
+        if shutil.which(b):
+            return _spawn([b, f"--app={url}"])
+    webbrowser.open(url)
+
+
+def _ps(script):
+    """Windows PowerShell 한 덩어리 실행 (WSL·Windows). (성공, 출력)"""
+    exe = "powershell.exe" if IS_WSL else "powershell"
+    r = subprocess.run([exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+                       **({"cwd": "/mnt/c"} if IS_WSL else {}))
+    return r.returncode == 0, (r.stdout + r.stderr).strip()
+
+
+def desktop_shortcut(folder, name="비서"):
+    """바탕화면에 'VSCode 로 이 폴더 열기' 바로가기. 만든 파일 경로를 돌려준다.
+    WSL: VSCode(Windows) 가 WSL 폴더를 원격으로 연다 (--folder-uri vscode-remote://wsl+<배포판>/…)."""
+    folder = Path(folder).resolve()
+    if IS_WSL or IS_WINDOWS:
+        if IS_WSL:
+            distro = os.environ.get("WSL_DISTRO_NAME", "Ubuntu")
+            args = f"--folder-uri vscode-remote://wsl+{distro}{folder.as_posix()}"
+        else:
+            args = f'"{folder}"'
+        script = f"""
+$ErrorActionPreference = 'Stop'
+$code = (Get-Command code.cmd -ErrorAction SilentlyContinue).Source
+if ($code) {{ $exe = Join-Path (Split-Path (Split-Path $code)) 'Code.exe' }}
+if (-not $exe -or -not (Test-Path $exe)) {{ $exe = Join-Path $env:LOCALAPPDATA 'Programs/Microsoft VS Code/Code.exe' }}
+if (-not (Test-Path $exe)) {{ throw 'VSCode(Code.exe)를 찾지 못했습니다' }}
+$lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) '{name}.lnk'
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+$s.TargetPath = $exe
+$s.Arguments = '{args}'
+$s.Description = '개인 비서 — VSCode 로 비서 폴더 열기 (엔진·대시보드가 자동으로 켜짐)'
+$s.IconLocation = "$exe,0"
+$s.Save()
+Write-Output $lnk
+"""
+        ok, out = _ps(script)
+        if not ok:
+            raise RuntimeError(out.splitlines()[-1] if out else "바로가기를 만들지 못했습니다")
+        return out.splitlines()[-1]
+    desk = Path.home() / "Desktop"
+    desk.mkdir(exist_ok=True)
+    f = desk / f"{name}.desktop"
+    f.write_text(f"[Desktop Entry]\nType=Application\nName={name}\nExec=code {folder}\nIcon=code\nTerminal=false\n", encoding="utf-8")
+    f.chmod(0o755)
+    return str(f)
+
+
 def open_path(path):
     """파일·폴더를 기본 프로그램으로 연다."""
     if IS_WSL:

@@ -700,7 +700,10 @@ function render() {
   $("view").innerHTML = view === "week" ? weekView(now, today) : todayView(now, today);
   $("title").textContent = view === "week" ? "주차별" : "오늘";
   $("more").innerHTML = moreHtml(now, today);
-  $("pageFoot").innerHTML = `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)} · <a href="legacy.html" style="color:inherit">예전 화면</a> <button class="kbhint" data-ui="keys">단축키 ?</button>`;
+  const RO = D.reopen || {};
+  const reopenTxt = LIVE && RO.minutes ? ` · 창 자동으로 다시 열기 ${RO.paused ? `오늘은 끔 <button class="link" data-act="dashpause" data-pause="0">다시 켜기</button>`
+    : `켜짐(${RO.minutes}분) <button class="link" data-act="dashpause" data-pause="1" title="창을 닫아도 오늘은 다시 열지 않음 (내일 다시 켜짐)">오늘은 끄기</button>`}` : "";
+  $("pageFoot").innerHTML = `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)}${reopenTxt} · <a href="legacy.html" style="color:inherit">예전 화면</a> <button class="kbhint" data-ui="keys">단축키 ?</button>`;
   if (keep) [...document.querySelectorAll("[data-row]")].find(r => r.dataset.row === keep)?.focus({ preventScroll: true });
   tickTimer();
   document.querySelectorAll("details[data-k]").forEach(el => el.addEventListener("toggle", () => {
@@ -1690,6 +1693,7 @@ document.addEventListener("click", async e => {
   // 자료 창·보고서 창 안의 동작 (시트를 닫지 않음)
   if (await panelAct(act, b, key)) return;
   if (act === "dupok") { UI.dupOk = true; render(); return; }
+  if (act === "dashpause") { await run(() => post("dash-pause", { pause: b.dataset.pause === "1" }), b.dataset.pause === "1" ? "오늘은 창을 닫아도 다시 열지 않습니다" : "창이 없으면 다시 엽니다"); return; }
   if (act === "defstep") { UI.defIdx = (UI.defIdx || 0) + +b.dataset.step; render(); return; }
   if (act === "defopen") {
     const d = (D.defaults || []).find(x => x.id === b.dataset.id);
@@ -1884,6 +1888,9 @@ setInterval(() => {  // 30초마다(휴대폰은 5분) 새 데이터 — 메뉴�
   if ($("menu").hidden && $("scrim").hidden && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) load();
 }, (MOB ? 300 : 30) * 1000);
 setInterval(tickTimer, 1000);
+// 창 신호: 입력 중·메뉴가 열려 있어 새로 읽기를 건너뛰어도 엔진이 '창이 있다'고 알게 (엔진은 창이 없으면 다시 연다)
+setInterval(() => { if (LIVE) fetch("/api/ping?v=" + VIEWER, { cache: "no-store" }).catch(() => {}); }, 30 * 1000);
+addEventListener("pagehide", () => { if (LIVE) fetch("/api/bye?v=" + VIEWER, { keepalive: true }).catch(() => {}); });
 </script>
 </body>
 </html>

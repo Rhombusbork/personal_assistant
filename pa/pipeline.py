@@ -208,6 +208,57 @@ WINDOW_GRACE = 3    # 창이 뜬 뒤 이만큼 더 (그려지는 동안 겹치�
 STATE = {"full": False}  # 대시보드 상태 줄 '최신화 중' 표시용
 
 
+_reopen_memo = {"at": 0, "v": None}
+
+
+def reopen_minutes():
+    """대시보드 창이 없으면 몇 분 뒤 다시 열지 (config/timetable.yaml dashboard.reopen_minutes, 0 = 안 함). 1분 기억."""
+    if time.time() - _reopen_memo["at"] > 60 or _reopen_memo["v"] is None:
+        from pa.config import load_timetable
+        try:
+            m = float((load_timetable().get("dashboard") or {}).get("reopen_minutes", 3))
+        except (TypeError, ValueError):
+            m = 3
+        _reopen_memo.update(at=time.time(), v=max(0, m))
+    return _reopen_memo["v"]
+
+
+def dash_paused():
+    """대시보드에서 '오늘은 다시 열지 않기' 를 눌렀나."""
+    conn = db.connect()
+    try:
+        return db.get_meta(conn, "dash_pause") == now().date().isoformat()
+    finally:
+        conn.close()
+
+
+VIEWER_WINDOW = 180  # 숨기거나 최소화한 창은 브라우저가 신호를 1분에 한 번쯤으로 늦추므로 넉넉하게
+WIN = {"missing_since": None, "tick": time.time()}
+
+
+def open_dashboard(reason=""):
+    log(f"대시보드 창 열기{' — ' + reason if reason else ''}")
+    osutil.open_app(f"http://localhost:{server.PORT}/")
+
+
+def _keep_window(serving):
+    """창은 늘 하나: 신호를 보내는 대시보드 창이 reopen_minutes 동안 없으면 앱 창을 연다.
+    PC 가 잠들었다 깬 직후(루프가 1분 넘게 멈췄던 때)는 창이 신호를 다시 보낼 시간을 준다."""
+    t = time.time()
+    gap, WIN["tick"] = t - WIN["tick"], t
+    mins = reopen_minutes()
+    if not serving or not mins:
+        return
+    if gap > 60 or server.viewer_count(VIEWER_WINDOW):
+        WIN["missing_since"] = None if server.viewer_count(VIEWER_WINDOW) else t
+        return
+    if WIN["missing_since"] is None:
+        WIN["missing_since"] = t
+    elif t - WIN["missing_since"] >= mins * 60 and not dash_paused():
+        open_dashboard(f"창이 {mins:g}분 동안 없어서")
+        WIN["missing_since"] = t  # 열리지 않았으면 다음 주기에 다시
+
+
 def _wait_for_window():
     """창이 먼저: 대시보드 탭이 신호를 보낼 때까지(최대 STARTUP_WAIT초) 기다린 뒤 최신화를 시작한다.
     VSCode 없이 켰으면 창이 없으니 STARTUP_WAIT 뒤에 그냥 시작."""
@@ -217,6 +268,8 @@ def _wait_for_window():
             time.sleep(WINDOW_GRACE)
             return
         time.sleep(1)
+    if reopen_minutes() and not dash_paused():  # VSCode 없이 켬(로그온) → 창을 직접 연다
+        open_dashboard("켤 때 창이 없어서")
 
 
 def _was_restart():
@@ -325,6 +378,7 @@ def watch():
             if time.time() - last_code >= 5:
                 last_code = time.time()
                 _restart_if_code_changed(code_state)
+                _keep_window(serving)
             if time.time() - last_phone >= PHONE_EVERY:  # 휴대폰 입력이 있으면 바로 반영
                 last_phone = time.time()
                 if _pull_phone():

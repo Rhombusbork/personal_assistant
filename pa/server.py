@@ -173,6 +173,14 @@ class Handler(SimpleHTTPRequestHandler):
                 conn.close()
         if self.path.startswith("/api/viewers"):
             return self._json(200, {"count": viewer_count()})
+        if self.path.startswith(("/api/ping", "/api/bye")):  # 창 신호 (입력 중·메뉴 열림과 상관없이 30초마다) / 창 닫힘
+            vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
+            if vid and self.path.startswith("/api/ping"):
+                VIEWERS[vid] = time.time()
+                FIRST_SEEN.setdefault(vid, time.time())
+            elif vid:
+                VIEWERS.pop(vid, None)
+            return self._json(200, {"ok": True})
         if self.path.split("?")[0] == "/api/data":
             vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid:
@@ -186,6 +194,7 @@ class Handler(SimpleHTTPRequestHandler):
             data["duplicate"] = bool(vid) and is_duplicate(vid)
             from pa import pipeline  # 같은 프로세스의 엔진 상태 (켤 때·⟳ 최신화 중인지)
             data["syncing"] = pipeline.STATE["full"]
+            data["reopen"] = {"minutes": pipeline.reopen_minutes(), "paused": pipeline.dash_paused()}
             return self._json(200, data)
         return super().do_GET()
 
@@ -241,7 +250,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest"):
+                            "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause"):
                 return self._json(200, self.side_action(action, body))
             else:
                 return self._json(404, {"error": "없는 요청"})
@@ -324,6 +333,11 @@ class Handler(SimpleHTTPRequestHandler):
                 if not row or not row["url"]:
                     raise ValueError("열 수 있는 링크가 없음")
                 osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
+                return {"ok": True}
+            if action == "/api/dash-pause":  # 창 자동으로 다시 열기: 오늘은 끄기 / 다시 켜기
+                from pa.model import now as _now
+                db.set_meta(conn, "dash_pause", _now().date().isoformat() if body.get("pause") else "")
+                conn.commit()
                 return {"ok": True}
             if action == "/api/folders":  # 기본 할 일 폴더 입력: 하위 폴더 추천 (Tab 완성)
                 from pa import folders

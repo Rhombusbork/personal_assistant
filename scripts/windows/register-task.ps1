@@ -1,7 +1,9 @@
-﻿# 개인 비서: VSCode 를 열지 않아도 Canvas 확인·자료 다운로드·계획·캘린더를 자동으로 돌린다.
-#   언제: Windows 로그인할 때 + 매일 07:00, 13:00, 19:00 (컴퓨터가 꺼져 있어 놓치면 켜졌을 때 바로)
-#   무엇: bin/pa run --full  (VSCode 안의 엔진과 겹쳐도 한 번에 하나만 실행됨)
-#         비서가 WSL 안에 있으면 run-hidden.vbs 로 WSL 을 깨워 실행, Windows 폴더에 있으면 .venv 의 pythonw 로 바로 (둘 다 창 없음)
+﻿# 개인 비서: VSCode 를 열지 않아도 엔진이 늘 켜져 있고, 따로 하루 몇 번 최신화도 한다.
+#   PersonalAssistant-Engine  Windows 로그인할 때 엔진(bin/pa watch)을 창 없이 켜 둔다 — 대시보드 서버, 자동 계획·알림,
+#                             대시보드 창이 없으면 앱 창으로 연다(config dashboard.reopen_minutes). 꺼지면 1분 뒤 다시 켬.
+#   PersonalAssistant-Sync    매일 07:00, 13:00, 19:00 (+ 로그인할 때) bin/pa run --full — 엔진이 꺼져 있을 때의 보험.
+#                             엔진과 겹쳐도 한 번에 하나만 실행됨.
+#   비서가 WSL 안에 있으면 wscript + .vbs 로 WSL 을 깨워 실행, Windows 폴더에 있으면 .venv 의 pythonw 로 바로 (둘 다 창 없음)
 #   기록: 비서 폴더의 data\pa.log
 #
 # 실행 (한 번만): Windows 의 PowerShell 에서 비서 폴더의 이 파일을
@@ -9,31 +11,50 @@
 #   Windows: powershell -ExecutionPolicy Bypass -File "<비서 폴더>\scripts\windows\register-task.ps1"
 # 지우기: 같은 폴더의 unregister-task.ps1
 
-$Name = "PersonalAssistant-Sync"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).ProviderPath
+$Dir = Join-Path $env:LOCALAPPDATA "PersonalAssistant"
+New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+
+function Hidden-Wsl($name, $cmd) {
+    # \\wsl.localhost\<배포판>\home\… (또는 \\wsl$\…) → 배포판 이름과 리눅스 경로로 .vbs 를 만든다
+    $parts = $Root.TrimStart('\').Split('\')
+    $distro = $parts[1]
+    $linux = '/' + (($parts | Select-Object -Skip 2) -join '/')
+    $vbs = Join-Path $Dir $name
+    $line = 'CreateObject("WScript.Shell").Run "wsl.exe -d ' + $distro + ' -- bash -lc ""cd ''' + $linux + ''' && ' + $cmd + '""", 0, True'
+    Set-Content -Path $vbs -Value ("' 개인 비서 (작업 스케줄러가 창 없이 실행). register-task.ps1 이 만듦.`r`n" + $line) -Encoding ASCII
+    return (New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbs`"")
+}
+
 if ($Root -like "\\wsl*") {
-    $Dir = Join-Path $env:LOCALAPPDATA "PersonalAssistant"
-    New-Item -ItemType Directory -Force -Path $Dir | Out-Null
-    Copy-Item -Force (Join-Path $PSScriptRoot "run-hidden.vbs") (Join-Path $Dir "run-hidden.vbs")
-    $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$Dir\run-hidden.vbs`""
+    $engine = Hidden-Wsl "engine-hidden.vbs" "bin/pa watch"
+    $sync = Hidden-Wsl "run-hidden.vbs" "bin/pa run --full"
     $Where = "WSL"
 } else {
     $Pyw = Join-Path $Root ".venv\Scripts\pythonw.exe"
     if (-not (Test-Path $Pyw)) { Write-Host "먼저 bin\setup.cmd 를 실행하세요 ($Pyw 없음)"; exit 1 }
-    $action = New-ScheduledTaskAction -Execute $Pyw -Argument "-X utf8 -m pa run --full" -WorkingDirectory $Root
+    $engine = New-ScheduledTaskAction -Execute $Pyw -Argument "-X utf8 -m pa watch" -WorkingDirectory $Root
+    $sync = New-ScheduledTaskAction -Execute $Pyw -Argument "-X utf8 -m pa run --full" -WorkingDirectory $Root
     $Where = "Windows"
 }
+
+$logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$engineSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -MultipleInstances IgnoreNew `
+    -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName "PersonalAssistant-Engine" -Action $engine -Trigger $logon -Settings $engineSettings `
+    -Description "개인 비서 엔진: 대시보드 서버·자동 계획·알림 ($Where bin/pa watch). 이미 켜져 있으면 바로 끝남" -Force | Out-Null
+
 $triggers = @(
-    (New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME),
+    $logon,
     (New-ScheduledTaskTrigger -Daily -At 7:00),
     (New-ScheduledTaskTrigger -Daily -At 13:00),
     (New-ScheduledTaskTrigger -Daily -At 19:00)
 )
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-            -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -MultipleInstances IgnoreNew
-
-Register-ScheduledTask -TaskName $Name -Action $action -Trigger $triggers -Settings $settings `
+$syncSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName "PersonalAssistant-Sync" -Action $sync -Trigger $triggers -Settings $syncSettings `
     -Description "개인 비서: Canvas 확인, 자료, 학습 계획, Google Calendar ($Where bin/pa run --full)" -Force | Out-Null
 
-Write-Host "등록 완료: 작업 스케줄러 > '$Name'"
-Write-Host "지금 한 번 시험:  Start-ScheduledTask -TaskName $Name"
+Write-Host "등록 완료: 작업 스케줄러 > 'PersonalAssistant-Engine' (로그인할 때 엔진), 'PersonalAssistant-Sync' (하루 3번)"
+Write-Host "지금 엔진 켜기:  Start-ScheduledTask -TaskName PersonalAssistant-Engine"

@@ -20,6 +20,8 @@
   bin/pa browser login | probe <과목> <제목>   로그인 브라우저 (자료 다운로드 시험)
   bin/pa google-login         Google Calendar 다시 로그인 (브라우저가 열림)
   bin/pa sync-timetable [--dry-run]   config/timetable.yaml 의 수업 시간표 → '수업 시간표' 캘린더 (학기 초 한 번)
+  bin/pa open                 대시보드를 앱 창으로 열기 (엔진이 꺼져 있으면 켜는 법을 알려 줌)
+  bin/pa shortcut             바탕화면에 '비서' 바로가기 (누르면 VSCode 로 비서 폴더 → 엔진·대시보드 자동)
 """
 import argparse
 import sys
@@ -80,6 +82,25 @@ def cmd_dashboard_check(conn, args):
             sys.exit(3)
         _time.sleep(1)
     print("대시보드 열기")
+
+
+def cmd_open(conn, args):
+    import urllib.request
+    from pa import osutil, server
+    url = f"http://localhost:{server.PORT}/"
+    try:
+        urllib.request.urlopen(url, timeout=3)
+    except OSError:
+        print("엔진이 꺼져 있습니다 — VSCode: Ctrl+Shift+P → Tasks: Run Task → '비서: 자동 감시', 또는 bin/pa watch")
+        sys.exit(1)
+    osutil.open_app(url)
+    print("대시보드 창을 열었습니다:", url)
+
+
+def cmd_shortcut(conn, args):
+    from pa import osutil
+    from pa.config import ROOT
+    print("만듦:", osutil.desktop_shortcut(ROOT))
 
 
 def cmd_plan(conn, args):
@@ -217,6 +238,8 @@ def main():
     sub.add_parser("watch").set_defaults(fn=cmd_watch)
     sub.add_parser("today").set_defaults(fn=cmd_today)
     sub.add_parser("dashboard-check").set_defaults(fn=cmd_dashboard_check)
+    sub.add_parser("open").set_defaults(fn=cmd_open)
+    sub.add_parser("shortcut").set_defaults(fn=cmd_shortcut)
     sp = sub.add_parser("plan")
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(fn=cmd_plan)

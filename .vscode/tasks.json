@@ -20,9 +20,10 @@
     },
     {
       "label": "비서: 대시보드 열기",
-      "detail": "VSCode 안의 브라우저 탭으로 http://localhost:8765 (이미 열려 있으면 건너뜀)",
+      "detail": "대시보드를 앱 창(Edge)으로 http://localhost:8765 (이미 열려 있으면 건너뜀)",
       "type": "shell",
-      "command": "echo '대시보드: http://localhost:8765' ${input:openDashboard}",
+      "command": "${workspaceFolder}/bin/pa open",
+      "windows": { "command": "${workspaceFolder}\\bin\\pa.cmd", "args": ["open"], "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } } },
       "dependsOn": "비서: 서버 대기",
       "problemMatcher": [],
       "runOptions": {
@@ -58,14 +59,6 @@
         "reveal": "always",
         "panel": "shared"
       }
-    }
-  ],
-  "inputs": [
-    {
-      "id": "openDashboard",
-      "type": "command",
-      "command": "simpleBrowser.show",
-      "args": "http://localhost:8765"
     }
   ]
 }
