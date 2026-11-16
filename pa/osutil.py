@@ -209,5 +209,8 @@ def restart_self(args):
     """이 프로세스를 새 코드로 다시 시작한다. 리눅스는 그 자리에서 바꿔치기(exec)하고,
     Windows 는 exec 가 새 프로세스를 띄우고 끝나 버려 VSCode 작업 창과 끊기므로 종료 코드로 알리고 bin/pa.cmd 가 다시 띄운다."""
     if IS_WINDOWS:
-        os._exit(RESTART_CODE)  # 서버·작업 스레드까지 바로 끝냄 (포트·잠금이 풀림)
+        if not os.environ.get("PA_LOOP"):  # bin\pa.cmd 를 거치지 않음 (작업 스케줄러의 pythonw) → 새 프로세스를 직접 띄운다
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, "DETACHED_PROCESS", 0x8)
+            subprocess.Popen([sys.executable, "-m", "pa", *args], creationflags=flags, close_fds=True)
+        os._exit(RESTART_CODE)  # 서버·작업 스레드까지 바로 끝냄 (포트·잠금이 풀림 → 새 프로세스가 잡는다)
     os.execv(sys.executable, [sys.executable, "-m", "pa", *args])

@@ -362,7 +362,14 @@ def watch():
     # 감시기는 하나만 (VSCode 창을 여러 개 열어도 캘린더에 중복으로 쓰지 않게)
     db.PATH.parent.mkdir(exist_ok=True)
     lock = open(db.PATH.parent / "watch.lock", "a", encoding="utf-8")
-    if not osutil.lock(lock, wait=False):
+    got = osutil.lock(lock, wait=False)
+    if not got and RESTART_FLAG.exists() and time.time() - RESTART_FLAG.stat().st_mtime < 120:
+        for _ in range(100):  # 새 코드로 다시 시작하는 중 → 이전 프로세스가 잠금을 풀 때까지 (최대 20초)
+            time.sleep(0.2)
+            if osutil.lock(lock, wait=False):
+                got = True
+                break
+    if not got:
         log("이미 다른 창에서 감시 중 — 이 창에서는 실행하지 않습니다.")
         return
 
