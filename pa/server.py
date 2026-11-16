@@ -58,6 +58,7 @@ PORT = 8765
 DASH = ROOT / "dashboard"
 ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}"}
 VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
+FIRST_SEEN = {}  # 대시보드 탭 id → 처음 신호 시각 (먼저 열린 창이 '원래 창')
 # 엔진이 다시 시작해도 로그인 창 프로세스는 남게
 _DETACH = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if osutil.IS_WINDOWS else {"start_new_session": True}
 
@@ -65,6 +66,14 @@ _DETACH = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if osutil.IS_WI
 def viewer_count(window=45):
     cutoff = time.time() - window
     return sum(1 for t in VIEWERS.values() if t >= cutoff)
+
+
+def is_duplicate(vid, window=45):
+    """이 탭보다 먼저 열려 지금도 신호를 보내는 대시보드 탭이 있나 → 이 탭은 겹친 창.
+    (VSCode 가 다시 열 때 뒤에 숨은 채 복원된 탭은 눌러 보기 전까지 신호를 못 보내서, 새 탭이 또 열릴 수 있다)"""
+    cutoff = time.time() - window
+    mine = FIRST_SEEN.get(vid, time.time())
+    return any(v != vid and t >= cutoff and FIRST_SEEN.get(v, 0) < mine for v, t in VIEWERS.items())
 
 
 def parse_add(body):
@@ -168,11 +177,13 @@ class Handler(SimpleHTTPRequestHandler):
             vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid:
                 VIEWERS[vid] = time.time()
+                FIRST_SEEN.setdefault(vid, time.time())
             conn = db.connect()
             try:
                 data = render.dashboard_data(conn)
             finally:
                 conn.close()
+            data["duplicate"] = bool(vid) and is_duplicate(vid)
             return self._json(200, data)
         return super().do_GET()
 

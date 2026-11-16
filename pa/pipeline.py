@@ -3,7 +3,7 @@
 run(full)  휴대폰 입력 → inbox → 퀴즈 기록 → (full 이면 Canvas·공지·자료) → 계획 → 마감 캘린더
            → TODAY.md·대시보드 → 휴대폰. 단계마다 따로 — 한 단계가 실패해도 나머지는 돈다.
 watch()    시작할 때 full 실행 후, inbox.md 가 저장될 때마다 빠른 실행, PLAN_EVERY 마다 확인,
-           CANVAS_EVERY 마다 full 실행, 대시보드 서버(pa/server.py)도 함께.
+           canvas.check_every_hours 마다 full 실행 (켤 때는 항상), 대시보드 서버(pa/server.py)도 함께.
            pa/*.py 가 바뀌면 스스로 다시 시작한다 (VSCode 를 다시 열 필요 없음).
            VSCode 작업 공간을 열면 자동으로 켜진다.
 """
@@ -18,7 +18,6 @@ from pa.config import ROOT
 from pa.gcal import GoogleAuthError, get_service
 from pa.model import now
 
-CANVAS_EVERY = 3 * 60 * 60  # 초
 PLAN_EVERY = 15 * 60        # 이때마다 '다시 계획할 필요가 있나' 확인 (필요할 때만 Google 에 요청) + 곧 마감인 것 제출 확인
 QUICK_SOON = 3 * 60         # 30분 안에 마감이 있으면 이때마다 제출·수강 확인 (끝낸 일의 촘촘한 알림을 빨리 지우게)
 PHONE_EVERY = 3 * 60
@@ -184,6 +183,52 @@ def _job_runner():
         time.sleep(2)
 
 
+RESTART_FLAG = ROOT / "data" / "restart.flag"
+_canvas_memo = {"at": 0, "v": None}
+
+
+def canvas_every():
+    """켜 둔 동안 Canvas 전체 확인 간격(초). config/timetable.yaml 의 canvas.check_every_hours (0 = 켤 때·⟳ 때만). 1분 기억."""
+    if time.time() - _canvas_memo["at"] > 60 or _canvas_memo["v"] is None:
+        from pa.config import load_timetable
+        try:
+            h = float((load_timetable().get("canvas") or {}).get("check_every_hours", 3))
+        except (TypeError, ValueError):
+            h = 3
+        _canvas_memo.update(at=time.time(), v=int(max(0, h) * 3600))
+    return _canvas_memo["v"]
+
+
+def _was_restart():
+    """코드가 바뀌어 스스로 다시 시작한 것인가 (2분 안에 남긴 표시). 표시는 지운다."""
+    try:
+        fresh = time.time() - RESTART_FLAG.stat().st_mtime < 120
+        RESTART_FLAG.unlink()
+        return fresh
+    except OSError:
+        return False
+
+
+def _safe(fn):
+    try:
+        return fn()
+    except Exception as e:
+        log(f"⚠️ 오류 (계속 감시함): {e}")
+        traceback.print_exc()
+
+
+def _new_code_ok():
+    """바뀐 코드를 다른 프로세스에서 불러 봐서 문법·import 오류가 없는지. (저장 도중의 덜 고친 코드로 다시 시작해 꺼지지 않게)"""
+    import subprocess
+    import sys
+    try:
+        r = subprocess.run([sys.executable, "-c", "import pa.pipeline, pa.server, pa.render, pa.jobs, pa.__main__"],
+                           cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+    return r.returncode == 0, (r.stderr or "").strip().splitlines()[-1:] or [""]
+
+
 def _restart_if_code_changed(state):
     """pa/*.py 가 바뀌었고 (3초 동안 더 안 바뀜) 진행 중인 에이전트 작업이 없으면 새 코드로 다시 시작."""
     m = _code_mtime()
@@ -198,7 +243,14 @@ def _restart_if_code_changed(state):
         conn.close()
     if busy:
         return  # 보고서 초안 등이 끝난 뒤에
+    ok, err = _new_code_ok()
+    if not ok:
+        state["code"] = m  # 다음에 또 바뀌면 다시 시험
+        log(f"⚠️ 바뀐 코드에 오류가 있어 다시 시작하지 않고 예전 코드로 계속합니다: {err[0] if isinstance(err, list) else err}")
+        return
     log("코드가 바뀌어 엔진을 새 코드로 다시 시작합니다")
+    RESTART_FLAG.parent.mkdir(exist_ok=True)
+    RESTART_FLAG.touch()
     osutil.restart_self(["watch"])  # 잠금·서버는 새 프로세스가 다시 잡는다
 
 
@@ -224,53 +276,65 @@ def watch():
         log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
     threading.Thread(target=_download_watcher, daemon=True).start()
     threading.Thread(target=_job_runner, daemon=True).start()
-    log("비서 감시 시작 — inbox.md 저장 시 반영, 15분마다 확인(바뀐 게 있을 때만 다시 계획), Canvas 3시간마다")
-    # 다시 시작(코드 변경)한 경우엔 방금 full 을 했을 수 있으니, 마지막 Canvas 확인 시각을 본다
+    every = canvas_every()
+    log("비서 감시 시작 — inbox.md 저장 시 반영, 15분마다 확인(바뀐 게 있을 때만 다시 계획), "
+        + (f"Canvas {every // 3600}시간마다" if every else "Canvas 는 켤 때와 ⟳ 누를 때만"))
+    restarted = _was_restart()
+    from pa.model import parse_dt
     conn = db.connect()
     try:
         last = db.get_meta(conn, "canvas_synced_at")
     finally:
         conn.close()
-    from pa.model import now, parse_dt
-    recent = last and (now() - parse_dt(last)).total_seconds() < CANVAS_EVERY
-    run(full=not recent)
-    last_full = time.time() if not recent else time.time() - (now() - parse_dt(last)).total_seconds()
+    age = (now() - parse_dt(last)).total_seconds() if last else None
+    # 켤 때는 항상 Canvas 까지 (창은 서버가 먼저 떠서 바로 보이고, 이건 뒤에서 돈다. 로그인이 끊겼으면 여기서 자동 로그인).
+    # 코드가 바뀌어 스스로 다시 시작한 때만 방금 확인했으면 건너뛴다.
+    full = not (restarted and age is not None and age < (every or 3 * 3600))
+    _safe(lambda: run(full=full))
+    last_full = time.time() if full else time.time() - age
     last_plan = last_phone = last_code = last_quick = time.time()
-    login_file = db.PATH.parent / "browser-state.json"  # 강의 플랫폼 로그인 (사용자가 직접 할 때만 바뀜)
+    login_file = db.PATH.parent / "browser-state.json"  # 강의 플랫폼 로그인
     login_seen = login_file.stat().st_mtime if login_file.exists() else 0
     while True:
         time.sleep(POLL)
-        if time.time() - last_code >= 5:
-            last_code = time.time()
-            _restart_if_code_changed(code_state)
-        if time.time() - last_phone >= PHONE_EVERY:  # 휴대폰 입력이 있으면 바로 반영
-            last_phone = time.time()
-            if _pull_phone():
+        try:  # 한 번 실패해도 감시는 계속 (예전엔 오류 하나로 엔진이 꺼졌다)
+            if time.time() - last_code >= 5:
+                last_code = time.time()
+                _restart_if_code_changed(code_state)
+            if time.time() - last_phone >= PHONE_EVERY:  # 휴대폰 입력이 있으면 바로 반영
+                last_phone = time.time()
+                if _pull_phone():
+                    seen["mtime"] = _mtime()
+                    seen["dirty"] = True
+            if seen.pop("dirty", False):
+                log("입력 반영")
+                run(full=False)
+                last_plan = time.time()
+            mtime = _mtime()
+            if mtime and mtime != seen["mtime"]:
+                time.sleep(0.5)  # 저장이 끝나길 잠깐 기다림
                 seen["mtime"] = _mtime()
-                seen["dirty"] = True
-        if seen.pop("dirty", False):
-            log("입력 반영")
-            run(full=False)
-            last_plan = time.time()
-        mtime = _mtime()
-        if mtime and mtime != seen["mtime"]:
-            time.sleep(0.5)  # 저장이 끝나길 잠깐 기다림
-            seen["mtime"] = _mtime()
-            log("inbox.md 저장 감지")
-            run(full=False)
-            last_plan = time.time()
-        lm = login_file.stat().st_mtime if login_file.exists() else 0
-        if lm != login_seen and time.time() - lm > 5:  # 방금 다시 로그인함 → 바로 확인 (경고가 3시간 동안 남아 있지 않게)
-            login_seen = lm
-            log("강의 플랫폼 로그인 감지 — 바로 확인")
-            run(full=True)
-            last_full = last_plan = time.time()
-        if time.time() - last_full >= CANVAS_EVERY:
-            run(full=True)
-            last_full = last_plan = time.time()
-        elif time.time() - last_plan >= PLAN_EVERY:
-            run(full=False, quick=True)  # 바뀐 게 없으면 Google 에 요청하지 않고 화면만 갱신
-            last_plan = last_quick = time.time()
-        elif time.time() - last_quick >= _quick_every():  # 마감이 30분 안이면 3분마다 제출 확인
-            run(full=False, quick=True)
-            last_quick = time.time()
+                log("inbox.md 저장 감지")
+                run(full=False)
+                last_plan = time.time()
+            lm = login_file.stat().st_mtime if login_file.exists() else 0
+            if lm != login_seen and time.time() - lm > 5:  # 방금 다시 로그인함 → 바로 확인
+                login_seen = lm
+                log("강의 플랫폼 로그인 감지 — 바로 확인")
+                run(full=True)
+                last_full = last_plan = time.time()
+            every = canvas_every()
+            if every and time.time() - last_full >= every:
+                run(full=True)
+                last_full = last_plan = time.time()
+            elif time.time() - last_plan >= PLAN_EVERY:
+                run(full=False, quick=True)  # 바뀐 게 없으면 Google 에 요청하지 않고 화면만 갱신
+                last_plan = last_quick = time.time()
+            elif time.time() - last_quick >= _quick_every():  # 마감이 30분 안이면 3분마다 제출 확인
+                run(full=False, quick=True)
+                last_quick = time.time()
+        except Exception as e:
+            log(f"⚠️ 감시 중 오류 (계속 감시함): {e}")
+            traceback.print_exc()
+            last_plan = last_quick = time.time()  # 같은 오류를 1초마다 되풀이하지 않게
+            time.sleep(5)

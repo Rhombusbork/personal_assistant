@@ -33,6 +33,10 @@ planner:
     quiz: 20
     assignment: 60
 
+# Canvas 전체 확인 (새 과제·마감 변경·공지·강의 자료). 비서를 켤 때는 항상 하고, 켜 둔 동안은 이 간격마다 (0 이면 대시보드 ⟳ 누를 때만)
+canvas:
+  check_every_hours: 3
+
 # 휴대폰 알림 — 비서가 Google Calendar 일정에 붙이는 알림 (휴대폰 Google Calendar 앱이 알려 줌, PC 꺼져도 됨)
 reminders:
   plan_minutes_before: 10           # '학습 계획' 블록 시작 몇 분 전 (0 이면 알림 없음)

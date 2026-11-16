@@ -169,6 +169,7 @@
   .cline .ic { width: 20px; height: 20px; border-radius: 50%; background: var(--danger); color: var(--bg); font-size: 13px; font-weight: 800;
                display: grid; place-items: center; line-height: 1; }
   .cline.warn .ic { background: var(--warn); }
+  .cline.info .ic { background: var(--text3); }
   .cline .tx b { font-weight: 600; }
   .cline .tx small { display: block; color: var(--text2); font-size: 13px; }
   .cline .tbtn { min-height: var(--hit); padding: 0 12px; }
@@ -824,6 +825,8 @@ function sevOf(w) {
 }
 function critHtml(now) {
   const L = [], st = engineState();
+  if (D.duplicate && !UI.dupOk) L.push({ sev: 0, t: "다른 대시보드 창이 이미 열려 있어요", s: "이 탭은 닫아도 됩니다 — 같은 내용이고, 먼저 열린 창이 그대로 동작합니다",
+    b: `<button class="tbtn" data-act="dupok" data-label="이 창에서 계속">이 창에서 계속</button>` });
   if (st === "off" && location.protocol.startsWith("http")) L.push({ sev: 2, t: "엔진이 꺼져 있음", s: `${ago(D.generated)} 데이터를 보여 주는 중 · VSCode: Ctrl+Shift+P → 작업 실행 → 비서: 자동 감시` });
   if (st === "stale") L.push({ sev: 1, t: `엔진이 ${ago(D.generated).replace(" 전", "")}째 새로 고치지 않음`, s: "감시기가 멈췄을 수 있음 · bin/pa run" });
   for (const w of WARN) {
@@ -848,8 +851,8 @@ function critHtml(now) {
     L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button>` : "" });
   if (!L.length) return "";
   L.sort((a, b) => b.sev - a.sev);
-  return `<div class="crit" role="region" aria-label="바로 처리할 것">${L.map(x => `<div class="cline ${x.sev < 2 ? "warn" : ""}${x.late ? " lateline" : ""}">
-    <span class="ic" aria-hidden="true">!</span><span class="tx"><span class="sr">${x.sev === 2 ? "긴급: " : "주의: "}</span><b>${esc(x.t)}</b>${x.s ? `<small>${esc(x.s)}</small>` : ""}</span><span>${x.b || ""}</span></div>`).join("")}</div>`;
+  return `<div class="crit" role="region" aria-label="바로 처리할 것">${L.map(x => `<div class="cline ${x.sev === 0 ? "info" : x.sev < 2 ? "warn" : ""}${x.late ? " lateline" : ""}">
+    <span class="ic" aria-hidden="true">${x.sev === 0 ? "i" : "!"}</span><span class="tx"><span class="sr">${x.sev === 2 ? "긴급: " : x.sev === 0 ? "안내: " : "주의: "}</span><b>${esc(x.t)}</b>${x.s ? `<small>${esc(x.s)}</small>` : ""}</span><span>${x.b || ""}</span></div>`).join("")}</div>`;
 }
 
 // ---- 확인할 것: 알림·점수·시험·공지·작업·파일·브리핑을 한 줄로 접는다
@@ -1685,6 +1688,7 @@ document.addEventListener("click", async e => {
   if (b.hasAttribute("data-vanish")) { const line = b.closest(".cline"); if (line) line.remove(); }
   // 자료 창·보고서 창 안의 동작 (시트를 닫지 않음)
   if (await panelAct(act, b, key)) return;
+  if (act === "dupok") { UI.dupOk = true; render(); return; }
   if (act === "defstep") { UI.defIdx = (UI.defIdx || 0) + +b.dataset.step; render(); return; }
   if (act === "defopen") {
     const d = (D.defaults || []).find(x => x.id === b.dataset.id);
