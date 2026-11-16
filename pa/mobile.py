@@ -71,6 +71,19 @@ def _git(*args, cwd=PUB, check=True):
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=120, check=check, encoding="utf-8")
 
 
+RESULT_MAX = 200_000  # 결과 글 하나 최대 (바이트)
+
+
+def results(job_list):
+    """끝난 작업의 결과 글(보고서 초안·내용정리 .md) → {경로: 글}. 휴대폰 화면의 '열기'가 이것을 보여 준다 (잠가서 올림)."""
+    out = {}
+    for j in job_list:
+        p = Path(j.get("result") or "")
+        if j.get("status") == "done" and p.suffix.lower() in (".md", ".txt") and p.is_file() and p.stat().st_size <= RESULT_MAX:
+            out[str(p)] = p.read_text(encoding="utf-8", errors="replace")
+    return out
+
+
 def build():
     """data/publish/ 에 올릴 파일들을 만든다. 데이터 해시(시각 제외)를 돌려준다."""
     conn = db.connect()
@@ -80,7 +93,9 @@ def build():
         conn.close()
     c = cfg()
     data["mobile"] = {"repo": c["repo"], "inboxBranch": c["inbox_branch"], "inboxFile": c["inbox_file"]}
+    data["results"] = results(data.get("jobs") or [])
     stable = {k: v for k, v in data.items() if k not in ("generated", "sessionsToday", "active", "jobs", "downloads")}
+    stable["jobs"] = [(j["id"], j["status"]) for j in data.get("jobs") or []]  # 진행 단계는 빼고, 끝났을 때만 다시 올림
     digest = hashlib.sha256(json.dumps(stable, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     PUB.mkdir(parents=True, exist_ok=True)
     for f in SITE_FILES:
@@ -201,6 +216,13 @@ def apply_entry(op):
             conn.close()
     elif kind == "today":
         inbox.set_due(op["key"], datetime.now(KST).replace(hour=23, minute=59, second=0, microsecond=0))
+    elif kind == "act":  # 대기열: 동기화·보고서 초안·내용정리·공지 정리 (PC 가 켜져 있을 때 실행, 결과는 다음 화면에)
+        from pa import server
+        if op.get("action") not in server.PHONE_ACTIONS:
+            raise ValueError(f"휴대폰에서 맡길 수 없는 요청: {op.get('action')}")
+        r = server.side_action(op["action"], op.get("body") or {}, remote=True)
+        if not r.get("ok"):
+            raise ValueError(r.get("error") or "실패")
     else:
         raise ValueError(f"모르는 입력: {kind}")
 

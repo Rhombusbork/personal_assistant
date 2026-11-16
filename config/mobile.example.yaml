@@ -6,3 +6,6 @@ pages_url: ""                               # 예: https://myname.github.io/my_a
 inbox_branch: phone-inbox
 inbox_file: phone-inbox.json
 min_interval_minutes: 10                    # 이보다 자주 올리지 않음
+# (선택) 휴대폰에서 Tailscale 로 PC 대시보드를 열 때 (docs/usage.md 'Tailscale'). Tailscale 이 켜져 있으면 주소를 저절로 알아내니
+# 보통은 비워 둔다. 다른 이름으로 들어올 때만 적는다. Tailscale 이 없으면 이 PC 에서만 열림
+remote_host: ""                             # 예: mypc.tail1234.ts.net

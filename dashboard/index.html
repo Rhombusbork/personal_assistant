@@ -335,6 +335,7 @@
   @media (max-width: 600px) { .scrim { place-items: end center; padding: 0; } .sheet { border-radius: 16px 16px 0 0; max-height: 88vh; } }
   .sheet h3 { font-size: 20px; margin: 0; letter-spacing: -.01em; overflow-wrap: anywhere; }
   .sheet .sh-top { display: flex; gap: var(--s1); align-items: start; }
+  .sheet .readtxt { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 15px; line-height: 1.6; margin: var(--s2) 0 0; }
   .sheet .sh-top h3 { flex: 1; min-width: 0; }
   .sheet .ways { display: grid; gap: var(--s1); margin-top: var(--s2); }
   .sheet .ways button { text-align: left; border: 0; background: var(--fill); border-radius: 10px; padding: 12px var(--s2); font-weight: 600; font-size: 15px; }
@@ -496,7 +497,7 @@ const clip = t => { const n = links(t).length;
 const taskOf = findTask;
 
 // ---- 행동 정의: 종류마다 '주 행동' 하나, 나머지는 ⋯ 안으로
-const MOB_OK = new Set(["open", "done", "ignore", "remove", "redo-today", "redo-day", "redo-clear"]);
+const MOB_OK = new Set(["open", "done", "ignore", "remove", "redo-today", "redo-day", "redo-clear", "report", "sumfor"]);
 const redoOf = t => t && D.redo && D.redo[t.key];  // 마감이 지난 일을 하기로 한 날
 // 마감이 지났고, 할 날을 정하지 않았거나 정한 날도 지난 일 → 맨 위 줄
 const overdueOpen = () => { const today = ymdOf(new Date());
@@ -554,7 +555,11 @@ const rowAttr = t => t ? ` tabindex="0" data-row="${esc(t.key)}"` : "";
 const VIEWER = Math.random().toString(36).slice(2, 10);
 // ---- 휴대폰 모드 (GitHub Pages): 비밀번호로 잠긴 data.enc.json 을 풀어서 보여 주고,
 //      입력은 GitHub 의 phone-inbox 파일에 (잠가서) 적는다 → PC 엔진이 몇 분 안에 가져가 반영.
-const MOB = location.protocol.startsWith("http") && !["localhost", "127.0.0.1"].includes(location.hostname);
+// 엔진이 보낸 화면이면 window.PA_ENGINE (pa/server.py 가 넣음) — 그때 주소가 localhost 가 아니면 휴대폰에서 Tailscale 로 연 것(REMOTE):
+// 엔진에 바로 묻되, PC 화면에 띄우는 기능(VSCode·탐색기·PC 브라우저) 대신 폰에서 링크·파일을 연다.
+const LOCALHOST = ["localhost", "127.0.0.1"].includes(location.hostname);
+const MOB = !window.PA_ENGINE && location.protocol.startsWith("http") && !LOCALHOST;
+const REMOTE = !!window.PA_ENGINE && !LOCALHOST;
 const ls = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
              set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -595,7 +600,10 @@ function askPassword(msg) {
 }
 async function phonePost(action, body) {
   if (action === "open-quiz") { window.open(D.quiz.url, "_blank"); return {}; }
-  const toOp = { quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
+  const act = (action, body) => ({ op: "act", action: "/api/" + action, body });  // 대기열: PC 가 켜지면 실행
+  const toOp = { sync: () => act("sync"), "job/report": b => act("job/report", { key: b.key }), "job/summary-for": b => act("job/summary-for", { key: b.key }),
+                 "job/notices": () => act("job/notices"), "notice/read": b => act("notice/read", { id: b.id }),
+                 quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
                  ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), keep: b => ({ op: "keep", key: b.key }), "exam-dismiss": b => ({ op: "exam-dismiss", id: b.id }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }), redo: b => ({ op: "redo", key: b.key, day: b.day || "" }), undone: b => ({ op: "undone", key: b.key }) }[action];
   if (!toOp) throw new Error("이 기능은 PC 대시보드에서만 됩니다");
   const pw = ls.get("pa.pw");
@@ -681,7 +689,7 @@ function render() {
   document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
   WARN = D.warnings.filter(w => { const m = w.match(/\[ack:(\w+)\]/); return !(MOB && m && ls.get("pa.ack." + m[1]) === w); });
   if (MOB) { const pend = JSON.parse(ls.get("pa.pending") || "[]"); if (pend.length) WARN.unshift(`휴대폰 입력 ${pend.length}건이 PC 반영을 기다리는 중 (PC 가 켜져 있으면 몇 분 안에)`); }
-  $("syncBtn").hidden = !LIVE; $("mobSet").hidden = !MOB;
+  $("syncBtn").hidden = !(LIVE || MOB); $("mobSet").hidden = !MOB;
   $("quickForm").hidden = !(LIVE || MOB);
   $("status").innerHTML = statusHtml(now);
   $("courses").innerHTML = (D.courses || []).map(c => `<option value="${esc(c)}">`).join("");
@@ -904,7 +912,7 @@ function checkHtml(now, today) {
     n += js.length; hint.push(`작업 ${js.length}`);
     G.push(`<div class="cgrp" id="jobs"><h3 class="cgrp-h">에이전트 작업</h3>${js.map(j => `<div class="citem"><span class="tx"><b>${ST[j.status] || j.status}</b> · ${esc(j.title)}
       <small>${j.status === "failed" ? esc(j.error) : esc(j.step)}${j.claude ? " · " + AI() + " 사용 " + j.claude + "회" : ""}</small></span>
-      ${j.status === "done" && j.result ? `<span class="ac"><button class="tbtn" data-act="openfile" data-path="${esc(j.result)}" data-label="결과 열기">열기</button></span>` : ""}</div>`).join("")}</div>`);
+      ${j.status === "done" && j.result ? `<span class="ac"><button class="tbtn" data-act="openfile" data-path="${esc(j.result)}" data-title="${esc(j.title)}" data-label="결과 열기">열기</button></span>` : ""}</div>`).join("")}</div>`);
   }
   const dls = D.downloads || [];
   if (dls.length) {
@@ -1210,6 +1218,14 @@ function closeSheet() {
   if (f && document.contains(f)) f.focus({ preventScroll: true });
 }
 const sheetTop = (title, sub) => `<div class="sh-top"><h3 id="sheetTitle">${esc(title)}</h3><button class="icon-btn" data-ui="sheetclose" aria-label="닫기">✕</button></div>${sub ? `<p class="small" style="margin:4px 0 0">${sub}</p>` : ""}`;
+// ---- 휴대폰에서 결과·자료 읽기: Tailscale 이면 엔진이 파일을 보내 주고, GitHub 화면이면 함께 올라온(잠긴) 결과 글
+function readFile(path, title) {
+  if (REMOTE) { window.open("/api/file?path=" + encodeURIComponent(path), "_blank", "noopener"); return; }
+  const text = (D.results || {})[path];
+  if (text == null) { toast("이 파일은 PC 에서만 열 수 있어요 (휴대폰 화면에는 끝난 작업의 결과 글만 올라옴)"); return; }
+  openSheet(sheetTop(title || path.split(/[\\/]/).pop()) + `<pre class="readtxt">${esc(text)}</pre>`);
+  $("sheet").classList.add("wide");
+}
 // ---- 보고서 창 · 자료 창: 시트 안에 (예전과 같은 기능 — 아래 코드는 예전 화면에서 그대로)
 async function openPanel(kind, key, opts) {
   closeMenu(false);
@@ -1506,8 +1522,9 @@ async function repAction(act) {
       await post("job/report", { ...repBrief(), force: REP.exists });
       msg.textContent = "🤖 초안을 쓰는 중 — 오른쪽 🤖 작업 칸에서 진행 상황, 끝나면 VSCode 에 열립니다";
     } else if (act === "repfile") {
-      await api("report-file", { key: REP.key });
-      msg.textContent = "VSCode 에 열었습니다"; REP.exists = true;
+      const f = await api("report-file", { key: REP.key });
+      msg.textContent = REMOTE ? "파일을 만들었어요 (PC 의 report 폴더)" : "VSCode 에 열었습니다"; REP.exists = true;
+      if (REMOTE) readFile(f.path);
     } else if (act === "repchat") {
       await api("report-brief", repBrief());
       const f = await api("report-file", { key: REP.key });  // 없으면 빈 파일을 만들어 열어 둠
@@ -1697,7 +1714,7 @@ document.addEventListener("click", async e => {
   if (act === "defstep") { UI.defIdx = (UI.defIdx || 0) + +b.dataset.step; render(); return; }
   if (act === "defopen") {
     const d = (D.defaults || []).find(x => x.id === b.dataset.id);
-    if (MOB) { if (d && d.kind === "link") window.open(d.target, "_blank", "noopener"); else toast("VSCode 열기는 PC 에서만 됩니다"); return; }
+    if (MOB || REMOTE) { if (d && d.kind === "link") window.open(d.target, "_blank", "noopener"); else toast("VSCode 열기는 PC 에서만 됩니다"); return; }
     await run(() => api("default-open", { id: b.dataset.id }), d && d.kind === "link" ? "브라우저로 열었습니다" : "VSCode 창을 열었습니다"); return;
   }
   if (act === "defmove" || act === "defdel") {
@@ -1722,7 +1739,13 @@ document.addEventListener("click", async e => {
     confirmSheet("강의 플랫폼에 다시 로그인할까요?", "비서용 로그인 창이 열립니다.<br><br>주의: 학교 시스템이 로그인을 하나만 유지해서, 이후 평소 브라우저에서 강의 영상·자료가 안 열릴 수 있습니다. 그러면 평소 브라우저에서 로그아웃 후 다시 로그인하세요.", "로그인 창 열기", "relogin-ok");
     return;
   }
-  if (act === "report" && t && !MOB) { closeSheet(); await run(() => openPanel("report", key)); return; }
+  if (act === "report" && t && MOB) {  // 휴대폰: 저장해 둔 지침대로 초안을 PC 에 맡김 → 끝나면 🤖 작업 칸에서 읽기
+    closeMenu(false); closeSheet();
+    if (confirm(`「${t.title}」 보고서 초안을 PC 에 맡길까요?\n\nPC 가 켜져 있으면 몇 분 안에 ${AI()} 로 쓰기 시작하고, 끝나면 이 화면의 작업 칸에서 읽을 수 있어요. 이미 있는 파일은 덮어쓰지 않습니다.`))
+      await run(() => post("job/report", { key }), "PC 에 맡겼어요 — PC 가 켜지면 시작");
+    return;
+  }
+  if (act === "report" && t) { closeSheet(); await run(() => openPanel("report", key)); return; }
   if (act === "mat" && t && !MOB) { closeSheet(); await run(() => openPanel("mat", key, { openSingle: true })); return; }
   if (act === "matshow" && !MOB) { await run(() => openPanel("mat", key)); return; }
   closeMenu(); closeSheet();
@@ -1734,7 +1757,9 @@ document.addEventListener("click", async e => {
     await run(() => post("redo", { key, day }), day ? `${day === ymdOf(new Date()) ? "오늘" : label(day)} 계획에 넣습니다 — 마감 지남 표시는 그대로` : "하기 날짜를 취소했습니다");
     return;
   }
-  if (MOB && !["revive", "redo-today", "redo-set", "redo-clear", "redo-pick", "done", "ign-one", "ign-all-ok", "remove-ok", "open", "dotoday", "keep", "examadd", "examno", "unign", "ack", "gradeack", "clipnames", "openquiz", "mobset"].includes(act)) {
+  if (REMOTE && ["workspace", "relogin-ok", "glogin"].includes(act)) { toast("PC 화면에서만 되는 기능입니다"); return; }
+  if (MOB && !["revive", "redo-today", "redo-set", "redo-clear", "redo-pick", "done", "ign-one", "ign-all-ok", "remove-ok", "open", "dotoday", "keep", "examadd", "examno", "unign", "ack", "gradeack", "clipnames", "openquiz", "mobset",
+               "sync", "sumfor", "njob", "nread", "nreadall", "nopen"].includes(act)) {
     toast("이 기능은 PC 대시보드에서만 됩니다"); return;
   }
   if (act === "done") {
@@ -1748,15 +1773,17 @@ document.addEventListener("click", async e => {
   if (act === "ign-all-ok") { await run(() => post("ignore", { key, pattern: true }), r => r.message || "앞으로도 제외"); return; }
   if (act === "remove-ok") { await run(() => post("remove", { key }), "삭제했습니다"); return; }
   if (act === "relogin-ok") { await run(() => post("browser-login"), r => r.message || "로그인 창을 열었습니다"); return; }
-  if (act === "open") { if (MOB) { if (t && t.url) window.open(t.url, "_blank", "noopener"); return; } await run(() => api("open", { key }), "브라우저로 열었습니다"); return; }
-  if (act === "openquiz") { if (MOB) { window.open(D.quiz.url, "_blank", "noopener"); return; } await run(() => api("open-quiz")); return; }
+  if (act === "open") { if (MOB || REMOTE) { if (t && t.url) window.open(t.url, "_blank", "noopener"); return; } await run(() => api("open", { key }), "브라우저로 열었습니다"); return; }
+  if (act === "openquiz") { if (MOB || REMOTE) { window.open(D.quiz.url, "_blank", "noopener"); return; } await run(() => api("open-quiz")); return; }
   if (act === "start") { await run(() => post("timer/start", { key }), "시간 재기 시작"); return; }
   if (act === "stop") { await run(() => post("timer/stop", {}), "기록을 멈췄습니다"); return; }
   if (act === "stopdone") { await run(() => post("timer/stop", { done: true }), "끝내고 완료"); return; }
   if (act === "revive") { if (await run(() => post("undone", { key }))) toast(`다시 할 일로: ${b.dataset.title || key}`, () => post("done", { key })); return; }
   if (act === "dotoday") { await run(() => post("today", { key }), "오늘 빈 시간에 넣었습니다"); return; }
   if (act === "sumfor") {
-    const r = await run(() => post("job/summary-for", { key }));
+    const r = await run(() => post("job/summary-for", { key }), MOB ? "내용정리를 PC 에 맡겼어요 — PC 가 켜지면 시작" : undefined);
+    if (MOB) return;
+    if (r && r.path) { readFile(r.path); return; }  // 원격: 이미 만든 정리
     if (r && r.choose) await run(() => openPanel("mat", key, { note: "연결된 PDF 가 여러 개입니다 — 정리할 자료 칩의 🤖 를 누르세요 (이미 만든 정리는 📝 로 열림)" }));
     else if (r && r.message) toast(r.message);
     return;
@@ -1764,7 +1791,7 @@ document.addEventListener("click", async e => {
   if (act === "workspace") { await run(() => api("workspace", { key }), r => r.message); return; }
   if (act === "quizcopy") { await quizCopy(key); return; }
   if (act === "clipnames") { alert("연결된 자료 (파일은 PC 에 있음)\n\n" + ((D.links || {})[key] || []).join("\n")); return; }
-  if (act === "sync") { await run(() => post("sync"), r => r.message || "Canvas 확인 시작"); return; }
+  if (act === "sync") { await run(() => post("sync"), MOB ? "동기화를 PC 에 맡겼어요 — PC 가 켜지면 시작" : r => r.message || "Canvas 확인 시작"); return; }
   if (act === "mobset") { mobileSettings(); return; }
   if (act === "glogin") { await run(() => post("google-login"), r => r.message); return; }
   if (act === "keep") { await run(() => post("keep", { key }), "이 과제는 계속 보이기"); return; }
@@ -1784,10 +1811,13 @@ document.addEventListener("click", async e => {
   if (act === "examno") { await run(() => post("exam-dismiss", { id: b.dataset.id })); return; }
   if (act === "wldel") { await run(() => post("worklog/delete", { id: +b.dataset.id }), "기록을 지웠어요"); return; }
   if (act === "unign") { await run(() => post("unignore", { text: b.dataset.text }), "제외 취소 — 다시 나타납니다"); return; }
-  if (act === "nopen") { await run(() => api("notice/open", { id: b.dataset.id })); return; }
+  if (act === "nopen") {
+    if (MOB || REMOTE) { const x = (D.notices || []).find(n => String(n.id) === b.dataset.id); if (x && x.url) window.open(x.url, "_blank", "noopener"); else toast("공지 주소가 없어요"); return; }
+    await run(() => api("notice/open", { id: b.dataset.id })); return;
+  }
   if (act === "nread") { await run(() => post("notice/read", { id: b.dataset.id })); return; }
   if (act === "nreadall") { await run(() => post("notice/read", { id: "all" })); return; }
-  if (act === "njob") { await run(() => post("job/notices"), "공지 정리를 시작합니다 (" + AI() + ", 몇 분)"); return; }
+  if (act === "njob") { await run(() => post("job/notices"), MOB ? "공지 정리를 PC 에 맡겼어요 — PC 가 켜지면 시작" : "공지 정리를 시작합니다 (" + AI() + ", 몇 분)"); return; }
   if (act === "sgno") { await run(() => post("suggest/dismiss", { key })); return; }
   if (act === "dlmove") {
     const course = document.querySelector(`select[data-dl="${CSS.escape(b.dataset.path)}"]`).value;
@@ -1808,8 +1838,8 @@ async function panelAct(act, b, key) {
   const msg = t => { const el = $("repMsg"); if (el) { el.className = "msg"; el.textContent = t; } };
   const err = e => { const el = $("repMsg") || $("mpMsg"); if (el) { el.className = "msg err"; el.textContent = e.message; } else toast(e.message); };
   try {
-    if (act === "openfile") { await api("open-file", { path: b.dataset.path }); return true; }
-    if (act === "reveal") { await api("reveal", { path: b.dataset.path }); return true; }
+    if (act === "openfile") { if (MOB || REMOTE) readFile(b.dataset.path, b.dataset.title); else await api("open-file", { path: b.dataset.path }); return true; }
+    if (act === "reveal") { if (REMOTE) toast("탐색기는 PC 화면에서만 됩니다"); else await api("reveal", { path: b.dataset.path }); return true; }
     if (act === "unlink") { await api("unlink", { key: MP.key, path: b.dataset.path }); await showMaterials(MP.key); load(); return true; }
     if (act === "refind") { const q = $("mpQ"); q.value = b.dataset.name.replace(/\.[^.]+$/, ""); MP.sel = 0; mpResults(); q.focus(); return true; }
     if (act === "mplinkp") { await mpLink([{ p: b.dataset.path, r: "" }]); return true; }
@@ -1824,7 +1854,7 @@ async function panelAct(act, b, key) {
       if (!confirm("이 자료의 요약을 " + AI() + " 로 만듭니다 (구독 사용량을 씀, 몇 분). 진행할까요?")) return true;
       await post("job/summary", { path: b.dataset.path }); closeSheet(); toast("요약을 시작합니다 — 위 상태 줄에서 진행 상황"); return true;
     }
-    if (act === "reppdf") { b.disabled = true; const r = await api("report-pdf", { key: REP.key }); msg(r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : "")); b.disabled = false; return true; }
+    if (act === "reppdf") { b.disabled = true; const r = await api("report-pdf", { key: REP.key }); msg(r.message + (r.pages > 1 ? " ⚠️ 한 장을 넘습니다" : "")); b.disabled = false; if (REMOTE) readFile(r.path); return true; }
     if (act === "repwin") { b.disabled = true; await api("report-brief", repBrief()); const r = await api("workspace", { key: REP.key }); msg(r.message); REP.exists = true; b.disabled = false; return true; }
     if (act === "repdraft" || act === "repfile" || act === "repchat") { b.disabled = true; await repAction(act); b.disabled = false; return true; }
     if (act === "repclose" || act === "matclose") { closeSheet(); return true; }

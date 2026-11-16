@@ -12,7 +12,7 @@ AI 는 읽기만 허용한다. 파일은 엔진이 쓴다.
 import html
 import re
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from pa import ai, canvas, db, links, materials
@@ -47,8 +47,16 @@ def _update(conn, job_id, **fields):
     conn.commit()
 
 
+def record_done(conn, kind, key, title, result):
+    """이미 있는 결과를 '끝난 작업'으로 남긴다 (휴대폰에서 요청했을 때 결과 목록에서 읽게)."""
+    t = _ts()
+    conn.execute("INSERT INTO jobs (kind, key, title, status, step, result, created_at, updated_at) "
+                 "VALUES (?, ?, ?, 'done', '완료', ?, ?, ?)", (kind, key, title, str(result), t, t))
+    conn.commit()
+
+
 def recent(conn):
-    since = (now().replace(hour=0, minute=0)).isoformat()
+    since = (now().replace(hour=0, minute=0) - timedelta(days=2)).isoformat()  # 사흘 — 휴대폰에서 결과를 읽을 시간
     return [dict(r) for r in conn.execute(
         "SELECT id, kind, key, title, status, step, result, error, claude, updated_at FROM jobs "
         "WHERE status IN ('queued', 'running') OR updated_at >= ? ORDER BY id DESC LIMIT 10", (since,))]

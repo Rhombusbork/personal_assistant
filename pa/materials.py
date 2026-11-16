@@ -139,14 +139,20 @@ def open_window(folder, file=None):
     return "vscode"
 
 
-def open_file(path):
-    """study_system·report 안의 파일, 또는 다운로드 폴더 맨 위의 파일(📄 자료 창에서 '열어보기')만 연다."""
+def checked(path):
+    """열어도 되는 파일인가: study_system·report 안, 또는 다운로드 폴더 맨 위의 문서. 아니면 ValueError."""
     path = Path(path).resolve()
     inside = any(r == path or r in path.parents for r in allowed_roots())
     if not inside and not (path.parent == downloads_dir() and path.suffix.lower() in DOC_EXT):
         raise ValueError("열 수 없는 위치")
-    if not path.exists():
+    if not path.is_file():
         raise ValueError("파일 없음")
+    return path
+
+
+def open_file(path):
+    """study_system·report 안의 파일, 또는 다운로드 폴더 맨 위의 파일(📄 자료 창에서 '열어보기')만 연다."""
+    path = checked(path)
     if _vscode_open(path):
         return "vscode"
     osutil.open_path(path)

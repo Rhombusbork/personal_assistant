@@ -43,10 +43,13 @@ VSCode 를 다시 열면 "이미 다른 창에서 감시 중" 이라고 나오�
 - (결정 2026-11-13) 다운로드 자동 정리는 하지 않는다 — 지금처럼 추천 + [옮기기] 한 번
 - 휴대폰 원격 (2026-11-16 사용자가 정한 순서: PC 꺼져 있을 때 먼저 → 켜져 있을 때 원격 조작)
   - [x] report 를 비공개 GitHub 저장소로, 엔진이 켤 때 저장소 내려받기 (`config/repos.yaml`, `bin/pa pull`)
-  - [ ] 클라우드 세션용 규칙: 각 저장소 CLAUDE.md 에 'PC 경로·자료가 없을 때' 절 (GitHub App 설치 뒤 실제로 한 번 써 보고)
-  - [ ] 휴대폰 화면에 명령 버튼(🔄 동기화·✍ 초안·📄 요약·📢 공지) → phone-inbox 대기열 → PC 켜지면 실행, 결과(초안·요약)를 잠가서 휴대폰 화면에
+  - [x] 클라우드 세션용 규칙: study_system·report·Pharmacy(main·2026-2-final) CLAUDE.md 에 '클라우드(휴대폰) 세션에서'
+  - [x] 휴대폰 화면 대기열: ⟳ 동기화·보고서 초안·내용정리·공지 정리 → PC 켜지면 실행, 결과 글을 잠가서 휴대폰 화면에
+  - [ ] 실제로 한 번: 휴대폰 Claude 앱 클라우드 세션에서 공부 기록 → PR 합치기 → PC 켤 때 내려받기
   - [ ] (선택) 비공개 저장소의 GitHub Actions 로 PC 없이 Canvas 새 과제·공지 알림 — personal_assistant 는 공개라 Actions 기록도 공개됨, 여기서 돌리지 않는다
-  - [ ] PC 켜져 있을 때: Claude Code Remote Control (설치 없음, 채팅에 `/rc`) · Tailscale 로 대시보드 (서버 Host 허용·PC 화면에 여는 버튼 숨기기·결과 읽기 화면)
+  - [x] Remote Control: 모든 세션 자동 연결 + 휴대폰 알림 (사용자 설정)
+  - [x] Tailscale 로 대시보드: 엔진이 Tailscale 이름을 알아내 허용, 휴대폰에서 PC 화면 동작 대신 링크·파일 열기
+  - [ ] **사용자**: Tailscale 설치·로그인 (usage.md 'Tailscale' 1~5) → 휴대폰에서 한 번 열어 보기
 
 ### 확인이 필요한 것
 - [ ] LearningX 다시 로그인 뒤: 약학윤리 등 빠진 자료 받기, 강의 짝 다시 채우기, 수강 완료 자동 체크가 되는지

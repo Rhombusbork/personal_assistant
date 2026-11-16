@@ -168,8 +168,11 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 
 - PC 엔진이 바뀐 내용을 **최대 10분마다** 올린다 (바뀐 게 없으면 1시간에 한 번). 작업 스케줄러로도 하루 3번.
 - 데이터는 **비밀번호로 잠겨** 올라간다. 비밀번호는 `.env` 의 `PA_MOBILE_PASSWORD` (바꾸면 다음 올릴 때부터 새 비밀번호, 휴대폰에서 다시 입력)
-- 휴대폰에서 되는 것: 오늘/주차별 보기, 할 일·하고 싶은 일 추가, ✓ 완료, ✕ 제외, 🗑 삭제, 📅 오늘 하기, 수업·Canvas·퀴즈 링크 열기
-- PC 에서만: 보고서 작성, 내용정리, 자료 열기, ⏱ 기록
+- 휴대폰에서 되는 것: 오늘/주차별 보기, 할 일·하고 싶은 일 추가, ✓ 완료, ✕ 제외, 🗑 삭제, 📅 오늘 하기, 수업·Canvas·퀴즈·공지 링크 열기
+- **PC 에 맡기기 (대기열)**: ⟳ 동기화, ⋯ → 보고서 작성(저장해 둔 지침대로 초안), 내용정리(강의), 공지 정리·읽음.
+  PC 가 켜져 있으면 몇 분 안에 실행되고, 꺼져 있으면 켜질 때. 끝난 초안·내용정리는 **확인할 것 › 에이전트 작업 › 열기** 로
+  휴대폰에서 읽는다 (결과 글도 잠가서 함께 올라감, 사흘 동안). 연결된 PDF 가 여러 개인 내용정리는 PC 에서 고른다
+- PC 에서만: 자료 고르기·열기, ⏱ 기록, VSCode·탐색기 (PC 가 켜져 있으면 아래 Tailscale 로 대부분 됨)
 - 휴대폰 입력은 GitHub 의 `phone-inbox` 브랜치에 (잠가서) 적히고, **PC 엔진이 3분마다** 가져가 반영 → 다음 올릴 때 화면에도 반영.
   PC 가 꺼져 있으면 켜질 때 반영된다
 - 휴대폰에서 입력하려면 **GitHub 토큰을 한 번** 넣는다 (⚙):
@@ -221,8 +224,35 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - 입력하면 위에 **"📱 PC 반영 대기 n건"** 이 뜬다. PC 엔진이 켜져 있으면 3분 안에 가져가고, 10분 안에 화면에 반영된다.
   PC 가 꺼져 있으면 다음에 켜질 때 (작업 스케줄러를 켰다면 7·13·19시에) 반영된다
 - 화면은 5분마다 새 데이터를 받는다. 머리글의 "데이터 ○○:○○ 기준" 이 PC 가 마지막으로 올린 시각
-- 보고서 작성·내용정리·자료 열기·⏱ 는 PC 대시보드에서만 된다
+- 보고서 초안·내용정리·동기화·공지 정리는 PC 에 **맡기고**, 끝나면 작업 칸에서 읽는다. 자료 고르기·⏱ 는 PC(또는 Tailscale)에서
 - 비밀번호를 바꿨거나 틀렸다고 나오면: ⚙ → "비밀번호도 다시 입력" 확인
+
+## PC 가 켜져 있을 때: 휴대폰에서 원격으로
+
+### Tailscale — 휴대폰에서 PC 대시보드 그대로
+
+내 기기끼리만 쓰는 사설망(Tailscale)으로 휴대폰에서 PC 의 대시보드(실시간, 버튼 전부)를 연다. 인터넷에 포트를 열지 않는다.
+
+처음 한 번:
+1. tailscale.com 가입 (Google 계정)
+2. PC(WSL 터미널): `curl -fsSL https://tailscale.com/install.sh | sh` → `sudo tailscale up` → 나온 링크로 로그인
+3. Tailscale 관리 화면(login.tailscale.com) → **DNS** → MagicDNS 와 **HTTPS Certificates** 켜기
+4. PC: `sudo tailscale serve --bg 8765` → 나온 `https://<PC이름>.<tailnet>.ts.net` 이 휴대폰 주소
+5. 휴대폰: Tailscale 앱 설치 → 같은 계정 로그인 → 위 주소를 열고 홈 화면에 추가
+
+- 엔진이 Tailscale 의 내 PC 이름을 저절로 알아내 그 주소만 받는다 (다른 이름이면 `config/mobile.yaml` 의 `remote_host`)
+- 휴대폰에서는 PC 화면에 띄우던 것 대신 휴대폰에서 연다: Canvas·수업·퀴즈·공지 링크, 자료·초안·요약 파일(읽기), 보고서 PDF.
+  VSCode 창·탐색기·학교/Google 다시 로그인은 PC 화면에서만
+- PC 가 켜져 있고 엔진이 돌아야 한다 (절전이면 안 열림). PC 가 꺼져 있으면 GitHub 휴대폰 화면을 쓴다
+
+### Claude Code Remote Control — 휴대폰에서 이 채팅 그대로
+
+PC 에서 도는 Claude Code 세션을 휴대폰 Claude 앱 › **Code** 에서 이어서 쓴다 (사진 첨부, "끝나면 알려줘" 푸시).
+
+- 켜 둔 것 (2026-11-16): 사용자 설정 `~/.claude/settings.json` 의 `remoteControlAtStartup`(모든 세션 자동 연결),
+  `inputNeededNotifEnabled`(허락·질문이 필요하면 휴대폰 알림), `agentPushNotifEnabled`(Claude 가 알림)
+- 지금 세션만 켜고 끄기: 채팅에 `/rc`. 휴대폰 Claude 앱에 같은 계정 로그인, 알림 허용
+- PC 가 꺼져 있으면 아래 클라우드 세션을 쓴다
 
 ## PC 가 꺼져 있을 때 (GitHub 저장소 + Claude 클라우드 세션)
 
@@ -237,6 +267,7 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - PC 에도 GitHub 에도 새 커밋이 있어 갈라졌거나, 저장 안 한 변경과 겹치면 **건드리지 않고** '⚠️ 확인 필요'에 알린다
   → 채팅에서 합쳐 달라고 하면 된다
 - PC 에서 고친 것은 각 저장소 규칙대로 커밋·push 해야 클라우드에서도 보인다
+- 각 저장소 CLAUDE.md 의 '클라우드(휴대폰) 세션에서' 절: 자료가 없을 때 지어내지 않기, 퀴즈는 시험 브랜치, push 가 막히면 PR
 
 ## 퀴즈 복습 (R11 — 퀴즈 앱은 고치지 않음)
 

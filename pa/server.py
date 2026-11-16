@@ -42,6 +42,7 @@ POST /api/browser-login  LearningX 다시 로그인 창 열기
 입력은 모두 inbox.md 를 고치는 방식이라, inbox.md 를 직접 고치는 것과 결과가 같다.
 """
 import json
+import mimetypes
 import subprocess
 import threading
 import time
@@ -57,6 +58,37 @@ from pa.model import KST
 PORT = 8765
 DASH = ROOT / "dashboard"
 ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}"}
+_remote_memo = {"at": 0.0, "hosts": set()}
+# 폰에서 열 때 PC 화면에 무언가를 띄우는 요청 — 원격(Tailscale)에서는 막는다 (화면은 그 대신 폰에서 링크·파일을 연다)
+PC_ONLY = {"/api/open", "/api/open-quiz", "/api/notice/open", "/api/open-file", "/api/reveal", "/api/workspace",
+           "/api/default-open", "/api/browser-login", "/api/google-login", "/api/open-request"}
+# GitHub 휴대폰 화면이 대기열(phone-inbox)로 맡길 수 있는 요청
+PHONE_ACTIONS = {"/api/sync", "/api/job/report", "/api/job/summary-for", "/api/job/notices", "/api/notice/read"}
+
+
+def tailscale_name():
+    """이 PC 의 Tailscale 주소 (예: mypc.tail1234.ts.net). Tailscale 이 없거나 꺼져 있으면 ''."""
+    import shutil
+    exe = shutil.which("tailscale")
+    if not exe:
+        return ""
+    try:
+        r = subprocess.run([exe, "status", "--json"], capture_output=True, text=True, encoding="utf-8", timeout=5)
+        return (json.loads(r.stdout or "{}").get("Self") or {}).get("DNSName", "").rstrip(".").lower()
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return ""
+
+
+def remote_hosts():
+    """휴대폰에서 이 대시보드를 여는 주소: Tailscale 의 내 PC 이름 (자동) + config/mobile.yaml 의 remote_host. 1분 보관."""
+    if time.time() - _remote_memo["at"] > 60:
+        from pa.mobile import cfg
+        try:
+            names = {str(cfg().get("remote_host") or "").strip().lower(), tailscale_name()} - {""}
+        except Exception:
+            names = set()
+        _remote_memo.update(at=time.time(), hosts={x for h in names for x in (h, f"{h}:443", f"{h}:{PORT}")})
+    return _remote_memo["hosts"]
 VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
 FIRST_SEEN = {}  # 대시보드 탭 id → 처음 신호 시각 (먼저 열린 창이 '원래 창')
 VSCODE = {}      # VSCode 창 id (비서 확장) → 마지막 신호 시각
@@ -150,11 +182,42 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _host_ok(self):
         # 다른 사이트가 이 서버에 요청을 보내는 것(DNS rebinding 등)을 막는다
-        return self.headers.get("Host") in ALLOWED_HOSTS
+        # (원격 주소도 Host 로만 판단 — 머리글은 누구나 붙일 수 있으니 '더 막는 쪽'(_remote)에만 쓴다)
+        return self.headers.get("Host") in ALLOWED_HOSTS or (self.headers.get("Host") or "").lower() in remote_hosts()
+
+    def _remote(self):
+        """휴대폰에서 Tailscale 로 들어온 요청인가 (주소, 또는 tailscale serve 가 붙이는 머리글 — 이 PC 의 브라우저는 안 붙임)"""
+        return ((self.headers.get("Host") or "").lower() in remote_hosts()
+                or bool(self.headers.get("Tailscale-User-Login") or self.headers.get("X-Forwarded-For")))
+
+    def _send_file(self, path, ctype):
+        data = Path(path).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_GET(self):
         if not self._host_ok():
             return self._json(403, {"error": "host"})
+        if self.path.split("?")[0] in ("/", "/index.html"):  # 엔진이 보낸 화면 — 주소가 localhost 가 아니어도 (Tailscale) 엔진에 묻는다
+            html = (DASH / "index.html").read_text(encoding="utf-8").replace(
+                "<head>", "<head><script>window.PA_ENGINE = 1</script>", 1).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.end_headers()
+            self.wfile.write(html)
+            return
+        if self.path.startswith("/api/file?"):  # 휴대폰(원격)에서 결과·자료 읽기 — 열 수 있는 위치는 'VSCode 로 열기'와 같다
+            try:
+                path = materials.checked(parse_qs(urlparse(self.path).query).get("path", [""])[0])
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            text = path.suffix.lower() in (".md", ".txt", ".csv", ".json", ".yaml", ".yml", ".py")
+            return self._send_file(path, "text/plain; charset=utf-8" if text else
+                                   mimetypes.guess_type(path.name)[0] or "application/octet-stream")
         if self.path.startswith(("/api/files", "/api/downloads", "/api/ls", "/api/links")):
             return self._links_get()
         if self.path.startswith("/api/note-for"):  # 강의를 들은 뒤: 그 강의의 내 노트가 있으면 (study_system/notes)
@@ -200,7 +263,7 @@ class Handler(SimpleHTTPRequestHandler):
                 OPEN_REQ["served"] = time.time()
             return self._json(200, {"open": go})
         if self.path.startswith(("/api/ping", "/api/bye")):  # 창 신호 (입력 중·메뉴 열림과 상관없이 30초마다) / 창 닫힘
-            vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
+            vid = "" if self._remote() else parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid and self.path.startswith("/api/ping"):
                 VIEWERS[vid] = time.time()
                 FIRST_SEEN.setdefault(vid, time.time())
@@ -208,7 +271,7 @@ class Handler(SimpleHTTPRequestHandler):
                 VIEWERS.pop(vid, None)
             return self._json(200, {"ok": True})
         if self.path.split("?")[0] == "/api/data":
-            vid = parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
+            vid = "" if self._remote() else parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid:
                 VIEWERS[vid] = time.time()
                 FIRST_SEEN.setdefault(vid, time.time())
@@ -228,6 +291,8 @@ class Handler(SimpleHTTPRequestHandler):
         # 사용자 정의 헤더를 요구 → 다른 사이트의 폼·스크립트는 브라우저가 막는다 (CORS)
         if not self._host_ok() or self.headers.get("X-PA") != "1":
             return self._json(403, {"error": "forbidden"})
+        if self._remote() and self.path.split("?")[0] in PC_ONLY:
+            return self._json(400, {"error": "PC 화면에서만 되는 기능입니다"})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
             action = self.path.split("?")[0]
@@ -333,196 +398,206 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(400, {"error": str(e)})
 
     def side_action(self, action, body):
-        """inbox 를 바꾸지 않는 요청 — 계획을 다시 짤 필요가 없다 (완료 처리 제외)."""
-        conn = db.connect()
-        try:
-            if action == "/api/timer/start":
-                db.start_session(conn, body["key"])
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/worklog/add":
-                db.add_worklog(conn, body.get("title", ""), body.get("minutes") or 0, body.get("day") or None)
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/worklog/delete":
-                db.delete_worklog(conn, body["id"])
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/timer/stop":
-                got = db.stop_session(conn)
-                conn.commit()
-                if got and body.get("done"):
-                    inbox.mark_done(got[0])
-                    self._applied()
-                return {"ok": True, "minutes": got[1] if got else 0}
-            if action == "/api/open":
-                row = conn.execute("SELECT url FROM tasks WHERE key = ?", (body["key"],)).fetchone()
-                if not row or not row["url"]:
-                    raise ValueError("열 수 있는 링크가 없음")
-                osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
-                return {"ok": True}
-            if action == "/api/open-request":  # bin/pa open: VSCode 안 탭 (확장이 있으면)
-                alive = vscode_alive()
-                if alive:
-                    request_open()
-                return {"ok": True, "vscode": alive}
-            if action == "/api/dash-pause":  # 창 자동으로 다시 열기: 오늘은 끄기 / 다시 켜기
-                from pa.model import now as _now
-                db.set_meta(conn, "dash_pause", _now().date().isoformat() if body.get("pause") else "")
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/folders":  # 기본 할 일 폴더 입력: 하위 폴더 추천 (Tab 완성)
-                from pa import folders
-                return {"ok": True, "items": folders.complete(body.get("text", ""))}
-            if action == "/api/folder-suggest":  # 칸을 눌렀을 때 후보: VSCode 최근 폴더 + git 저장소 (5분 기억)
-                from pa import folders
-                hit = _suggest_cache.get("v")
-                if not hit or time.time() - hit[0] > 300:
-                    hit = _suggest_cache["v"] = (time.time(), folders.suggestions())
-                return {"ok": True, "items": hit[1]}
-            if action == "/api/defaults":  # 기본 할 일 목록 전체 저장 (순서 = 보이는 순서)
-                return {"ok": True, "defaults": render.set_defaults(conn, body.get("items") or [])}
-            if action == "/api/default-open":  # 기본 할 일 열기: VSCode 새 창(폴더) 또는 평소 브라우저(링크)
-                it = next((x for x in render.defaults(conn) if x["id"] == body.get("id")), None)
-                if not it:
-                    raise ValueError("없는 기본 할 일")
-                if it["kind"] == "link":
-                    osutil.open_url(it["target"])
-                elif not materials.vscode_folder(it["target"]):
-                    raise ValueError("VSCode 를 찾지 못했습니다 — VSCode 창이 하나라도 열려 있어야 합니다")
-                return {"ok": True}
-            if action == "/api/report-brief":
-                jobs.save_brief(conn, body["key"], body.get("text", ""), body.get("blanks", True))
-                return {"ok": True}
-            if action == "/api/workspace":  # 🗂 VSCode 작업 창: 과제 → ~/report (+ 보고서 파일), 강의 → ~/study_system (+ 맞는 노트)
-                row = conn.execute("SELECT kind, course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
-                if not row:
-                    raise ValueError("할 일을 찾지 못함")
-                if row["kind"] == "lecture":
-                    dirs = materials.course_dirs(row["course"])
-                    note = next((f for sc, f in materials.scan(dirs[1], row["title"]) if sc >= 10), None) if dirs else None
-                    materials.open_window(materials._cfg()["root"], note)
-                    return {"ok": True, "message": "study_system 을 VSCode 새 창으로 열었습니다"}
-                path = jobs.blank_report(conn, body["key"])
-                materials.open_window(jobs.REPORT_DIR, path)
-                return {"ok": True, "message": f"report 폴더를 VSCode 새 창으로 열었습니다 ({path.name})"}
-            if action == "/api/report-pdf":  # .md → 제출용 PDF (Claude 안 씀) → 탐색기에서 보여 줌
-                from pa import pdf
-                row = conn.execute("SELECT * FROM tasks WHERE key = ?", (body["key"],)).fetchone()
-                md = jobs.report_path(dict(row), conn) if row else None
-                if not md or not md.exists():
-                    raise ValueError("아직 보고서 파일이 없습니다")
-                out, pages = pdf.make(md)
-                materials.reveal(out)
-                return {"ok": True, "path": str(out), "pages": pages,
-                        "message": f"PDF {pages}쪽: {out.name} — 탐색기에서 열었습니다"}
-            if action == "/api/reveal":  # 탐색기에서 파일 위치 보기
-                path = Path(body["path"]).resolve()
-                if not any(r == path or r in path.parents for r in materials.allowed_roots()) or not path.exists():
-                    raise ValueError("열 수 없는 위치")
-                materials.reveal(path)
-                return {"ok": True}
-            if action == "/api/report-file":
-                path = jobs.blank_report(conn, body["key"])
-                return {"ok": True, "path": str(path), "where": materials.open_file(path)}
-            if action == "/api/job/report":
-                if "text" in body:  # ✍ 창의 지침을 저장한 뒤 초안
-                    jobs.save_brief(conn, body["key"], body["text"], body.get("blanks", True))
-                row = conn.execute("SELECT title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
-                if not row:
-                    raise ValueError("할 일을 찾지 못함")
-                jobs.enqueue(conn, "report-force" if body.get("force") else "report", body["key"], row["title"])
-                return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
-            if action == "/api/link":  # 자료 연결 (여러 개 한 번에도)
-                for p in body.get("paths") or [body["path"]]:
-                    links.add(conn, body["key"], p)
-                return {"ok": True}
-            if action == "/api/unlink":
-                links.remove(conn, body["key"], body["path"])
-                return {"ok": True}
-            if action == "/api/link-download":  # 다운로드 파일 → 과목 폴더로 옮겨서 연결
-                return links.add_download(conn, body["key"], body["path"], body.get("course"))
-            if action == "/api/exam-dismiss":
-                from pa import exams
-                exams.dismiss(conn, body["id"])
-                return {"ok": True}
-            if action == "/api/google-login":
-                subprocess.Popen(osutil.pa_command("google-login"), cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 **_DETACH)
-                return {"ok": True, "message": "브라우저에 Google 로그인 창이 열립니다 — 허용하면 끝 (10분 안에)"}
-            if action == "/api/ack":  # 알림 확인 (휴대폰 입력 실패·새 점수 등) — 이 시각 이전 것은 더 안 보여 줌
-                if not str(body["what"]).isidentifier():
-                    raise ValueError("잘못된 확인 요청")
-                db.set_meta(conn, f"ack_{body['what']}", datetime.now(KST).isoformat())
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/open-quiz":
-                from pa import quiz
-                if not quiz.cfg()["url"]:
-                    return {"ok": False, "error": "config/courses.yaml 의 quiz.url 이 비어 있습니다"}
-                osutil.open_url(quiz.cfg()["url"])
-                return {"ok": True}
-            if action == "/api/browser-login":
-                subprocess.Popen(osutil.pa_command("browser", "login"), cwd=ROOT,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return {"ok": True, "message": "로그인 창을 엽니다 — 로그인하면 저절로 닫힙니다"}
-            if action == "/api/job/summary-for":
-                row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
-                if not row:
-                    raise ValueError("할 일을 찾지 못함")
-                linked = [f for f in links.paths(conn, body["key"]) if f.suffix.lower() == ".pdf"]
-                if len(linked) > 1:  # 연결된 PDF 가 여러 개 → 자료 창에서 고르게
-                    return {"ok": True, "choose": True}
-                if linked:
-                    pdfs = linked
-                else:
-                    _, scored = materials.find(row["course"], row["title"])
-                    pdfs = [f for sc, f in scored if sc >= 10 and f.suffix.lower() == ".pdf" and "요약" not in f.parts]
-                if not pdfs:
-                    raise ValueError("이 강의의 자료(PDF)가 아직 없습니다 — 📄 자료 에서 연결하거나, 받으면 그때 정리할 수 있어요")
-                existing = jobs.summary_path(pdfs[0])
-                if existing.exists():
-                    materials.open_file(existing)
-                    return {"ok": True, "message": "이미 만든 정리를 열었습니다"}
-                jobs.enqueue(conn, "summary", str(pdfs[0]), "내용정리: " + pdfs[0].stem)
-                return {"ok": True, "message": f"내용정리 시작: {pdfs[0].name} (🤖 작업 칸)"}
-            if action == "/api/job/summary":
-                jobs.enqueue(conn, "summary", body["path"], "요약: " + Path(body["path"]).stem)
-                return {"ok": True}
-            if action == "/api/job/notices":
-                jobs.enqueue(conn, "notices", "notices", "새 공지 정리")
-                return {"ok": True}
-            if action == "/api/notice/read":
-                if body.get("id") == "all":
-                    conn.execute("UPDATE notices SET status = 'read' WHERE status = 'new'")
-                else:
-                    conn.execute("UPDATE notices SET status = 'read' WHERE id = ?", (str(body["id"]),))
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/notice/open":
-                row = conn.execute("SELECT url FROM notices WHERE id = ?", (str(body["id"]),)).fetchone()
-                if row and row["url"]:
-                    osutil.open_url(row["url"])
-                return {"ok": True}
-            if action == "/api/suggest/dismiss":
-                sugg = [x for x in json.loads(db.get_meta(conn, "notice_suggestions") or "[]") if x["key"] != body["key"]]
-                db.set_meta(conn, "notice_suggestions", json.dumps(sugg, ensure_ascii=False))
-                conn.commit()
-                return {"ok": True}
-            if action == "/api/open-file":
-                return {"ok": True, "where": materials.open_file(body["path"])}
-            if action == "/api/move-download":
-                dst = materials.move_download(conn, body["path"], body["course"])
-                return {"ok": True, "message": f"옮김: {dst}"}
-            if action == "/api/dismiss-download":
-                materials.dismiss_download(conn, body["path"])
-                return {"ok": True}
-            if action == "/api/sync" and Handler.on_sync:
-                threading.Thread(target=Handler.on_sync, daemon=True).start()
-                return {"ok": True, "message": "Canvas 확인 시작 (30초쯤 걸림)"}
-            return {"ok": False}
-        finally:
-            conn.close()
+        return side_action(action, body, self._remote(), self._applied)
+
+
+def side_action(action, body, remote=False, applied=None):
+    """inbox 를 바꾸지 않는 요청 — 계획을 다시 짤 필요가 없다 (완료 처리 제외).
+    remote: 휴대폰(Tailscale·GitHub 대기열)에서 온 요청 → PC 화면에 아무것도 띄우지 않고 경로만 돌려준다."""
+    conn = db.connect()
+    try:
+        if action == "/api/timer/start":
+            db.start_session(conn, body["key"])
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/worklog/add":
+            db.add_worklog(conn, body.get("title", ""), body.get("minutes") or 0, body.get("day") or None)
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/worklog/delete":
+            db.delete_worklog(conn, body["id"])
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/timer/stop":
+            got = db.stop_session(conn)
+            conn.commit()
+            if got and body.get("done"):
+                inbox.mark_done(got[0])
+                (applied or (lambda: None))()
+            return {"ok": True, "minutes": got[1] if got else 0}
+        if action == "/api/open":
+            row = conn.execute("SELECT url FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+            if not row or not row["url"]:
+                raise ValueError("열 수 있는 링크가 없음")
+            osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
+            return {"ok": True}
+        if action == "/api/open-request":  # bin/pa open: VSCode 안 탭 (확장이 있으면)
+            alive = vscode_alive()
+            if alive:
+                request_open()
+            return {"ok": True, "vscode": alive}
+        if action == "/api/dash-pause":  # 창 자동으로 다시 열기: 오늘은 끄기 / 다시 켜기
+            from pa.model import now as _now
+            db.set_meta(conn, "dash_pause", _now().date().isoformat() if body.get("pause") else "")
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/folders":  # 기본 할 일 폴더 입력: 하위 폴더 추천 (Tab 완성)
+            from pa import folders
+            return {"ok": True, "items": folders.complete(body.get("text", ""))}
+        if action == "/api/folder-suggest":  # 칸을 눌렀을 때 후보: VSCode 최근 폴더 + git 저장소 (5분 기억)
+            from pa import folders
+            hit = _suggest_cache.get("v")
+            if not hit or time.time() - hit[0] > 300:
+                hit = _suggest_cache["v"] = (time.time(), folders.suggestions())
+            return {"ok": True, "items": hit[1]}
+        if action == "/api/defaults":  # 기본 할 일 목록 전체 저장 (순서 = 보이는 순서)
+            return {"ok": True, "defaults": render.set_defaults(conn, body.get("items") or [])}
+        if action == "/api/default-open":  # 기본 할 일 열기: VSCode 새 창(폴더) 또는 평소 브라우저(링크)
+            it = next((x for x in render.defaults(conn) if x["id"] == body.get("id")), None)
+            if not it:
+                raise ValueError("없는 기본 할 일")
+            if it["kind"] == "link":
+                osutil.open_url(it["target"])
+            elif not materials.vscode_folder(it["target"]):
+                raise ValueError("VSCode 를 찾지 못했습니다 — VSCode 창이 하나라도 열려 있어야 합니다")
+            return {"ok": True}
+        if action == "/api/report-brief":
+            jobs.save_brief(conn, body["key"], body.get("text", ""), body.get("blanks", True))
+            return {"ok": True}
+        if action == "/api/workspace":  # 🗂 VSCode 작업 창: 과제 → ~/report (+ 보고서 파일), 강의 → ~/study_system (+ 맞는 노트)
+            row = conn.execute("SELECT kind, course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+            if not row:
+                raise ValueError("할 일을 찾지 못함")
+            if row["kind"] == "lecture":
+                dirs = materials.course_dirs(row["course"])
+                note = next((f for sc, f in materials.scan(dirs[1], row["title"]) if sc >= 10), None) if dirs else None
+                materials.open_window(materials._cfg()["root"], note)
+                return {"ok": True, "message": "study_system 을 VSCode 새 창으로 열었습니다"}
+            path = jobs.blank_report(conn, body["key"])
+            materials.open_window(jobs.REPORT_DIR, path)
+            return {"ok": True, "message": f"report 폴더를 VSCode 새 창으로 열었습니다 ({path.name})"}
+        if action == "/api/report-pdf":  # .md → 제출용 PDF (Claude 안 씀) → 탐색기에서 보여 줌
+            from pa import pdf
+            row = conn.execute("SELECT * FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+            md = jobs.report_path(dict(row), conn) if row else None
+            if not md or not md.exists():
+                raise ValueError("아직 보고서 파일이 없습니다")
+            out, pages = pdf.make(md)
+            if remote:
+                return {"ok": True, "path": str(out), "pages": pages, "message": f"PDF {pages}쪽: {out.name}"}
+            materials.reveal(out)
+            return {"ok": True, "path": str(out), "pages": pages,
+                    "message": f"PDF {pages}쪽: {out.name} — 탐색기에서 열었습니다"}
+        if action == "/api/reveal":  # 탐색기에서 파일 위치 보기
+            path = Path(body["path"]).resolve()
+            if not any(r == path or r in path.parents for r in materials.allowed_roots()) or not path.exists():
+                raise ValueError("열 수 없는 위치")
+            materials.reveal(path)
+            return {"ok": True}
+        if action == "/api/report-file":
+            path = jobs.blank_report(conn, body["key"])
+            return {"ok": True, "path": str(path), "where": "" if remote else materials.open_file(path)}
+        if action == "/api/job/report":
+            if "text" in body:  # ✍ 창의 지침을 저장한 뒤 초안
+                jobs.save_brief(conn, body["key"], body["text"], body.get("blanks", True))
+            row = conn.execute("SELECT title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+            if not row:
+                raise ValueError("할 일을 찾지 못함")
+            jobs.enqueue(conn, "report-force" if body.get("force") else "report", body["key"], row["title"])
+            return {"ok": True, "message": "보고서 작업을 시작합니다 (🤖 작업 칸)"}
+        if action == "/api/link":  # 자료 연결 (여러 개 한 번에도)
+            for p in body.get("paths") or [body["path"]]:
+                links.add(conn, body["key"], p)
+            return {"ok": True}
+        if action == "/api/unlink":
+            links.remove(conn, body["key"], body["path"])
+            return {"ok": True}
+        if action == "/api/link-download":  # 다운로드 파일 → 과목 폴더로 옮겨서 연결
+            return links.add_download(conn, body["key"], body["path"], body.get("course"))
+        if action == "/api/exam-dismiss":
+            from pa import exams
+            exams.dismiss(conn, body["id"])
+            return {"ok": True}
+        if action == "/api/google-login":
+            subprocess.Popen(osutil.pa_command("google-login"), cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             **_DETACH)
+            return {"ok": True, "message": "브라우저에 Google 로그인 창이 열립니다 — 허용하면 끝 (10분 안에)"}
+        if action == "/api/ack":  # 알림 확인 (휴대폰 입력 실패·새 점수 등) — 이 시각 이전 것은 더 안 보여 줌
+            if not str(body["what"]).isidentifier():
+                raise ValueError("잘못된 확인 요청")
+            db.set_meta(conn, f"ack_{body['what']}", datetime.now(KST).isoformat())
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/open-quiz":
+            from pa import quiz
+            if not quiz.cfg()["url"]:
+                return {"ok": False, "error": "config/courses.yaml 의 quiz.url 이 비어 있습니다"}
+            osutil.open_url(quiz.cfg()["url"])
+            return {"ok": True}
+        if action == "/api/browser-login":
+            subprocess.Popen(osutil.pa_command("browser", "login"), cwd=ROOT,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return {"ok": True, "message": "로그인 창을 엽니다 — 로그인하면 저절로 닫힙니다"}
+        if action == "/api/job/summary-for":
+            row = conn.execute("SELECT course, title FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+            if not row:
+                raise ValueError("할 일을 찾지 못함")
+            linked = [f for f in links.paths(conn, body["key"]) if f.suffix.lower() == ".pdf"]
+            if len(linked) > 1:  # 연결된 PDF 가 여러 개 → 자료 창에서 고르게
+                return {"ok": True, "choose": True}
+            if linked:
+                pdfs = linked
+            else:
+                _, scored = materials.find(row["course"], row["title"])
+                pdfs = [f for sc, f in scored if sc >= 10 and f.suffix.lower() == ".pdf" and "요약" not in f.parts]
+            if not pdfs:
+                raise ValueError("이 강의의 자료(PDF)가 아직 없습니다 — 📄 자료 에서 연결하거나, 받으면 그때 정리할 수 있어요")
+            existing = jobs.summary_path(pdfs[0])
+            if existing.exists():
+                if remote:  # 휴대폰: 결과 목록에 올려 거기서 읽게
+                    jobs.record_done(conn, "summary", str(pdfs[0]), "내용정리(이미 있음): " + pdfs[0].stem, existing)
+                    return {"ok": True, "path": str(existing), "message": "이미 만든 정리가 있어요"}
+                materials.open_file(existing)
+                return {"ok": True, "message": "이미 만든 정리를 열었습니다"}
+            jobs.enqueue(conn, "summary", str(pdfs[0]), "내용정리: " + pdfs[0].stem)
+            return {"ok": True, "message": f"내용정리 시작: {pdfs[0].name} (🤖 작업 칸)"}
+        if action == "/api/job/summary":
+            jobs.enqueue(conn, "summary", body["path"], "요약: " + Path(body["path"]).stem)
+            return {"ok": True}
+        if action == "/api/job/notices":
+            jobs.enqueue(conn, "notices", "notices", "새 공지 정리")
+            return {"ok": True}
+        if action == "/api/notice/read":
+            if body.get("id") == "all":
+                conn.execute("UPDATE notices SET status = 'read' WHERE status = 'new'")
+            else:
+                conn.execute("UPDATE notices SET status = 'read' WHERE id = ?", (str(body["id"]),))
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/notice/open":
+            row = conn.execute("SELECT url FROM notices WHERE id = ?", (str(body["id"]),)).fetchone()
+            if row and row["url"]:
+                osutil.open_url(row["url"])
+            return {"ok": True}
+        if action == "/api/suggest/dismiss":
+            sugg = [x for x in json.loads(db.get_meta(conn, "notice_suggestions") or "[]") if x["key"] != body["key"]]
+            db.set_meta(conn, "notice_suggestions", json.dumps(sugg, ensure_ascii=False))
+            conn.commit()
+            return {"ok": True}
+        if action == "/api/open-file":
+            return {"ok": True, "where": materials.open_file(body["path"])}
+        if action == "/api/move-download":
+            dst = materials.move_download(conn, body["path"], body["course"])
+            return {"ok": True, "message": f"옮김: {dst}"}
+        if action == "/api/dismiss-download":
+            materials.dismiss_download(conn, body["path"])
+            return {"ok": True}
+        if action == "/api/sync" and Handler.on_sync:
+            threading.Thread(target=Handler.on_sync, daemon=True).start()
+            return {"ok": True, "message": "Canvas 확인 시작 (30초쯤 걸림)"}
+        return {"ok": False}
+    finally:
+        conn.close()
 
 
 def start(on_change=None, on_sync=None):

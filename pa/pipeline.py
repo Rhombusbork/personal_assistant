@@ -181,6 +181,7 @@ def _job_runner():
         try:
             if jobs.run_next(conn):
                 log("에이전트 작업 하나 처리")
+                STATE["job_done"] = True  # 감시 순환이 화면(휴대폰 포함)을 다시 올리게
                 continue
         except Exception as e:
             log(f"작업 처리 오류: {e}")
@@ -425,6 +426,8 @@ def watch():
                 if _pull_phone():
                     seen["mtime"] = _mtime()
                     seen["dirty"] = True
+            if STATE.pop("job_done", False):
+                seen["dirty"] = True
             if seen.pop("dirty", False):
                 log("입력 반영")
                 run(full=False)

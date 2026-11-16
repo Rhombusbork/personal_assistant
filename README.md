@@ -139,6 +139,7 @@ bin/pa open                   # 대시보드 열기 (VSCode 안 탭 — 비서 V
 - 매일의 일정 관리는 Claude 없이 코드로 동작한다 (inbox.md 입력 → 자동 계획·기록·시각화). 설계: [docs/automation-plan.md](docs/automation-plan.md)
 - 휴대폰: GitHub Pages (비밀번호 잠금, 휴대폰 입력 → PC 반영) — `config/mobile.yaml`
 - 켤 때 내 git 저장소(공부 기록·보고서·퀴즈)를 GitHub 과 대조해 내려받기 — `config/repos.yaml`, `bin/pa pull`
+- 휴대폰에서 PC 에 맡기기(동기화·보고서 초안·내용정리·공지 정리 → 결과를 휴대폰에서 읽기), Tailscale 로 PC 대시보드 열기 — docs/usage.md
 - 종합 설계(욕구 분석·제안 기능·가능/불가능·로드맵): [docs/assistant-master-design.md](docs/assistant-master-design.md)
 
 ## 진행 상황
