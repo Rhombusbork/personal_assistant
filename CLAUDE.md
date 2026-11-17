@@ -15,6 +15,7 @@
 | 공부 기록, 질문 답변, 강의 자료 | `~/study_system` | `~/study_system/CLAUDE.md` |
 | 보고서·과제 글쓰기 | `~/report` | `~/report/CLAUDE.md` |
 | 퀴즈 덱 제작 | `~/quiz_system_project/pharmacy` | 그 폴더의 `CLAUDE.md`, `docs/QUIZ_PLANNING_METHOD.md`, 과목별 `docs/*_PLAN.md` |
+| HRA 텍스트(한글 hwpx 보고서) 작성 | `~/hra` (고전 `classic/`, 경영서 `business_book/`) | `~/hra/CLAUDE.md`. **hwpx 는 직접 다루지 말고 원고 .md → `hra-write` → `hra-fix`** (`~/hra/text/docs/WRITE.md`) |
 
 - 각 프로젝트의 규칙이 이 파일보다 우선한다. 그 프로젝트의 git 규칙(커밋·push 여부)도 그대로 따른다.
 - 강의 자료는 `~/study_system/materials/<영문 과목명>/` 에 모은다 (git 제외).
