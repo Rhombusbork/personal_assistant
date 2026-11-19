@@ -120,3 +120,28 @@ def test_proxy_header_does_not_open_other_hosts(srv):
     h = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     h.request("GET", "/api/viewers", headers={"Host": "evil.example", "X-Forwarded-For": "1.2.3.4"})
     assert h.getresponse().status == 403
+
+
+def test_same_start_and_end_means_no_end():
+    """휴대폰 시각 칸은 누르기만 해도 지금 시각이 들어가 시작=끝이 된다 → 24시간으로 보지 않는다."""
+    a = server.parse_add({"title": "자동차점검", "date": "2027-03-24", "sdate": "2026-11-19",
+                          "sfrom": "17:17", "sto": "17:17"})
+    assert a["earliest"] is not None and a["slot_end"] is None
+
+
+def test_phone_add_keeps_task_when_slot_is_bad(tmp_path, monkeypatch):
+    """할 시간이 잘못돼도 할 일은 넣고, 할 시간만 뺀다."""
+    monkeypatch.setattr(db, "PATH", tmp_path / "pa.db")
+    db.connect().close()
+    op = {"op": "add", "fields": {"title": "긴 일", "sdate": "2026-11-19", "sfrom": "08:00", "sto": "22:00"}}
+    monkeypatch.setattr(mobile, "enabled", lambda: True)
+    monkeypatch.setattr(mobile, "password", lambda: "pw")
+    monkeypatch.setattr(mobile, "fetch_phone_entries", lambda: [{"id": "x1"}])
+    monkeypatch.setattr(mobile, "decrypt", lambda e, pw: op)
+    applied = []
+    monkeypatch.setattr(mobile, "apply_entry", lambda o: (server.parse_add(o["fields"]), applied.append(o)))
+    assert mobile.pull_phone_inbox() == 1
+    assert applied and "sfrom" not in applied[-1]["fields"]
+    conn = db.connect()
+    assert conn.execute("SELECT COUNT(*) FROM events WHERE type = 'phone_input_failed'").fetchone()[0] == 0
+    conn.close()

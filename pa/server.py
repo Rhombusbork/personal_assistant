@@ -133,7 +133,8 @@ def parse_add(body):
     earliest = slot_end = None
     if body.get("sdate") and body.get("sfrom"):  # 할 시간 (마감과 따로)
         earliest = datetime.fromisoformat(f"{body['sdate']}T{body['sfrom']}").replace(tzinfo=KST)
-        if body.get("sto"):
+        # 끝 = 시작이면 끝은 없는 것으로 (휴대폰 시각 칸은 누르기만 해도 지금 시각이 들어가 둘이 같아진다)
+        if body.get("sto") and body["sto"] != body["sfrom"]:
             hh, mm = map(int, body["sto"].split(":"))
             slot_end = earliest.replace(hour=0, minute=0) + timedelta(hours=hh, minutes=mm)
             if slot_end <= earliest:  # 23:00-01:00 처럼 자정을 넘김

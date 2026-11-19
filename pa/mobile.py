@@ -241,12 +241,23 @@ def pull_phone_inbox():
         for e in entries:
             if e.get("id") in done:
                 continue
+            op = None
             try:
-                apply_entry(decrypt(e, pw))
+                op = decrypt(e, pw)
+                try:
+                    apply_entry(op)
+                    db.log(conn, "phone_input", None, id=e.get("id"))
+                except ValueError as err:
+                    # 추가가 '할 시간' 때문에 막히면 할 시간만 빼고라도 넣는다 (입력을 통째로 잃지 않게)
+                    if op.get("op") != "add" or not (op.get("fields") or {}).get("sfrom"):
+                        raise
+                    fields = {k: v for k, v in op["fields"].items() if k not in ("sdate", "sfrom", "sto")}
+                    apply_entry({**op, "fields": fields})
+                    db.log(conn, "phone_input", None, id=e.get("id"), dropped=f"할 시간 ({err})")
                 n += 1
-                db.log(conn, "phone_input", None, id=e.get("id"))
             except Exception as err:  # 하나가 잘못돼도 나머지는 반영
-                db.log(conn, "phone_input_failed", None, id=e.get("id"), error=str(err)[:200])
+                title = ((op or {}).get("fields") or {}).get("title") or (op or {}).get("text") or ""
+                db.log(conn, "phone_input_failed", None, id=e.get("id"), error=str(err)[:200], title=str(title)[:60])
             done.add(e.get("id"))
         db.set_meta(conn, "phone_processed", json.dumps(sorted(done)[-2000:]))
         conn.commit()

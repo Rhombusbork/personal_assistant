@@ -198,10 +198,15 @@ def dashboard_data(conn):
     if db.get_meta(conn, "last_error"):
         warns.append(f"마지막 동기화 문제: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
     ack = db.get_meta(conn, "ack_phone") or "0"
-    fails = conn.execute("SELECT ts FROM events WHERE type = 'phone_input_failed' AND ts > ? ORDER BY ts",
+    fails = conn.execute("SELECT ts, detail FROM events WHERE type = 'phone_input_failed' AND ts > ? ORDER BY ts",
                          (ack,)).fetchall()
     if fails:
-        warns.append(f"휴대폰 입력 {len(fails)}건을 반영하지 못했습니다 ({', '.join(fmt_time(r['ts']) for r in fails[:3])}) "
+        def what(r):
+            d = json.loads(r["detail"] or "{}")
+            name = f"'{d['title']}' " if d.get("title") else ""
+            why = f": {d['error']}" if d.get("error") else ""
+            return f"{fmt_time(r['ts'])} {name}{why}".strip()
+        warns.append(f"휴대폰 입력 {len(fails)}건을 반영하지 못했습니다 ({' / '.join(what(r) for r in fails[:3])}) "
                      "— 휴대폰에서 다시 입력해 주세요 [ack:phone]")
     ack = db.get_meta(conn, "ack_hidden") or "0"
     for r in conn.execute("SELECT e.key, e.detail, t.title, t.due FROM events e JOIN tasks t ON t.key = e.key "
