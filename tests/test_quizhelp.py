@@ -72,3 +72,14 @@ def test_quiz_runner_does_not_take_other_jobs(env):
     conn, *_ = env
     jobs.enqueue(conn, "notices", "notices", "공지")
     assert not jobs.run_next(conn, quick=True)
+
+
+def test_closing_quiz_tab_turns_help_off(env):
+    conn, _, _, task = env
+    quizhelp.start(conn, task, now())
+    assert not quizhelp.watch_tab(conn, lambda t: False)  # 아직 페이지가 안 뜸 → 끄지 않음
+    assert not quizhelp.watch_tab(conn, lambda t: None)   # 못 읽음 → 그대로
+    assert not quizhelp.watch_tab(conn, lambda t: True)   # 탭 확인
+    assert not quizhelp.watch_tab(conn, lambda t: False)  # 한 번 안 보임 (탭 옮기는 중일 수도)
+    assert quizhelp.watch_tab(conn, lambda t: False)      # 두 번 → 닫힘
+    assert quizhelp.state(conn) is None

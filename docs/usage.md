@@ -161,7 +161,8 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 
 ### 퀴즈 도움 (`quiz_help`, AI 도움이 허용된 퀴즈만)
 
-퀴즈 페이지가 열리면(계획 시간 자동 열기 · 대시보드 ▶) 2시간 동안 '퀴즈 도움'이 켜진다.
+퀴즈 페이지가 열리면(계획 시간 자동 열기 · 대시보드 ▶) '퀴즈 도움'이 켜지고, **그 퀴즈 탭을 닫으면 꺼진다**
+(켜져 있는 동안만 15초마다 브라우저 탭 제목을 본다. 늦어도 2시간 뒤엔 꺼짐).
 그동안 **Win+Shift+S**(또는 PrtSc)로 문제를 찍으면 엔진이 사진을 AI(`pa/ai.py`, 구독 CLI)에 보내고,
 답·풀이를 `materials/<과목>/퀴즈풀이/<날짜>_<퀴즈>/풀이.md` 에 사진과 함께 쌓아 VSCode 에 연다 (보통 1분 안).
 

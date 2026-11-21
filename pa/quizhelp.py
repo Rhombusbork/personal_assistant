@@ -1,6 +1,7 @@
 """퀴즈 도움 — 퀴즈를 푸는 동안 찍은 스크린샷을 AI 에 보내 답과 풀이를 받는다 (AI 도움이 허용된 퀴즈용).
 
-  1. 퀴즈 페이지가 열리면 (계획 시간 자동 열기 · 대시보드 ▶) '퀴즈 도움'이 켜진다 (minutes 분 동안)
+  1. 퀴즈 페이지가 열리면 (계획 시간 자동 열기 · 대시보드 ▶) '퀴즈 도움'이 켜진다.
+     그 퀴즈 탭을 닫으면 꺼진다 (켜져 있는 동안만 15초마다 탭 제목을 봄). 늦어도 minutes 분 뒤엔 꺼짐
   2. 그동안 Win+Shift+S 나 PrtSc 로 문제를 찍으면 → Windows 스크린샷 폴더에 새 사진이 생김
   3. 엔진이 사진을 materials/<과목>/퀴즈풀이/<날짜>_<퀴즈>/ 로 복사하고, AI 에 답·풀이를 묻는다 (작업 'quizhelp')
   4. 풀이는 같은 폴더의 풀이.md 에 사진과 함께 쌓이고, VSCode 에 열린다
@@ -61,6 +62,34 @@ def start(conn, task, t_now=None):
     db.log(conn, "quiz_help_on", task["key"])
     conn.commit()
     return s
+
+
+TAB_EVERY = 15  # 초
+
+
+def watch_tab(conn, tab_open=None):
+    """퀴즈 탭이 닫혔으면 퀴즈 도움을 끈다. 탭을 한 번이라도 본 뒤, 연달아 두 번 안 보이면 닫힌 것으로
+    (페이지가 뜨기 전·제목을 못 읽을 때 잘못 끄지 않게). 껐으면 True."""
+    s = state(conn)
+    if not s:
+        return False
+    if tab_open is None:
+        from pa.autoplay import tab_open
+    here = tab_open(s["title"])
+    if here is None:
+        return False
+    if here:
+        s["seen"], s["missing"] = True, 0
+    elif s.get("seen"):
+        s["missing"] = s.get("missing", 0) + 1
+        if s["missing"] >= 2:
+            stop(conn)
+            db.log(conn, "quiz_help_off", s["key"], why="tab_closed")
+            conn.commit()
+            return True
+    db.set_meta(conn, "quiz_help", json.dumps(s, ensure_ascii=False))
+    conn.commit()
+    return False
 
 
 def stop(conn):

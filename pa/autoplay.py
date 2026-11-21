@@ -62,12 +62,40 @@ def press_play(title, dry=False):
     if not (osutil.IS_WSL or osutil.IS_WINDOWS):
         return "skip"
     script = SCRIPT.replace("__TITLE__", _key(title)).replace("__NAMES__", ", ".join(f"'{n}'" for n in NAMES)).replace("__DRY__", "true" if dry else "false")
-    enc = base64.b64encode(script.encode("utf-16-le")).decode()  # 한글 제목이 깨지지 않게
+    out = _ps(script)
+    return out[-1] if out else "none"
+
+
+def _ps(script):
+    """PowerShell 실행 → 출력 줄 목록. 한글이 깨지지 않게 스크립트를 인코딩해서 넘긴다."""
+    enc = base64.b64encode(script.encode("utf-16-le")).decode()
     exe = "powershell.exe" if osutil.IS_WSL else "powershell"
     r = subprocess.run([exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], capture_output=True,
                        text=True, encoding="utf-8", errors="replace", timeout=60, **({"cwd": "/mnt/c"} if osutil.IS_WSL else {}))
-    out = (r.stdout or "").strip().splitlines()
-    return out[-1] if out else "none"
+    return (r.stdout or "").strip().splitlines()
+
+
+TABS = r"""
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+$A = [Windows.Automation.AutomationElement]
+$c = New-Object Windows.Automation.PropertyCondition($A::ControlTypeProperty, [Windows.Automation.ControlType]::TabItem)
+$A::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition) |
+  Where-Object { $_.Current.ClassName -in @('MozillaWindowClass', 'Chrome_WidgetWin_1') } |
+  ForEach-Object { foreach ($t in $_.FindAll([Windows.Automation.TreeScope]::Descendants, $c)) { 'TAB ' + $t.Current.Name } }
+"""
+
+
+def tab_open(title):
+    """그 제목의 브라우저 탭이 열려 있나. Windows 가 아니거나 읽지 못하면 None (모름)."""
+    if not (osutil.IS_WSL or osutil.IS_WINDOWS):
+        return None
+    try:
+        tabs = [l[4:] for l in _ps(TABS) if l.startswith("TAB ")]
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    key = title.strip()[:20]
+    return any(key in t for t in tabs) if tabs else None
 
 
 def play_when_ready(title, tries=12, every=5, log=lambda m: None):

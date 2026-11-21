@@ -200,12 +200,17 @@ def _job_runner(quick=False):
     conn = db.connect()
     if not quick:
         jobs.reset_stuck(conn)
+    last_tab = 0
     while True:
         try:
             if quick:
                 from pa import quizhelp
                 if quizhelp.scan(conn):
                     log("퀴즈 도움 — 새 스크린샷")
+                if time.time() - last_tab >= quizhelp.TAB_EVERY:
+                    last_tab = time.time()
+                    if quizhelp.watch_tab(conn):
+                        log("퀴즈 탭을 닫아 퀴즈 도움 끔")
             if jobs.run_next(conn, quick=quick):
                 log("에이전트 작업 하나 처리")
                 STATE["job_done"] = True  # 감시 순환이 화면(휴대폰 포함)을 다시 올리게
