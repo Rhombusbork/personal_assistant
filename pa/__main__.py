@@ -11,6 +11,7 @@
   bin/pa done <키>            완료 표시
   bin/pa ignore <키>          계속 제외 / unignore 로 되돌리기
   bin/pa time <키> <분>       예상 소요 시간 조정
+  bin/pa quiz-help <키>|off   퀴즈 도움: 이제부터 찍은 스크린샷을 AI 에 보내 답·풀이 (퀴즈 페이지를 열면 자동으로 켜짐)
   bin/pa task <키>            할 일 하나: 마감·주소·Canvas 과제 설명·보고서 파일·연결된 자료 (채팅 작업용)
   bin/pa notices [--all]      새 공지 (읽지 않은 것; --all 은 최근 2주 전부) — 본문 앞부분과 🤖 요약
   bin/pa pdf <보고서.md>       제출용 A4 PDF 만들기 (쪽수 출력) → 탐색기에서 위치 보여 주기
@@ -240,6 +241,20 @@ def cmd_link(conn, args):
         print(("연결: " if args.cmd == "link" else "뺌: ") + f)
 
 
+def cmd_quiz_help(conn, args):
+    from pa import quizhelp
+    if args.key == "off":
+        quizhelp.stop(conn)
+        return print("퀴즈 도움 끔")
+    row = conn.execute("SELECT * FROM tasks WHERE key = ?", (args.key,)).fetchone()
+    if not row:
+        raise SystemExit(f"'{args.key}' 를 찾지 못했습니다 (bin/pa list)")
+    s = quizhelp.start(conn, dict(row))
+    if not s:
+        raise SystemExit("config/timetable.yaml 에 quiz_help 가 없습니다 (꺼짐)")
+    print(f"퀴즈 도움 켬 — {s['until'][11:16]} 까지 찍은 스크린샷을 AI 에 보냅니다")
+
+
 def cmd_time(conn, args):
     conn.execute("UPDATE tasks SET minutes_override = ? WHERE key = ?", (args.minutes, args.key))
     conn.commit()
@@ -297,6 +312,9 @@ def main():
         sp = sub.add_parser(name)
         sp.add_argument("key")
         sp.set_defaults(fn=cmd_status(status))
+    sp = sub.add_parser("quiz-help", help="퀴즈 도움 켜기 (<키>) · 끄기 (off)")
+    sp.add_argument("key")
+    sp.set_defaults(fn=cmd_quiz_help)
     sp = sub.add_parser("time")
     sp.add_argument("key")
     sp.add_argument("minutes", type=int)

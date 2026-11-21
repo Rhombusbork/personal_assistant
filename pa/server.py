@@ -427,10 +427,13 @@ def side_action(action, body, remote=False, applied=None):
                 (applied or (lambda: None))()
             return {"ok": True, "minutes": got[1] if got else 0}
         if action == "/api/open":
-            row = conn.execute("SELECT url FROM tasks WHERE key = ?", (body["key"],)).fetchone()
+            row = conn.execute("SELECT * FROM tasks WHERE key = ?", (body["key"],)).fetchone()
             if not row or not row["url"]:
                 raise ValueError("열 수 있는 링크가 없음")
             osutil.open_url(row["url"])  # 평소 브라우저 (학교 로그인 유지)
+            if row["kind"] == "quiz":
+                from pa import quizhelp
+                quizhelp.start(conn, dict(row))  # 이제부터 찍은 스크린샷 → AI 풀이
             return {"ok": True}
         if action == "/api/open-request":  # bin/pa open: VSCode 안 탭 (확장이 있으면)
             alive = vscode_alive()

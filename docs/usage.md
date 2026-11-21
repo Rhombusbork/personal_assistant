@@ -155,6 +155,17 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
   더 늦으면 열지 않고 기록만 남긴다.
 - 켜고 끄기: `config/timetable.yaml` 의 `auto_open` (`enabled`, 종류별 `lecture`·`quiz`·`assignment`). 채팅에서 "자동 열기 꺼줘"도 된다.
 
+### 퀴즈 도움 (`quiz_help`, AI 도움이 허용된 퀴즈만)
+
+퀴즈 페이지가 열리면(계획 시간 자동 열기 · 대시보드 ▶) 2시간 동안 '퀴즈 도움'이 켜진다.
+그동안 **Win+Shift+S**(또는 PrtSc)로 문제를 찍으면 엔진이 사진을 AI(`pa/ai.py`, 구독 CLI)에 보내고,
+답·풀이를 `materials/<과목>/퀴즈풀이/<날짜>_<퀴즈>/풀이.md` 에 사진과 함께 쌓아 VSCode 에 연다 (보통 1분 안).
+
+- 답 체크·제출은 직접. 프로그램은 퀴즈를 시작하거나 답을 고르지 않는다. AI 답은 틀릴 수 있다.
+- 켜진 시간 밖의 스크린샷은 보내지 않는다. 직접 켜기·끄기: `bin/pa quiz-help <키>` / `bin/pa quiz-help off`.
+- 풀이는 AI 글이라 내 기록(`notes/`)이 아니라 `materials/` 에 둔다 (git 제외). 나중에 읽고 내 말로 노트에 적으면 된다.
+- 보고서 초안 같은 다른 작업이 몇 분 걸려도 퀴즈 풀이는 따로 처리돼 기다리지 않는다.
+
 ## 공지 · 시험 · 요약 (R6·R8)
 
 - **📢 새 공지**: Canvas 확인 때 새 공지를 모아 보여 준다 (코드만). [🤖 요약·제외 후보 찾기] 를 누르면 그때만 Claude 가

@@ -15,7 +15,7 @@ import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pa import ai, canvas, db, links, materials
+from pa import ai, canvas, db, links, materials, quizhelp
 from pa.model import KST, now, parse_dt, short_course
 
 REPORT_DIR = Path.home() / "report"
@@ -62,16 +62,19 @@ def recent(conn):
         "WHERE status IN ('queued', 'running') OR updated_at >= ? ORDER BY id DESC LIMIT 10", (since,))]
 
 
-def run_next(conn):
-    """대기 중인 작업 하나를 처리. 처리했으면 True."""
-    row = conn.execute("SELECT * FROM jobs WHERE status = 'queued' ORDER BY id LIMIT 1").fetchone()
+def run_next(conn, quick=False):
+    """대기 중인 작업 하나를 처리. 처리했으면 True.
+    quick=True: 퀴즈 풀이만 (따로 도는 스레드 — 몇 분 걸리는 보고서 초안 뒤에서 기다리지 않게). False: 그 밖의 작업."""
+    row = conn.execute("SELECT * FROM jobs WHERE status = 'queued' AND (kind = 'quizhelp') = ? ORDER BY id LIMIT 1",
+                       (int(quick),)).fetchone()
     if not row:
         return False
     _update(conn, row["id"], status="running", step="시작")
     try:
         result = {"report": report_job, "report-force": lambda c, j: report_job(c, j, force=True),
                   "report-auto": lambda c, j: report_job(c, j, show=False),
-                  "notices": notices_job, "summary": summary_job}[row["kind"]](conn, row)
+                  "notices": notices_job, "summary": summary_job,
+                  "quizhelp": quizhelp.job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
         db.log(conn, "job_done", row["key"], kind=row["kind"], result=str(result))
     except Exception as e:

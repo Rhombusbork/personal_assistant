@@ -194,13 +194,19 @@ def _auto_open():
         conn.close()
 
 
-def _job_runner():
-    """에이전트 작업을 하나씩 처리하는 스레드 (보고서 초안 등은 몇 분 걸릴 수 있음)."""
+def _job_runner(quick=False):
+    """에이전트 작업을 하나씩 처리하는 스레드 (보고서 초안 등은 몇 분 걸릴 수 있음).
+    quick=True 는 퀴즈 풀이만 처리하는 두 번째 스레드 — 사진을 찍고 바로 답을 보게."""
     conn = db.connect()
-    jobs.reset_stuck(conn)
+    if not quick:
+        jobs.reset_stuck(conn)
     while True:
         try:
-            if jobs.run_next(conn):
+            if quick:
+                from pa import quizhelp
+                if quizhelp.scan(conn):
+                    log("퀴즈 도움 — 새 스크린샷")
+            if jobs.run_next(conn, quick=quick):
                 log("에이전트 작업 하나 처리")
                 STATE["job_done"] = True  # 감시 순환이 화면(휴대폰 포함)을 다시 올리게
                 continue
@@ -410,6 +416,7 @@ def watch():
         log(f"포트 {server.PORT} 사용 중 — 대시보드 서버는 켜지 않음")
     threading.Thread(target=_download_watcher, daemon=True).start()
     threading.Thread(target=_job_runner, daemon=True).start()
+    threading.Thread(target=_job_runner, args=(True,), daemon=True).start()
     every = canvas_every()
     log("비서 감시 시작 — inbox.md 저장 시 반영, 15분마다 확인(바뀐 게 있을 때만 다시 계획), "
         + (f"Canvas {every // 3600}시간마다" if every else "Canvas 는 켤 때와 ⟳ 누를 때만"))

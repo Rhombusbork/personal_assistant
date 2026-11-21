@@ -65,6 +65,14 @@ auto_open:
   draft_hours_before: 3             # 과제 블록 몇 시간 전에 초안을 미리 쓸지 (0 이면 안 씀, 구독 사용량 씀)
   late_limit_minutes: 15            # 노트북이 늦게 깨면 이만큼 지난 블록까지만 연다
 
+# 퀴즈 도움 (AI 도움이 허용된 퀴즈만) — 퀴즈 페이지가 열리면 minutes 분 동안, 찍은 스크린샷(Win+Shift+S·PrtSc)을
+#   AI 에 보내 답·풀이를 받는다 → materials/<과목>/퀴즈풀이/ 에 사진과 함께 (pa/quizhelp.py). 답 체크·제출은 직접.
+#   그 시간 밖에 찍은 스크린샷은 보내지 않는다. 손으로: bin/pa quiz-help <키> | off
+quiz_help:
+  enabled: false
+  minutes: 120
+  screenshots_dir: ""               # 비우면 Windows '사진\Screenshots' 폴더를 찾아 씀
+
 reminders:
   plan_minutes_before: 10             # '학습 계획' 블록 시작 몇 분 전 (0 이면 알림 없음, [10, 0] 은 10분 전·시작할 때)
   deadline_minutes_before: [1440, 180, 60]   # '과제' 마감 하루 전 · 3시간 전 · 1시간 전 (최대 5개)

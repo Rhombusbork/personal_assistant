@@ -50,6 +50,10 @@ def open_task(conn, task):
             materials.open_file(path)
             materials.reveal(path)
             opened += ["초안", "탐색기"]
+    if task["kind"] == "quiz":
+        from pa import quizhelp
+        if quizhelp.start(conn, task):
+            opened.append("퀴즈 도움")
     url = quiz.cfg()["url"] if task["kind"] == "review" else task["url"]
     if url:
         osutil.open_url(url)

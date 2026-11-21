@@ -80,23 +80,26 @@ def _run(cmd, cwd, timeout, stdin=None):
     return result.stdout.strip()
 
 
-def ask(prompt, files=(), timeout=600, cwd=ROOT, add_dirs=()):
+def ask(prompt, files=(), timeout=600, cwd=ROOT, add_dirs=(), images=()):
     """프롬프트를 보내고 텍스트 응답을 반환. 읽기만 허용한다 (파일은 엔진이 쓴다).
 
     cwd: 그 폴더의 규칙 파일(CLAUDE.md)이 적용된다. add_dirs: 추가로 읽을 수 있는 폴더.
-    files: AI 가 읽을 수 있게 경로를 알려준다.
+    files: AI 가 읽을 수 있게 경로를 알려준다. images: 보여 줄 사진 (Claude 는 Read 로 보고, Codex 는 -i 로 붙인다).
     """
     if files:
         prompt += "\n\n참고 파일:\n" + "\n".join(f"- {Path(f).resolve()}" for f in files)
     if backend() == "codex":
-        return _ask_codex(prompt, timeout, Path(cwd), add_dirs)
+        return _ask_codex(prompt, timeout, Path(cwd), add_dirs, images)
+    if images:
+        prompt += "\n\n사진 (Read 로 본다):\n" + "\n".join(f"- {Path(f).resolve()}" for f in images)
+        add_dirs = [*add_dirs, *{str(Path(f).resolve().parent) for f in images}]
     cmd = [claude_bin(), "-p", prompt, "--output-format", "text", "--allowedTools", "Read"]
     for d in add_dirs:
         cmd += ["--add-dir", str(d)]
     return _run(cmd, cwd, timeout)
 
 
-def _ask_codex(prompt, timeout, cwd, add_dirs):
+def _ask_codex(prompt, timeout, cwd, add_dirs, images=()):
     # Codex 는 CLAUDE.md 가 아니라 AGENTS.md 를 읽는다 → AGENTS.md 가 없는 폴더면 CLAUDE.md 를 규칙으로 읽으라고 알려 준다.
     # --add-dir 은 쓰기 권한을 주는 옵션이라 쓰지 않고, 읽을 폴더는 프롬프트로 알려 준다.
     head = []
@@ -106,7 +109,10 @@ def _ask_codex(prompt, timeout, cwd, add_dirs):
         head.append("읽어도 되는 폴더: " + ", ".join(str(Path(d).resolve()) for d in add_dirs))
     head.append("파일을 고치거나 명령으로 무언가를 바꾸지 않는다. 결과는 답으로만 낸다.")
     cmd = [_find("codex"), "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral",
-           "--cd", str(cwd), "-"]  # 프롬프트는 표준 입력으로 (Windows 명령 줄 길이 제한을 피함). 최종 답만 stdout 으로 나온다
+           "--cd", str(cwd)]
+    for f in images:
+        cmd += ["-i", str(Path(f).resolve())]
+    cmd.append("-")  # 프롬프트는 표준 입력으로 (Windows 명령 줄 길이 제한을 피함). 최종 답만 stdout 으로 나온다
     return _run(cmd, cwd, timeout, stdin="\n".join(head) + "\n\n" + prompt)
 
 
