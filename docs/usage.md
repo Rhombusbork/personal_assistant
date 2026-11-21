@@ -146,11 +146,15 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 
 | 블록 | 시작할 때 여는 것 |
 |---|---|
-| 강의 | 강의 페이지 (평소 브라우저) |
+| 강의 | 강의 페이지 (평소 브라우저) + 플레이어 ▶ 누르기 (`play`) |
 | 퀴즈 | Canvas 퀴즈 페이지 (퀴즈 복습 블록은 퀴즈 앱) |
 | 과제 | 초안 파일 + 탐색기(파일 선택된 채) + Canvas 제출 페이지. 초안은 블록 `draft_hours_before`(기본 3)시간 전에 ✍ 와 같은 방법으로 미리 씀 |
 
 - 여는 것까지만. 강의 시청·퀴즈 풀이·**제출은 직접** 한다.
+- ▶ 누르기: 페이지가 뜨는 동안 5초마다 1분까지, 창 제목이 그 강의인 브라우저 창에서 이름이 '재생'인 버튼을 찾아
+  누른다 (Windows 접근성 기능, 마우스 위치를 짐작하지 않음). 못 찾으면 안 누름. 소리까지 나려면 브라우저에서 학교
+  사이트 자동 재생을 허용한다 (Firefox: 주소창 왼쪽 아이콘 → 자동 재생 → 오디오 및 비디오 허용).
+  직접 시험: `.venv/bin/python -m pa.autoplay --find <강의 제목>` (찾기만)
 - 블록마다 한 번만 연다. 이미 끝낸 일은 안 연다. 노트북이 늦게 깨면 `late_limit_minutes`(기본 15분) 안일 때만 열고,
   더 늦으면 열지 않고 기록만 남긴다.
 - 켜고 끄기: `config/timetable.yaml` 의 `auto_open` (`enabled`, 종류별 `lecture`·`quiz`·`assignment`). 채팅에서 "자동 열기 꺼줘"도 된다.

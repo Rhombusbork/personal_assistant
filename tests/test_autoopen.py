@@ -84,3 +84,14 @@ def test_plan_reminder_at_start():
     from pa.config import popup
     assert [o["minutes"] for o in popup([10, 0])["overrides"]] == [10, 0]
     assert popup(0)["overrides"] == []
+
+
+def test_lecture_page_then_play_button(conn, monkeypatch):
+    calls = []
+    monkeypatch.setattr(autoopen.osutil, "open_url", lambda u: calls.append(u))
+    monkeypatch.setattr(autoopen, "_play", lambda title: calls.append("play:" + title))
+    task = dict(conn.execute("SELECT * FROM tasks WHERE key = 'l1'").fetchone())
+    assert autoopen.open_task(conn, task) == ["페이지", "재생"]
+    import time
+    time.sleep(0.1)  # 재생은 뒤에서 (페이지가 뜰 때까지 기다리므로)
+    assert calls == ["https://canvas/lecture", "play:10주차 강의"]

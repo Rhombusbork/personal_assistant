@@ -1,6 +1,6 @@
 """학습 계획 블록이 시작되면 그 일을 PC 에서 열어 준다 — 정해 둔 시간에 까먹지 않게 (엔진이 30초마다 확인).
 
-  강의     → 강의 페이지 (평소 브라우저, 학교 로그인이 남아 있는 곳)
+  강의     → 강의 페이지 (평소 브라우저, 학교 로그인이 남아 있는 곳) + 플레이어 ▶ 누르기 (pa/autoplay.py)
   퀴즈     → Canvas 퀴즈 페이지 / 퀴즈 복습 → 퀴즈 앱
   과제     → 미리 써 둔 초안 파일 + 탐색기(파일 선택된 채) + Canvas 제출 페이지
 
@@ -12,13 +12,14 @@
 
 설정: config/timetable.yaml 의 auto_open (없으면 꺼짐).
 """
+import threading
 from datetime import timedelta
 
 from pa import db, osutil
 from pa.config import load_timetable
 from pa.model import parse_dt
 
-DEFAULTS = {"lecture": True, "quiz": True, "assignment": True, "draft_hours_before": 3, "late_limit_minutes": 15}
+DEFAULTS = {"lecture": True, "play": True, "quiz": True, "assignment": True, "draft_hours_before": 3, "late_limit_minutes": 15}
 
 
 def cfg():
@@ -58,7 +59,16 @@ def open_task(conn, task):
     if url:
         osutil.open_url(url)
         opened.append("제출 페이지" if task["kind"] == "assignment" else "페이지")
+    if url and task["kind"] == "lecture" and (cfg() or {}).get("play"):
+        threading.Thread(target=_play, args=(task["title"],), daemon=True).start()
+        opened.append("재생")
     return opened
+
+
+def _play(title):
+    from pa import autoplay
+    from pa.pipeline import log
+    autoplay.play_when_ready(title, log=log)
 
 
 def check(conn, t_now, opener=open_task):

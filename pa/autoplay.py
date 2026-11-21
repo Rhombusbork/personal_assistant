@@ -1,0 +1,82 @@
+"""강의 페이지를 연 뒤 플레이어의 ▶(재생) 버튼을 눌러 준다 — Windows 접근성(UI Automation)으로 버튼을 '이름'으로 찾는다.
+
+마우스 위치를 짐작해 누르지 않는다:
+  - 창 제목(= 지금 보이는 탭)에 강의 제목이 들어 있는 브라우저 창만 (Firefox·Edge·Chrome)
+  - 그 창의 화면에 보이는 버튼 중 이름이 '재생'/'Play' 인 것만
+  - 누르기는 버튼의 기본 동작(Invoke)으로. 그게 없으면 그 버튼 한가운데를 클릭
+못 찾으면 아무것도 안 누른다. 페이지가 뜨는 동안 몇 번 다시 찾는다 (pa/autoopen.py 에서 부름).
+Windows·WSL 에서만 (리눅스·Mac 은 건너뜀).
+"""
+import base64
+import subprocess
+import time
+
+from pa import osutil
+
+NAMES = ("재생", "Play", "play")
+
+SCRIPT = r"""
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+$want = '__TITLE__'
+$names = @(__NAMES__)
+$dry = $__DRY__
+$A = [Windows.Automation.AutomationElement]
+$wins = $A::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition) |
+  Where-Object { $_.Current.ClassName -in @('MozillaWindowClass', 'Chrome_WidgetWin_1') -and $_.Current.Name.Contains($want) }
+foreach ($w in $wins) {
+  $cond = New-Object Windows.Automation.PropertyCondition($A::ControlTypeProperty, [Windows.Automation.ControlType]::Button)
+  foreach ($b in $w.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)) {
+    if ($b.Current.IsOffscreen -or $names -notcontains $b.Current.Name) { continue }
+    if ($dry) { 'found'; exit }
+    $p = $null
+    if ($b.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$p)) { $p.Invoke(); 'invoked'; exit }
+    $r = $b.Current.BoundingRectangle
+    Add-Type -Name M -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+[DllImport("user32.dll")] public static extern void mouse_event(int f, int x, int y, int d, int e);'
+    [W.M]::SetCursorPos([int]($r.Left + $r.Width / 2), [int]($r.Top + $r.Height / 2))
+    [W.M]::mouse_event(2, 0, 0, 0, 0); [W.M]::mouse_event(4, 0, 0, 0, 0)
+    'clicked'; exit
+  }
+}
+'none'
+"""
+
+
+def _key(title):
+    """창 제목과 맞춰 볼 강의 제목 앞부분 (Canvas 가 탭 제목 뒤를 자르거나 덧붙여도 맞게)."""
+    return title.strip()[:20].replace("'", "''")
+
+
+def press_play(title, dry=False):
+    """'invoked' · 'clicked' · 'none' · 'skip'(Windows 아님). dry=True 면 찾기만 ('found')."""
+    if not (osutil.IS_WSL or osutil.IS_WINDOWS):
+        return "skip"
+    script = SCRIPT.replace("__TITLE__", _key(title)).replace("__NAMES__", ", ".join(f"'{n}'" for n in NAMES)).replace("__DRY__", "true" if dry else "false")
+    enc = base64.b64encode(script.encode("utf-16-le")).decode()  # 한글 제목이 깨지지 않게
+    exe = "powershell.exe" if osutil.IS_WSL else "powershell"
+    r = subprocess.run([exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", timeout=60, **({"cwd": "/mnt/c"} if osutil.IS_WSL else {}))
+    out = (r.stdout or "").strip().splitlines()
+    return out[-1] if out else "none"
+
+
+def play_when_ready(title, tries=12, every=5, log=lambda m: None):
+    """페이지가 뜰 때까지 every 초마다 최대 tries 번 찾아서 한 번 누른다. 결과를 돌려준다."""
+    for _ in range(tries):
+        try:
+            got = press_play(title)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            got = f"error: {e}"
+        if got in ("invoked", "clicked", "skip"):
+            log(f"강의 재생 버튼: {got}")
+            return got
+        time.sleep(every)
+    log("강의 재생 버튼을 못 찾음 — 직접 ▶ 를 눌러 주세요")
+    return "none"
+
+
+if __name__ == "__main__":  # python -m pa.autoplay [--find] <강의 제목>
+    import sys
+    dry = "--find" in sys.argv
+    print(press_play(" ".join(a for a in sys.argv[1:] if a != "--find"), dry=dry))
