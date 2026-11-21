@@ -34,12 +34,15 @@ def reminders():
     r = load_timetable().get("reminders") or {}
     dl = r.get("deadline_minutes_before", [])
     every = max(1, int(r.get("dense_every_minutes", 2) or 2))
-    return {"plan": int(r.get("plan_minutes_before", 0)),
+    pl = r.get("plan_minutes_before", 0)
+    return {"plan": [int(x) for x in pl] if isinstance(pl, list) else int(pl or 0),
             "deadline": [int(x) for x in (dl if isinstance(dl, list) else [dl]) if int(x) > 0],
             "dense_from": max(0, min(60, int(r.get("dense_from_minutes", 0) or 0))), "dense_every": every}
 
 
 def popup(minutes):
-    """Google Calendar 일정 알림 설정. minutes: 분 또는 분 목록 (최대 5개, 0 이하는 무시)."""
-    ms = sorted({m for m in (minutes if isinstance(minutes, (list, tuple)) else [minutes]) if m > 0}, reverse=True)[:5]
+    """Google Calendar 일정 알림 설정. minutes: 분 또는 분 목록 (최대 5개).
+    숫자 하나일 때 0 은 '알림 없음', 목록 안의 0 은 '시작할 때' 알림."""
+    many = isinstance(minutes, (list, tuple))
+    ms = sorted({m for m in (minutes if many else [minutes]) if m > 0 or (many and m == 0)}, reverse=True)[:5]
     return {"useDefault": False, "overrides": [{"method": "popup", "minutes": m} for m in ms]}

@@ -21,6 +21,7 @@ from pa.model import now
 PLAN_EVERY = 15 * 60        # 이때마다 '다시 계획할 필요가 있나' 확인 (필요할 때만 Google 에 요청) + 곧 마감인 것 제출 확인
 QUICK_SOON = 3 * 60         # 30분 안에 마감이 있으면 이때마다 제출·수강 확인 (끝낸 일의 촘촘한 알림을 빨리 지우게)
 PHONE_EVERY = 3 * 60
+AUTOOPEN_EVERY = 30           # 학습 계획 블록이 시작됐나 (강의·퀴즈·과제 자동 열기, pa/autoopen.py)
 DOWNLOADS_EVERY = 30
 POLL = 1.0
 
@@ -181,6 +182,16 @@ def _download_watcher():
         finally:
             conn.close()
         time.sleep(DOWNLOADS_EVERY)
+
+
+def _auto_open():
+    from pa import autoopen
+    conn = db.connect()
+    try:
+        for key in autoopen.check(conn, now()):
+            log(f"계획 시간 — 열었음: {key}")
+    finally:
+        conn.close()
 
 
 def _job_runner():
@@ -422,6 +433,7 @@ def watch():
     _safe(lambda: run(full=full))
     last_full = time.time() if full else time.time() - age
     last_plan = last_phone = last_code = last_quick = time.time()
+    last_open = 0
     login_file = db.PATH.parent / "browser-state.json"  # 강의 플랫폼 로그인
     login_seen = login_file.stat().st_mtime if login_file.exists() else 0
     while True:
@@ -431,6 +443,9 @@ def watch():
                 last_code = time.time()
                 _restart_if_code_changed(code_state)
                 _keep_window(serving)
+            if time.time() - last_open >= AUTOOPEN_EVERY:
+                last_open = time.time()
+                _safe(_auto_open)
             if time.time() - last_phone >= PHONE_EVERY:  # 휴대폰 입력이 있으면 바로 반영
                 last_phone = time.time()
                 if _pull_phone():

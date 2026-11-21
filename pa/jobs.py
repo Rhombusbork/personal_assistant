@@ -70,6 +70,7 @@ def run_next(conn):
     _update(conn, row["id"], status="running", step="시작")
     try:
         result = {"report": report_job, "report-force": lambda c, j: report_job(c, j, force=True),
+                  "report-auto": lambda c, j: report_job(c, j, show=False),
                   "notices": notices_job, "summary": summary_job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
         db.log(conn, "job_done", row["key"], kind=row["kind"], result=str(result))
@@ -185,7 +186,8 @@ def blank_report(conn, key):
     return path
 
 
-def report_job(conn, job, force=False):
+def report_job(conn, job, force=False, show=True):
+    """show=False: 과제 블록 전에 미리 쓰는 초안 (pa/autoopen.py) — 지금 열지 않고 블록이 시작될 때 연다."""
     task = conn.execute("SELECT * FROM tasks WHERE key = ?", (job["key"],)).fetchone()
     if not task:
         raise ValueError("할 일을 찾지 못함")
@@ -211,8 +213,9 @@ def report_job(conn, job, force=False):
     path = report_path(task, conn)
     db.set_meta(conn, "report_file:" + task["key"], str(path))
     if path.exists() and not force:
-        _update(conn, job["id"], step="이미 있는 파일 열기")
-        materials.open_file(path)
+        if show:
+            _update(conn, job["id"], step="이미 있는 파일 열기")
+            materials.open_file(path)
         return path
     if path.exists() and path.read_text(encoding="utf-8").strip() == _template(task).strip():  # 📝 로 만든 빈 파일이면 그냥 덮어씀
         path.unlink()
@@ -261,6 +264,8 @@ def report_job(conn, job, force=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text + "\n", encoding="utf-8")
 
+    if not show:
+        return path
     _update(conn, job["id"], step="5/5 열기")
     try:
         materials.open_file(path)

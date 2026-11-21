@@ -139,6 +139,22 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - 결과는 `data/pa.log`, 실패하면 대시보드·TODAY.md 에 "마지막 동기화 실패"
 - 지우기: 같은 폴더의 `unregister-task.ps1`
 
+## 계획 시간 자동 열기 (`auto_open`)
+
+'학습 계획' 블록이 시작되면 엔진이 그 일을 PC 에서 열어 준다 (까먹지 않게). PC 가 켜져 있을 때만 — 꺼져 있으면
+휴대폰에 캘린더 알림만 온다 (`reminders.plan_minutes_before: [10, 0]` = 10분 전 · 시작할 때).
+
+| 블록 | 시작할 때 여는 것 |
+|---|---|
+| 강의 | 강의 페이지 (평소 브라우저) |
+| 퀴즈 | Canvas 퀴즈 페이지 (퀴즈 복습 블록은 퀴즈 앱) |
+| 과제 | 초안 파일 + 탐색기(파일 선택된 채) + Canvas 제출 페이지. 초안은 블록 `draft_hours_before`(기본 3)시간 전에 ✍ 와 같은 방법으로 미리 씀 |
+
+- 여는 것까지만. 강의 시청·퀴즈 풀이·**제출은 직접** 한다.
+- 블록마다 한 번만 연다. 이미 끝낸 일은 안 연다. 노트북이 늦게 깨면 `late_limit_minutes`(기본 15분) 안일 때만 열고,
+  더 늦으면 열지 않고 기록만 남긴다.
+- 켜고 끄기: `config/timetable.yaml` 의 `auto_open` (`enabled`, 종류별 `lecture`·`quiz`·`assignment`). 채팅에서 "자동 열기 꺼줘"도 된다.
+
 ## 공지 · 시험 · 요약 (R6·R8)
 
 - **📢 새 공지**: Canvas 확인 때 새 공지를 모아 보여 준다 (코드만). [🤖 요약·제외 후보 찾기] 를 누르면 그때만 Claude 가
