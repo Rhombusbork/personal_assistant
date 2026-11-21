@@ -1,7 +1,8 @@
 """강의 페이지를 연 뒤 플레이어의 ▶(재생) 버튼을 눌러 준다 — Windows 접근성(UI Automation)으로 버튼을 '이름'으로 찾는다.
 
 마우스 위치를 짐작해 누르지 않는다:
-  - 창 제목(= 지금 보이는 탭)에 강의 제목이 들어 있는 브라우저 창만 (Firefox·Edge·Chrome)
+  - 창 제목(= 지금 보이는 탭)에 강의 제목이 들어 있는 브라우저 창만 (Firefox·Edge·Chrome).
+    최소화돼 있으면 화면에 띄우고 앞으로 가져온다 (최소화된 창의 버튼은 '화면 밖'이라 찾을 수 없음)
   - 그 창의 화면에 보이는 버튼 중 이름이 '재생'/'Play' 인 것만
   - 누르기는 버튼의 기본 동작(Invoke)으로. 그게 없으면 그 버튼 한가운데를 클릭
 못 찾으면 아무것도 안 누른다. 페이지가 뜨는 동안 몇 번 다시 찾는다 (pa/autoopen.py 에서 부름).
@@ -24,7 +25,17 @@ $dry = $__DRY__
 $A = [Windows.Automation.AutomationElement]
 $wins = $A::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition) |
   Where-Object { $_.Current.ClassName -in @('MozillaWindowClass', 'Chrome_WidgetWin_1') -and $_.Current.Name.Contains($want) }
+Add-Type -Name M -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+[DllImport("user32.dll")] public static extern void mouse_event(int f, int x, int y, int d, int e);
+[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);'
 foreach ($w in $wins) {
+  $h = [IntPtr]$w.Current.NativeWindowHandle
+  if (-not $dry) {
+    if ([W.M]::IsIconic($h)) { [W.M]::ShowWindow($h, 9) | Out-Null; Start-Sleep -Milliseconds 800 }  # 최소화돼 있으면 화면에 띄움
+    [W.M]::SetForegroundWindow($h) | Out-Null
+  }
   $cond = New-Object Windows.Automation.PropertyCondition($A::ControlTypeProperty, [Windows.Automation.ControlType]::Button)
   foreach ($b in $w.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)) {
     if ($b.Current.IsOffscreen -or $names -notcontains $b.Current.Name) { continue }
@@ -32,8 +43,6 @@ foreach ($w in $wins) {
     $p = $null
     if ($b.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$p)) { $p.Invoke(); 'invoked'; exit }
     $r = $b.Current.BoundingRectangle
-    Add-Type -Name M -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-[DllImport("user32.dll")] public static extern void mouse_event(int f, int x, int y, int d, int e);'
     [W.M]::SetCursorPos([int]($r.Left + $r.Width / 2), [int]($r.Top + $r.Height / 2))
     [W.M]::mouse_event(2, 0, 0, 0, 0); [W.M]::mouse_event(4, 0, 0, 0, 0)
     'clicked'; exit
