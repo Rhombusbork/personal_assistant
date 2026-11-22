@@ -12,7 +12,7 @@ import time
 import traceback
 from datetime import datetime, timedelta
 
-from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, osutil, plan, portal, quiz, render, server
+from pa import collect_canvas, db, deadlines, inbox, jobs, learningx, materials, mobile, osutil, peer, plan, portal, quiz, render, server
 from pa.canvas import CanvasAuthError
 from pa.config import ROOT
 from pa.gcal import GoogleAuthError, get_service
@@ -45,6 +45,10 @@ def run(full=False, force_plan=False, quick=False):
     db.PATH.parent.mkdir(exist_ok=True)
     with open(db.PATH.parent / "run.lock", "a", encoding="utf-8") as lock:
         osutil.lock(lock)
+        if not peer.is_leader():  # 두 PC: 대기 PC 는 화면만 (계획·캘린더·Canvas·휴대폰은 일하는 PC 가)
+            peer.get().inbox_changed()
+            _render_only()
+            return
         STATE["full"] = full
         try:
             _run(full, force_plan or full, quick)
@@ -133,6 +137,40 @@ def _run(full, force_plan, quick=False):
     log(" · ".join(steps))
 
 
+def _render_only():
+    conn = db.connect()
+    try:
+        render.write(conn)
+    finally:
+        conn.close()
+
+
+def _peer_loop(seen):
+    """두 PC: 30초마다 저장소와 맞춘다. 넘겨받으면 바로 전체 확인, 기록을 받아 오면 화면 갱신."""
+    p = peer.get()
+    while True:
+        try:
+            res = p.tick()
+            warns = res.get("warnings") or []
+            conn = db.connect()
+            try:
+                if (db.get_meta(conn, "peer_warnings") or "") != "\n".join(warns):
+                    db.set_meta(conn, "peer_warnings", "\n".join(warns))
+                    conn.commit()
+            finally:
+                conn.close()
+            if res.get("became"):
+                log(f"두 PC: 이 PC 는 이제 {'일하는 PC' if res['became'] == 'leader' else '대기 PC'}")
+            if res.get("became") == "leader":
+                seen["full"] = True
+            elif res.get("restored") or res.get("became") or res.get("replayed"):
+                seen["mtime"] = _mtime()  # 받아 온 inbox.md 를 '저장'으로 보지 않게
+                seen["dirty"] = True
+        except Exception as e:
+            log(f"⚠️ 두 PC 맞추기 실패 (계속 시도): {str(e)[:120]}")
+        time.sleep(peer.TICK)
+
+
 _quick_memo = {"at": 0, "v": None}
 
 
@@ -152,6 +190,8 @@ def _quick_every():
 
 def _pull_phone():
     """휴대폰 입력(GitHub phone-inbox)을 inbox.md 로. 실패해도 계속."""
+    if not peer.is_leader():
+        return 0
     try:
         return mobile.pull_phone_inbox()
     except Exception as e:
@@ -186,6 +226,8 @@ def _download_watcher():
 
 def _auto_open():
     from pa import autoopen
+    if not peer.is_leader():  # 두 PC 가 같이 켜져 있으면 일하는 PC 에서만 연다
+        return
     conn = db.connect()
     try:
         for key in autoopen.check(conn, now()):
@@ -422,6 +464,13 @@ def watch():
     threading.Thread(target=_download_watcher, daemon=True).start()
     threading.Thread(target=_job_runner, daemon=True).start()
     threading.Thread(target=_job_runner, args=(True,), daemon=True).start()
+    if peer.enabled():
+        try:  # 켤 때 한 번은 기다려서 맞춘다 → 대기 PC 가 잠깐이라도 캘린더를 쓰지 않게
+            peer.get().tick()
+        except Exception as e:
+            log(f"⚠️ 두 PC 맞추기 실패 (계속 시도): {str(e)[:120]}")
+        threading.Thread(target=_peer_loop, args=(seen,), daemon=True).start()
+        log("두 PC 같이 쓰기 — 이 PC 는 " + ("일하는 PC" if peer.is_leader() else "대기 PC"))
     every = canvas_every()
     log("비서 감시 시작 — inbox.md 저장 시 반영, 15분마다 확인(바뀐 게 있을 때만 다시 계획), "
         + (f"Canvas {every // 3600}시간마다" if every else "Canvas 는 켤 때와 ⟳ 누를 때만"))
@@ -465,6 +514,9 @@ def watch():
                     seen["dirty"] = True
             if STATE.pop("job_done", False):
                 seen["dirty"] = True
+            if seen.pop("full", False):  # 두 PC: 방금 넘겨받음 → Canvas 까지
+                run(full=True)
+                last_full = last_plan = time.time()
             if seen.pop("dirty", False):
                 log("입력 반영")
                 run(full=False)
@@ -473,7 +525,7 @@ def watch():
             if mtime and mtime != seen["mtime"]:
                 time.sleep(0.5)  # 저장이 끝나길 잠깐 기다림
                 seen["mtime"] = _mtime()
-                log("inbox.md 저장 감지")
+                log("inbox.md 저장 감지" + (" — 일하는 PC 로 보냄" if peer.standby() else ""))
                 run(full=False)
                 last_plan = time.time()
             lm = login_file.stat().st_mtime if login_file.exists() else 0

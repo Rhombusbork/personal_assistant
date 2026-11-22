@@ -4,6 +4,7 @@
   bin/pa run [--full]         한 번 실행: inbox → (Canvas) → 계획 → TODAY.md
   bin/pa today                TODAY.md 다시 만들고 출력
   bin/pa pull                 내 git 저장소를 GitHub 과 대조해 내려받기 (엔진은 켤 때 한 번 자동)
+  bin/pa peer [sync|init <주소>]   두 PC 같이 쓰기: 이 PC 가 일하는 PC 인지 대기 PC 인지 / 지금 맞추기 / 처음 연결
   bin/pa list                 남은 할 일 (마감 순, 맨 앞이 키)
   bin/pa sync                 Canvas 확인 → 저장소 반영
   bin/pa inbox                inbox.md → 저장소 반영
@@ -35,6 +36,30 @@ from pa import collect_canvas, db, inbox, pipeline, plan, render
 from pa.model import KIND_LABEL, fmt, kday, label
 
 
+def cmd_peer(conn, args):
+    """두 PC 같이 쓰기: 상태 보기 / init <저장소 주소> (처음 한 번, .env 에 PA_STATE_REPO 를 적고 맞춤)."""
+    from pa import config, peer
+    if args.action == "init":
+        if not args.url:
+            sys.exit("bin/pa peer init <비공개 저장소 주소>  예: https://github.com/<나>/pa_state.git")
+        env = config.ROOT / ".env"
+        text = env.read_text(encoding="utf-8") if env.exists() else ""
+        if "PA_STATE_REPO=" not in text.replace("# PA_STATE_REPO=", ""):
+            env.write_text(text.rstrip("\n") + f"\nPA_STATE_REPO={args.url}\n", encoding="utf-8")
+    p = peer.get()
+    if not p.enabled():
+        sys.exit("두 PC 같이 쓰기가 꺼져 있습니다 — bin/pa peer init <비공개 저장소 주소>")
+    if args.action in ("init", "sync"):
+        res = p.tick()
+        for w in res.get("warnings", []):
+            print(f"⚠️ {w}")
+    st = p.status()
+    import time as _time
+    ago = f"{int((_time.time() - float(st['leader_at'])) // 60)}분 전" if st["leader_at"] else "-"
+    print(f"이 PC: {st['host']} (우선순위 {st['priority']}) — {'일하는 PC' if st['leader'] else '대기 PC'}\n"
+          f"일하는 PC: {st['leader_host'] or '-'} (마지막 신호 {ago}) · 보낼 입력 {st['pending']}건")
+
+
 def cmd_list(conn, args):
     for t in db.tasks(conn, "status = 'open' AND due IS NOT NULL AND due >= ?", (plan.now().isoformat(),)):
         print(fmt(t))
@@ -52,6 +77,16 @@ def cmd_inbox(conn, args):
 
 
 def cmd_run(conn, args):
+    from pa import peer
+    if peer.standby():  # 두 PC: 대기 PC 는 고친 inbox.md 를 일하는 PC 로 보내고 화면만
+        peer.get().inbox_changed()
+        try:
+            peer.get().tick()
+        except Exception as e:
+            print(f"⚠️ 저장소와 맞추지 못함: {e}")
+        pipeline.run(full=False)
+        print(f"대기 PC — 입력을 일하는 PC({peer.get().status()['leader_host']})로 보냈습니다. 1~2분 뒤 반영")
+        return
     if args.full and _ask_engine_sync():
         print("엔진이 켜져 있어 엔진에게 최신화를 맡겼습니다 (data/pa.log)")
         return
@@ -168,6 +203,13 @@ def cmd_status(status):
         if db.set_status(conn, args.key, status, "cli"):
             conn.commit()
             print(f"{args.key} → {status}")
+            from pa import peer
+            action = {"done": "/api/done", "ignored": "/api/ignore"}.get(status)
+            if peer.standby():  # 두 PC: 일하는 PC 에도
+                if action:
+                    peer.get().queue(action, {"key": args.key})
+                else:
+                    print("⚠️ 대기 PC 라 일하는 PC 에는 안 넘어갑니다 — 대시보드에서 하세요")
         else:
             print(f"{args.key}: 없는 키이거나 이미 {status} 상태입니다.")
     return run
@@ -316,6 +358,10 @@ def main():
     sub.add_parser("today").set_defaults(fn=cmd_today)
     sub.add_parser("pull", help="내 git 저장소를 GitHub 과 대조해 내려받기 (config/repos.yaml)").set_defaults(fn=cmd_pull)
     sub.add_parser("dashboard-check").set_defaults(fn=cmd_dashboard_check)
+    sp = sub.add_parser("peer", help="두 PC 같이 쓰기: 상태 / sync (지금 맞추기) / init <비공개 저장소 주소>")
+    sp.add_argument("action", nargs="?", default="status", choices=["status", "sync", "init"])
+    sp.add_argument("url", nargs="?")
+    sp.set_defaults(fn=cmd_peer)
     sub.add_parser("open").set_defaults(fn=cmd_open)
     sub.add_parser("shortcut").set_defaults(fn=cmd_shortcut)
     sub.add_parser("vscode-ext").set_defaults(fn=cmd_vscode_ext)

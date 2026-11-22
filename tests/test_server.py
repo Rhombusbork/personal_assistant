@@ -61,3 +61,15 @@ def test_link_flow_respects_scope(srv, tmp_path):
     assert st == 200 and [x["p"] for x in j["links"]] == [f] and j["max"] == 3
     assert req(port, "POST", "/api/unlink", {"key": "m1", "path": f})[0] == 200
     assert req(port, "GET", "/api/links?key=m1")[1]["links"] == []
+
+
+def test_standby_forwards_shared_inputs(srv, monkeypatch):
+    """두 PC: 대기 PC 에서 공유 기록을 바꾸는 입력은 일하는 PC 로 보낼 목록에, 창 열기 같은 건 안 보냄."""
+    from pa import peer
+    queued = []
+    monkeypatch.setattr(peer, "standby", lambda: True)
+    monkeypatch.setattr(peer, "get", lambda: type("P", (), {"queue": lambda self, a, b: queued.append((a, b))})())
+    port, _ = srv
+    assert req(port, "POST", "/api/worklog/add", {"title": "복습", "minutes": 20})[0] == 200
+    req(port, "POST", "/api/dash-pause", {"paused": True})
+    assert queued == [("/api/worklog/add", {"title": "복습", "minutes": 20})]

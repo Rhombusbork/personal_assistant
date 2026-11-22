@@ -3,6 +3,7 @@ import json
 import os
 import uuid
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -79,7 +80,7 @@ def today_md(conn):
 
     # 주의할 것
     warns = [w for k in ("inbox_warnings", "repo_warnings") for w in (db.get_meta(conn, k) or "").split("\n") if w]
-    warns += portal_warnings(conn)
+    warns += portal_warnings(conn) + peer_notes(conn)
     failed = [tasks[k] for k in (db.get_meta(conn, "plan_failed") or "").split(",") if k in tasks]
     if warns or failed:
         L += ["## ⚠️ 확인 필요", ""]
@@ -150,6 +151,22 @@ def fmt_time(iso):
     return f"{kday(dt)} {dt:%H:%M}" if dt else "-"
 
 
+def peer_notes(conn):
+    """두 PC 같이 쓰기: 대기 PC 라는 안내 + 맞추기 문제 (pa/peer.py)."""
+    from pa import peer
+    p = peer.get()
+    if not p.enabled():
+        return []
+    notes = [w for w in (db.get_meta(conn, "peer_warnings") or "").split("\n") if w]
+    if not p.is_leader():
+        st = p.status()
+        who = st["leader_host"] or "?"
+        ago = f" · 신호 {int((time.time() - float(st['leader_at'])) // 60)}분 전" if st["leader_at"] else ""
+        notes.insert(0, f"🖥 대기 PC — 계획·캘린더·Canvas 는 일하는 PC({who}{ago})가 합니다. 이 PC 에서 한 입력은 1~2분 뒤 반영"
+                        + (f" (보낼 입력 {st['pending']}건)" if st["pending"] else ""))
+    return notes
+
+
 def write(conn):
     TODAY_PATH.write_text(today_md(conn), encoding="utf-8")
     write_dashboard(conn)
@@ -194,7 +211,7 @@ def dashboard_data(conn):
         done_by_day[d] = done_by_day.get(d, 0) + 1
 
     warns = [w for k in ("inbox_warnings", "repo_warnings") for w in (db.get_meta(conn, k) or "").split("\n") if w]
-    warns += portal_warnings(conn)
+    warns += portal_warnings(conn) + peer_notes(conn)
     if db.get_meta(conn, "last_error"):
         warns.append(f"마지막 동기화 문제: {db.get_meta(conn, 'last_error')} (자세한 내용: data/pa.log)")
     ack = db.get_meta(conn, "ack_phone") or "0"

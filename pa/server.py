@@ -344,13 +344,22 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
                             "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause",
                             "/api/open-request"):
-                return self._json(200, self.side_action(action, body))
+                out = self.side_action(action, body)
+                self._forward(action, body)
+                return self._json(200, out)
             else:
                 return self._json(404, {"error": "없는 요청"})
         except (ValueError, KeyError) as e:
             return self._json(400, {"error": str(e)})
         self._applied()
+        self._forward(action, body)  # inbox 를 다 고친 뒤 (기준이 정리된 inbox.md 가 되게)
         self._json(200, {"ok": True, "message": msg})
+
+    def _forward(self, action, body):
+        """두 PC: 대기 PC 에서 공유 기록을 바꾼 입력은 일하는 PC 에도 (pa/peer.py). 이 PC 에는 이미 적용됨."""
+        from pa import peer
+        if action in peer.SHARED_ACTIONS and peer.standby():
+            peer.get().queue(action, body)
 
     def _applied(self):
         """inbox 를 바꾼 뒤: 저장소에는 바로 반영(빠름), 계획·캘린더는 뒤에서 (몇 초)."""

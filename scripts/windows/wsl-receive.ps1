@@ -1,8 +1,10 @@
 ﻿# WSL(Ubuntu) 복사본 받기 - 받는 PC 에서 관리자 PowerShell 로 (wsl-send.ps1 이 알려 주는 한 줄로 실행됨)
 # 1) WSL 이 없으면 설치하고 재부팅을 부탁 (재부팅 뒤 같은 한 줄을 다시)
 # 2) 보내는 PC 에서 복사본을 받아 wsl --import, 기본으로 지정
-# 3) 이 PC 의 비서는 엔진을 끈다 (.env 에 PA_ENGINE=off) - 일정은 보내는 PC 한 대만 고치게
-param([Parameter(Mandatory = $true)][string]$Url, [string]$Distro = "Ubuntu", [string]$Dir = "C:\WSL", [string]$PaDir = "personal_assistant")
+# 3) 이 PC 의 비서 .env 에 이름(PA_HOST)과 우선순위(PA_PRIORITY)를 적는다 - 두 PC 같이 쓰기(pa/peer.py)에서
+#    둘 다 켜져 있으면 우선순위가 큰 PC 가 일한다. 같이 쓰기를 안 쓰면 -Priority 0 → 이 PC 는 엔진을 끈다(PA_ENGINE=off)
+param([Parameter(Mandatory = $true)][string]$Url, [string]$Distro = "Ubuntu", [string]$Dir = "C:\WSL", [string]$PaDir = "personal_assistant",
+      [int]$Priority = 2)
 $ErrorActionPreference = "Stop"
 $env:WSL_UTF8 = "1"
 
@@ -34,10 +36,15 @@ if ($LASTEXITCODE -ne 0) { Write-Host "wsl --import 실패. 받은 파일은 남
 wsl --set-default $Distro
 Remove-Item $tar
 
-wsl -d $Distro -- sh -c "test -f ~/$PaDir/.env && printf '\nPA_ENGINE=off\n' >> ~/$PaDir/.env && echo ok"
+$lines = if ($Priority -gt 0) { "PA_HOST=$env:COMPUTERNAME\nPA_PRIORITY=$Priority" } else { "PA_ENGINE=off" }
+wsl -d $Distro -- sh -c "test -f ~/$PaDir/.env && printf '\n$lines\n' >> ~/$PaDir/.env && echo ok"
 wsl --shutdown
 curl.exe -s "$Url/done" | Out-Null
 
 Write-Host ""
-Write-Host "끝났습니다. 이 PC 의 비서는 엔진을 끈 채로 둡니다 (.env 의 PA_ENGINE=off)." -ForegroundColor Green
+if ($Priority -gt 0) {
+    Write-Host "끝났습니다. 이 PC 이름은 $env:COMPUTERNAME, 우선순위 $Priority (두 PC 가 같이 켜져 있으면 큰 쪽이 일함)." -ForegroundColor Green
+} else {
+    Write-Host "끝났습니다. 이 PC 의 비서는 엔진을 끈 채로 둡니다 (.env 의 PA_ENGINE=off)." -ForegroundColor Green
+}
 Write-Host "다음: VSCode 설치 → 설정 동기화 켜기(같은 GitHub 계정) → PowerShell 에서 wsl → cd ~/$PaDir → code ."

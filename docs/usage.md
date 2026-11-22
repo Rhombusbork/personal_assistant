@@ -139,19 +139,36 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - 결과는 `data/pa.log`, 실패하면 대시보드·TODAY.md 에 "마지막 동기화 실패"
 - 지우기: 같은 폴더의 `unregister-task.ps1`
 
-## 두 번째 PC (복사해서 두 대 다 쓰기)
+## 두 PC 같이 쓰기 (`pa/peer.py`)
 
-WSL 을 통째로 복사해 두 대에서 쓴다. **엔진은 한 대(엔진 PC)만** — 둘 다 돌면 캘린더·휴대폰 화면을 서로 덮어쓴다.
+두 노트북을 둘 다 평소처럼 쓴다. 할 일·계획·공지·퀴즈 기록·설정은 **비공개 git 저장소**(`.env` 의 `PA_STATE_REPO`)로 맞춘다.
 
-- 복사 (USB 없이, 같은 와이파이): `scripts/windows/wsl-send.ps1`·`wsl-receive.ps1` 을 Windows 폴더(예: `C:\pa-transfer`)에 복사 →
-  VSCode 를 닫고 엔진 PC 의 관리자 PowerShell 에서 `powershell -ExecutionPolicy Bypass -File C:\pa-transfer\wsl-send.ps1`.
-  비서를 잠시 멈추고 `wsl --export` → 다시 켜고 → 비밀 주소로 같은 와이파이에만 받기 서버를 열고, 받는 PC 에 칠 한 줄을 보여 준다.
-  받는 PC 는 그 한 줄로 받기·`wsl --import`·`.env` 에 `PA_ENGINE=off` 까지 (WSL 이 없으면 설치 → 재부팅 → 같은 한 줄 다시).
-  다 받으면 서버·방화벽 규칙을 닫고 복사본(비밀번호·토큰이 들어 있음)을 지운다
-- `.env` 의 `PA_ENGINE=off`: 그 PC 에서는 `watch`·`run`·`plan`·`timetable`·`sync-timetable` 이 그냥 끝난다 (VSCode 를 열어도 엔진이 안 켜짐).
-  작업 스케줄러 등록(`register-task.ps1`)도 하지 않는다
-- 두 번째 PC 에서: 일정·할 일은 휴대폰 화면(`pages_url`)에서. 공부·보고서·퀴즈는 시작할 때 `bin/pa pull`, 끝나면 커밋·push.
-  git 에 없는 것(강의 자료 `materials/`, `추가자료/`, Claude 대화 기록 `~/.claude/projects`)은 저절로 맞춰지지 않는다
+- **한 번에 한 PC 만 엔진 일**(Canvas·계획·캘린더·휴대폰 화면·휴대폰 입력·계획 시간 자동 열기)을 한다 = '일하는 PC'.
+  다른 PC 는 '대기 PC': 대시보드·TODAY.md·명령은 그대로 쓰고, 화면은 일하는 PC 의 기록으로 30초마다 맞춘다.
+  대시보드·TODAY.md 의 ⚠️ 칸에 "🖥 대기 PC — 일하는 PC(…)" 가 보인다
+- 둘 다 켜져 있으면 `.env` 의 `PA_PRIORITY` 가 큰 PC 가 일한다 (기본 1, 같으면 먼저 일하던 PC). 큰 PC 가 켜지면 1분쯤 안에 넘겨받는다
+- 일하는 PC 가 꺼지거나 잠들어 **10분** 소식이 없으면 대기 PC 가 이어받는다. 잠에서 깬 PC 는 저장소와 맞춰 보기 전에는 캘린더를 쓰지 않는다
+- 대기 PC 에서 한 입력(대시보드 버튼, inbox.md 고치기, `bin/pa done/ignore`)은 그 PC 에 바로 보이고, 1~2분 안에 일하는 PC 가 다시 실행한다.
+  inbox.md 는 3방향으로 합친다 (같은 줄을 양쪽에서 고쳤으면 ⚠️). 창 열기·탐색기·다운로드 정리·🤖 에이전트 작업은 누른 PC 에서만
+- 설정(`config/*.yaml`, `config/profile.md`)은 어느 PC 에서 고쳐도 다른 PC 로. 같은 파일을 양쪽에서 고쳤으면 이 PC 것을 쓰고
+  다른 PC 것은 `data/peer-conflict/` 에 남긴다 (⚠️)
+- PC 마다 따로 (올리지 않음): `.env`, `token.json`·`credentials.json`(Google), `data/browser-*`·`portal-state.json`(학교 로그인), 🤖 작업 목록.
+  새 PC 에서는 `bin/pa google-login`, `bin/pa browser login` 을 한 번
+- `bin/pa peer` 지금 상태 / `bin/pa peer sync` 지금 맞추기 / `bin/pa peer init <주소>` 처음 연결 (`.env` 에 적고 이 PC 기록을 올림)
+- 저장소 내용: `leader.json`(일하는 PC) · `peers/` · `db/<표>.jsonl` · `inbox.md` · `ops/`·`acks.json`(대기 PC 입력) · `config/`.
+  이 PC 의 사본은 `data/state` (지워도 다음에 다시 받음), 이 PC 만의 상태는 `data/peer.json`
+- `.env` 의 `PA_ENGINE=off` 는 따로: 그 PC 는 아예 엔진을 안 돌린다 (`watch`·`run`·`plan`·시간표가 그냥 끝남)
+
+### 새 PC 로 복사하기 (USB 없이, 같은 와이파이)
+
+1. 보내는 PC: `bin/pa peer init <비공개 저장소 주소>` 를 먼저 (복사본에 같은 설정이 들어가게)
+2. `scripts/windows/wsl-send.ps1`·`wsl-receive.ps1` 을 Windows 폴더(예: `C:\pa-transfer`)에 복사 → VSCode 를 닫고 관리자 PowerShell 에서
+   `powershell -ExecutionPolicy Bypass -File C:\pa-transfer\wsl-send.ps1`. 비서를 잠시 멈추고 `wsl --export` → 다시 켜고 →
+   비밀 주소로 같은 와이파이에만 받기 서버를 열고, 받는 PC 에 칠 한 줄(초록색)을 보여 준다
+3. 받는 PC 의 관리자 PowerShell 에 그 한 줄 → 받기·`wsl --import`·`.env` 에 `PA_HOST`·`PA_PRIORITY=2` (WSL 이 없으면 설치 → 재부팅 → 같은 한 줄 다시).
+   다 받으면 보내는 PC 가 서버·방화벽 규칙을 닫고 복사본(비밀번호·토큰이 들어 있음)을 지운다
+4. 받는 PC: 작업 스케줄러 등록(`register-task.ps1`)·`bin/pa shortcut` 도 한 번 (Windows 쪽은 복사되지 않음)
+- git 에 없는 것 중 강의 자료(`materials/`)·`추가자료/`·Claude 대화 기록(`~/.claude/projects`)은 복사한 뒤로는 PC 마다 따로 쌓인다
 
 ## 계획 시간 자동 열기 (`auto_open`)
 
