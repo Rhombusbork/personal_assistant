@@ -122,6 +122,46 @@ def viewer_count(window=45):
     return sum(1 for t in VIEWERS.values() if t >= cutoff)
 
 
+def when(text):
+    """화면에서 온 시각 (ISO, 시간대 없으면 한국 시각) → 분 단위 datetime."""
+    t = datetime.fromisoformat(str(text).replace("Z", "+00:00"))
+    return (t if t.tzinfo else t.replace(tzinfo=KST)).astimezone(KST).replace(second=0, microsecond=0)
+
+
+def move_block(conn, key, start, end):
+    """계획 블록(또는 할 일)을 그 시간에 고정한다 → 새 계획 키. 겹쳐도 된다 (2026-11-22 사용자가 정함).
+    inbox 할 일 전체는 inbox.md 의 할 시간(>…)으로, 그 밖(Canvas 항목·나눈 조각)은 slots 표로."""
+    from pa.model import now as _now
+    if end <= start or end - start > timedelta(hours=12):
+        raise ValueError("시간이 올바르지 않아요 (끝이 시작보다 늦게, 12시간 안에서)")
+    if end <= _now():
+        raise ValueError("이미 지난 시간으로는 옮길 수 없어요")
+    base, _, tail = key.partition("#")
+    row = conn.execute("SELECT source FROM tasks WHERE key = ? AND status = 'open'", (base,)).fetchone()
+    if not row:
+        raise ValueError("남은 할 일이 아니에요 (끝냈거나 없어짐)")
+    if tail.startswith("고정") and tail[2:].isdigit():  # 이미 정한 시간 옮기기
+        db.update_slot(conn, int(tail[2:]), start, end)
+        return key
+    if row["source"] == "inbox" and tail in ("", "고정"):
+        inbox.set_slot(base, start, end)
+        return base + "#고정"
+    sid = db.add_slot(conn, base, start, end, int(tail) if tail.isdigit() else 0)
+    return f"{base}#고정{sid}"
+
+
+def clear_block(conn, key):
+    """정한 시간을 풀어 다시 자동 배치 — 블록 하나(…#고정<id>, inbox 의 …#고정) 또는 할 일 키면 그 일 전부."""
+    base, _, tail = key.partition("#")
+    if tail.startswith("고정") and tail[2:].isdigit():
+        db.delete_slots(conn, sid=int(tail[2:]))
+        return
+    row = conn.execute("SELECT source, slot_end FROM tasks WHERE key = ?", (base,)).fetchone()
+    if row and row["source"] == "inbox" and row["slot_end"]:
+        inbox.set_slot(base, None, None)
+    db.delete_slots(conn, key=base)
+
+
 def parse_add(body):
     """폼 입력 → inbox.add_task 인자."""
     due = None
@@ -296,6 +336,7 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
             action = self.path.split("?")[0]
+            extra = {}
             if action == "/api/add":
                 msg = inbox.add_task(**parse_add(body))
             elif action == "/api/done":
@@ -325,6 +366,17 @@ class Handler(SimpleHTTPRequestHandler):
             elif action == "/api/exam-add":  # 시험 일정 후보 → inbox (시험 모드가 복습을 배치)
                 when = datetime.fromisoformat(f"{body['date']}T{body.get('time') or '09:00'}").replace(tzinfo=KST)
                 msg = inbox.add_task(title=body["title"], due=when, minutes=None, course=body.get("course", ""), every=None)
+            elif action in ("/api/move", "/api/unslot"):  # 시간 정하기 · 시간표에서 끌어 옮기기 / 자동으로 되돌리기
+                conn = db.connect()
+                try:
+                    if action == "/api/move":
+                        extra["key"] = move_block(conn, body["key"], when(body["start"]), when(body["end"]))
+                        msg = "시간을 정했어요"
+                    else:
+                        clear_block(conn, body["key"]); msg = "자동 배치로 되돌렸어요"
+                    conn.commit()
+                finally:
+                    conn.close()
             elif action == "/api/keep":
                 inbox.keep(body["key"]); msg = "이 과제는 계속 보이기"
             elif action == "/api/unignore":
@@ -352,7 +404,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(400, {"error": str(e)})
         self._applied()
         self._forward(action, body)  # inbox 를 다 고친 뒤 (기준이 정리된 inbox.md 가 되게)
-        self._json(200, {"ok": True, "message": msg})
+        self._json(200, {"ok": True, "message": msg, **extra})
 
     def _forward(self, action, body):
         """두 PC: 대기 PC 에서 공유 기록을 바꾼 입력은 일하는 PC 에도 (pa/peer.py). 이 PC 에는 이미 적용됨."""

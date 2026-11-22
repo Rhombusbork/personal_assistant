@@ -40,7 +40,7 @@ SHARED_ACTIONS = {
     "/api/add", "/api/done", "/api/ignore", "/api/redo", "/api/undone", "/api/exam-add", "/api/keep", "/api/unignore",
     "/api/remove", "/api/today", "/api/quick", "/api/timer/start", "/api/timer/stop", "/api/worklog/add",
     "/api/worklog/delete", "/api/notice/read", "/api/suggest/dismiss", "/api/ack", "/api/exam-dismiss", "/api/link",
-    "/api/unlink", "/api/report-brief", "/api/report-file", "/api/defaults", "/api/sync",
+    "/api/unlink", "/api/report-brief", "/api/report-file", "/api/defaults", "/api/sync", "/api/move", "/api/unslot",
 }
 
 

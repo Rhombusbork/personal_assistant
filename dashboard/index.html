@@ -526,6 +526,8 @@ function menuItems(t) {
   if (t.url && t.kind !== "todo") g[0].push({ act: "open", label: openName, strong: P.act === "open" });
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) g[0].push({ act: "report", label: "보고서 작성", hint: "설명·자료·지침", strong: P.act === "report" });
   if (t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) g[0].push({ act: "submit", label: "📤 제출", hint: "확인 후 · .md 는 PDF 로" });
+  if (LIVE && t.status === "open") { const fx = (D.plan || []).find(p => p.task === t.key && p.fixed && dt(p.end) > new Date());
+    g[0].push({ act: "slot", label: "시간 정하기…", hint: fx ? `${label(ymd(fx.start))} ${hm(fx.start)} 정함` : "그 시각에 자동으로 열기" }); }
   if (t.course) g[1].push({ act: "mat", label: "자료", hint: links(t).length ? `연결 ${links(t).length}` : "고르기" });
   if (t.kind === "lecture") g[1].push({ act: "sumfor", label: "내용정리", hint: AI() + " 사용" },
     { act: "workspace", label: "VSCode 작업 창", hint: "study_system" }, { act: "quizcopy", label: "퀴즈 요청 복사", hint: "채팅에 붙여 넣기" });
@@ -747,7 +749,7 @@ function todayView(now, today) {
     }
     h += `<div class="row${past}${cur}"${past ? "" : rowAttr(t)}>${tcol}${t ? ck(t) : `<span></span>`}<div class="body" title="${esc(r.why || "")}">
         <div class="ttl">${t ? esc(t.title) : esc(clean(r.summary))}${r.part ? ` <span class="clip">(${r.part})</span>` : ""}${clip(t)}</div>
-        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}${redoTag(t)}</div>` : ""}${ovNote(r.pk)}</div>
+        ${t ? `<div class="meta">${[KIND[t.kind], t.course && esc(t.course), dueMeta(t, now, today)].filter(Boolean).join(" · ")}${redoTag(t)}</div>` : ""}</div>
       ${t && !past ? rowActs(t) : "<span></span>"}</div>`;
   }
   if (dayEnd > cursor) h += gap(cursor, dayEnd);
@@ -769,8 +771,6 @@ function dueMeta(t, now, today) {
 }
 
 // 직접 정한 할 시간이 수업·다른 블록과 겹치면 회색 한 줄로만 알린다 (막지 않음)
-const ovNote = (pk, cls = "meta") => { const o = pk && D.overlaps && D.overlaps[pk];
-  return o && o.length ? `<div class="${cls}">겹침 · ${esc(o.join(", "))}</div>` : ""; };
 const URGENT_MS = 3 * 36e5;  // 이 안에 마감이 있으면 기본 할 일 대신 그 일을 맨 위에
 // 기본 할 일: 급한 게 없을 때 맨 위에 이름만 (VSCode 폴더 열기 / 링크 열기). 위 작은 줄에 다음 계획을 알려 준다.
 function defaultHero(defs, next, now) {
@@ -824,7 +824,7 @@ function hero(rows, now, today) {
       <div class="hero-acts"><button class="btn primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>
         ${P.act !== "start" && !MOB ? `<button class="btn plain" data-act="start" data-key="${esc(t.key)}" data-label="시간 재기 시작">⏱ 시간 재기</button>` : ""}
         <button class="icon-btn" data-menu="${esc(t.key)}" title="다른 동작 (.)" aria-label="다른 동작: ${esc(t.title)}" aria-haspopup="menu" aria-expanded="false">⋯</button></div>
-      ${pick && pick.why ? `<p class="why">왜 지금? ${esc(pick.why)}</p>` : ""}${pick ? ovNote(pick.pk, "why") : ""}</div></div></section>` };
+      ${pick && pick.why ? `<p class="why">왜 지금? ${esc(pick.why)}</p>` : ""}</div></div></section>` };
 }
 
 // ---- 심각도 분류: 2 = 지금 행동해야 함(빨강) · 1 = 행동 필요하지만 급하지 않음(주황) · 0 = '확인할 것' 안에 접어 둠
@@ -1556,6 +1556,34 @@ async function quizCopy(key) {
 }
 
 
+// 시간 정하기: 그 시각에 고정 (계획기가 옮기지 않음, 겹쳐도 됨). pkey = 시간표에서 고른 블록 (없으면 그 일의 첫 블록)
+function slotSheet(t, pkey) {
+  const nowD = new Date(), blocks = (D.plan || []).filter(p => p.task === t.key && dt(p.end) > nowD);
+  const b = blocks.find(p => p.key === pkey) || blocks.find(p => p.fixed) || blocks[0];
+  const q = new Date(Math.ceil(nowD.getTime() / 9e5) * 9e5), st = b ? dt(b.start) : q;
+  const en = b ? dt(b.end) : new Date(st.getTime() + (t.minutes || 60) * 6e4), p2 = n => String(n).padStart(2, "0");
+  const hmOf = d => `${p2(d.getHours())}:${p2(d.getMinutes())}`, fixed = blocks.filter(p => p.fixed);
+  openSheet(sheetTop("시간 정하기", `${esc(t.title)}${t.due ? ` · 마감 ${label(ymd(t.due))} ${hm(t.due)}` : ""}`) + `
+    <div class="frow" style="margin-top:16px;flex-wrap:wrap;gap:8px"><input class="field" type="date" id="slDate" value="${ymdOf(st)}" min="${ymdOf(nowD)}" aria-label="날짜">
+      <input class="field" type="time" id="slFrom" value="${hmOf(st)}" step="900" aria-label="시작"> <span>~</span>
+      <input class="field" type="time" id="slTo" value="${hmOf(en)}" step="900" aria-label="끝"></div>
+    <p class="small" style="margin-top:8px">수업·다른 일과 겹쳐도 돼요. 정한 시간은 비서가 옮기지 않고, ${t.kind === "lecture" ? "그 시각에 강의를 열고 ▶ 재생해요" : t.kind === "quiz" ? "그 시각에 퀴즈 페이지를 열어요" : t.kind === "assignment" ? "그 시각에 초안·제출 페이지를 열어요" : "그 시각에 알려 줘요"}.</p>
+    <div class="confirm-acts">${fixed.length ? `<button class="btn" data-act="slot-clear" data-key="${esc(b && b.fixed ? b.key : t.key)}" data-task="${esc(t.key)}">자동으로 되돌리기</button>` : `<button class="btn" data-ui="sheetclose">취소</button>`}
+      <button class="btn primary" data-act="slot-save" data-key="${esc(b ? b.key : t.key)}" data-task="${esc(t.key)}"
+        data-old="${b && b.fixed ? esc(b.start + "|" + b.end) : ""}">저장</button></div>`);
+}
+function slotRange(date, from, to) {  // 화면 입력 → [시작, 끝] ISO (끝이 시작보다 이르면 다음 날 — 자정 넘김)
+  const s = new Date(`${date}T${from}:00`), e = new Date(`${date}T${to}:00`);
+  if (e <= s) e.setDate(e.getDate() + 1);
+  return [s.toISOString(), e.toISOString()];
+}
+async function moveBlock(key, start, end, old) {  // 옮기고 '되돌리기' (원래 자동 블록이었으면 고정 풀기)
+  const r = await run(() => post("move", { key, start, end }));
+  if (!r) return null;
+  const nk = r.key;
+  toast("시간을 정했어요", old ? () => post("move", { key: nk, start: old[0], end: old[1] }) : () => post("unslot", { key: nk }));
+  return nk;
+}
 function redoSheet(t) {
   const today = ymdOf(new Date()), d = new Date();
   const opts = [[0, "오늘"], [1, "내일"], [2, "모레"]];
@@ -1759,6 +1787,12 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "submit-ok") { closeSheet(); await run(() => post("submit", { key }), r => r.message); return; }
+  if (act === "slot" && t) { closeMenu(false); closeSheet(); slotSheet(t, b.dataset.pkey); return; }
+  if (act === "slot-save") {
+    const [s1, e1] = slotRange($("slDate").value, $("slFrom").value, $("slTo").value);
+    closeSheet(); await moveBlock(key, s1, e1, b.dataset.old ? b.dataset.old.split("|") : null); return;
+  }
+  if (act === "slot-clear") { closeSheet(); await run(() => post("unslot", { key }), "자동 배치로 되돌렸어요"); return; }
   if (act === "report" && t && MOB) {  // 휴대폰: 저장해 둔 지침대로 초안을 PC 에 맡김 → 끝나면 🤖 작업 칸에서 읽기
     closeMenu(false); closeSheet();
     if (confirm(`「${t.title}」 보고서 초안을 PC 에 맡길까요?\n\nPC 가 켜져 있으면 몇 분 안에 ${AI()} 로 쓰기 시작하고, 끝나면 이 화면의 작업 칸에서 읽을 수 있어요. 이미 있는 파일은 덮어쓰지 않습니다.`))

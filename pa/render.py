@@ -38,27 +38,6 @@ def load_plan(conn):
             for r in conn.execute("SELECT * FROM plan ORDER BY start")]
 
 
-def _plain(summary):
-    return re.sub(r"^\[[^\]]+\]\s*", "", summary)  # '[과제] 생약학 · …' → '생약학 · …'
-
-
-def overlaps(conn, t_now=None):
-    """직접 정한 할 시간(계획 키 …#고정)이 수업·약속이나 다른 계획 블록과 겹치는 것.
-    {계획 키: ['물리약학 13:30–14:45', …]} — 막지 않고 알려만 준다 (일부러 겹치게 넣을 수도 있음)."""
-    t_now = t_now or now()
-    plan = [(k, s, e, summ) for k, s, e, summ in load_plan(conn) if e > t_now]
-    busy = [(parse_dt(r["start"]), parse_dt(r["end"]), r["label"]) for r in conn.execute("SELECT * FROM busy")]
-    out = {}
-    for k, s, e, _ in plan:
-        if not k.endswith("#고정"):
-            continue
-        hit = [f"{lab} {bs:%H:%M}–{be:%H:%M}" for bs, be, lab in busy if bs < e and s < be]
-        hit += [f"{_plain(summ2)} {s2:%H:%M}–{e2:%H:%M}" for k2, s2, e2, summ2 in plan if k2 != k and s2 < e and s < e2]
-        if hit:
-            out[k] = hit
-    return out
-
-
 def today_md(conn):
     t_now = now()
     cfg = load_timetable()["planner"]
@@ -191,7 +170,8 @@ def dashboard_data(conn):
                 if t.status == "open" and t.due and t_now - timedelta(days=1) <= t.due <= t_now + timedelta(days=21)]
     why = json.loads(db.get_meta(conn, "plan_why") or "{}")
     plan = [{"key": k, "task": k.split("#")[0], "start": s.isoformat(), "end": e.isoformat(), "summary": summ,
-             "why": why.get(k, ""), "kind": by_key[k.split("#")[0]].kind if k.split("#")[0] in by_key else "todo"}
+             "why": why.get(k, ""), "kind": by_key[k.split("#")[0]].kind if k.split("#")[0] in by_key else "todo",
+             "fixed": "#고정" in k}  # 직접 정한 시간 (계획기가 옮기지 않음)
             for k, s, e, summ in load_plan(conn)]
     busy = [{"start": r["start"], "end": r["end"], "label": r["label"]} for r in conn.execute("SELECT * FROM busy")]
 
@@ -243,10 +223,6 @@ def dashboard_data(conn):
         warns.append(f"강의 플랫폼(LearningX) 로그인 필요: {lx}")
     elif lx:  # 시간 초과 같은 일시적 오류
         warns.append(f"강의 플랫폼 확인 중 일시적 오류 ({lx}) — 다음 확인 때 다시 시도합니다")
-    ov = overlaps(conn, t_now)
-    for k, hit in ov.items():
-        t = by_key.get(k.split("#")[0])
-        warns.append(f"할 시간이 겹쳐요: {t.title if t else k} ↔ {', '.join(hit)}")
     warns += [f"마감 전 빈 시간 부족: {label(by_key[k])}" for k in (db.get_meta(conn, "plan_failed") or "").split(",")
               if k in by_key]
     return {
@@ -268,7 +244,6 @@ def dashboard_data(conn):
         "grades": new_grades(conn),
         "redo": _redo(conn),
         "defaults": defaults(conn),
-        "overlaps": ov,
         "weekReview": week_review(conn, t_now),
         "excluded": inbox_excluded(conn),
         "quiz": quiz.status(conn),

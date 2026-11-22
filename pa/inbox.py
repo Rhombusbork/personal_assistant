@@ -366,6 +366,20 @@ def set_due(key, due):
     PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def set_slot(key, start, end):
+    """inbox 할 일의 '할 시간'(>…)을 바꾸거나(start·end) 지운다(None). 마감·길이·과목·반복은 그대로."""
+    lines = PATH.read_text(encoding="utf-8").splitlines()
+    i = _todo_line_index(lines, key[2:]) if key.startswith("i:") else None
+    if i is None:
+        raise ValueError("inbox 에 없는 항목")
+    it = parse_line(RE_CHECK.match(lines[i]).group(2), now().date(), None)
+    if start and end - start > timedelta(hours=24):
+        raise ValueError("할 시간은 하루 안에서")
+    minutes = it["minutes"] if start or not it["slot_end"] else int((it["slot_end"] - it["earliest"]).total_seconds() // 60)
+    lines[i] = format_line(it["title"], it["due"], minutes, it["course"], it["every"], start, end)
+    PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def remove(key):
     """inbox 에 직접 쓴 할 일 줄을 지운다."""
     lines = PATH.read_text(encoding="utf-8").splitlines()

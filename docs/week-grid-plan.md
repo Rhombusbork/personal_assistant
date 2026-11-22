@@ -172,7 +172,7 @@ Wi-Fi 카드(Intel 8265)는 **'깨우기 가능 장치'** 이고 드라이버에
 |---|---|---|---|
 | **P1 제출 기반** ✅ 2026-11-22 | `pa/submit.py` (제출 전 확인 · PDF 만들기 · 올리기 · 다시 읽어 확인 · 기록), `bin/pa submit <키> [파일] [--yes]`, 제출 뒤 탐색기, 대시보드·휴대폰 '제출 기록' | `pa/submit.py`, `pa/canvas.py`, `pa/__main__.py`, `pa/render.py`, `dashboard/index.html`, `tests/test_submit.py` | 채팅·명령으로 안전하게 제출, 휴대폰에서 낸 파일 확인 |
 | **P2 제출 버튼** ✅ 2026-11-23 | 과제 줄 ⋯ → [📤 제출] (확인 창: 파일·쪽수·몇 번째·마감) · 휴대폰 [제출] (대기열 → PC). ✅ 완성 표시는 P7 로 | `pa/server.py`, `dashboard/index.html`, `pa/mobile.py` | 버튼으로 제출 |
-| P3 시간 정하기 | Canvas 항목에도 할 시간 고정 (`tasks.earliest/slot_end` 를 Canvas 확인이 덮어쓰지 않게), `POST /api/move`, ⋯ → "시간 정하기" | `pa/collect_canvas.py`, `pa/db.py`, `pa/server.py` | 강의를 원하는 시간에 → 기존 자동 열기·▶ 가 그 시각에 |
+| **P3 시간 정하기** ✅ 2026-11-23 | Canvas 항목에도 할 시간 고정 (`tasks.earliest/slot_end` 를 Canvas 확인이 덮어쓰지 않게), `POST /api/move`, ⋯ → "시간 정하기" | `pa/collect_canvas.py`, `pa/db.py`, `pa/server.py` | 강의를 원하는 시간에 → 기존 자동 열기·▶ 가 그 시각에 |
 | P4 쉬운 예약 | 종류별 기본 동작 (3-2 표): 미리(초안·자료) / 시작(열기·재생) / 끝(수강 확인·남은 시간 다시) | `pa/autoopen.py`, `pa/jobs.py` | 시간만 정하면 다 함 |
 | P5 시간표 화면 | 1·2·3 장 (범위 자동·겹침·손잡이 끌기·되돌리기) | `dashboard/index.html` | 주차별 시간표 |
 | P6 고급 예약 | `schedules` 표 + "+ 예약 추가" 창 (AI 프롬프트 · 만들어 둔 기능 고르기 · 반복) + 엔진 실행기 | `pa/schedules.py`, `pa/db.py`, `pa/server.py`, 화면 | 아무 작업이나 시각 예약 |

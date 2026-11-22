@@ -7,6 +7,7 @@ busy    계획 기간의 대면 수업·약속 (시각화용)
 sessions 실제로 한 시간 기록 (⏱) — 예상 시간 보정에 쓴다
 jobs    에이전트 작업 대기열과 결과 (🤖 작업 칸)
 notices Canvas 과목 공지
+slots   직접 정한 할 시간 (시간 정하기 · 시간표에서 끌어 옮기기) — 계획기가 옮기지 않고, 수업·다른 일과 겹쳐도 됨
 """
 import json
 import sqlite3
@@ -81,6 +82,14 @@ CREATE TABLE IF NOT EXISTS sessions (           -- 실제로 한 시간 (⏱ 시
   start TEXT NOT NULL,
   end TEXT,                                     -- NULL = 진행 중
   minutes INTEGER
+);
+CREATE TABLE IF NOT EXISTS slots (              -- 직접 정한 할 시간. 계획 키는 '<할 일 키>#고정<id>'
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT NOT NULL,                            -- 할 일 키
+  start TEXT NOT NULL,
+  end TEXT NOT NULL,
+  part INTEGER NOT NULL DEFAULT 0,              -- 0 = 그 일 전체를 이 시간에 (자동 배치 안 함) / n = 나눈 조각 하나만 옮김 (나머지는 자동)
+  created TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS worklog (            -- 한 일 기록 (직접 적은 것: 무엇을 · 몇 분)
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -230,3 +239,37 @@ def prune_events(conn, days=365):
     set_meta(conn, "events_pruned_at", now().isoformat())
     conn.commit()
     return n
+
+
+def slots(conn, after=None, key=None):
+    """직접 정한 할 시간 (after 보다 늦게 끝나는 것만)."""
+    q, args = "SELECT * FROM slots WHERE 1", []
+    if after is not None:
+        q, args = q + " AND end > ?", args + [after.isoformat()]
+    if key is not None:
+        q, args = q + " AND key = ?", args + [key]
+    return [dict(r) for r in conn.execute(q + " ORDER BY start", args)]
+
+
+def add_slot(conn, key, start, end, part=0):
+    cur = conn.execute("INSERT INTO slots (key, start, end, part, created) VALUES (?, ?, ?, ?, ?)",
+                       (key, start.isoformat(), end.isoformat(), part, now().isoformat()))
+    log(conn, "slot_set", key, start=start.isoformat(), end=end.isoformat(), part=part)
+    return cur.lastrowid
+
+
+def update_slot(conn, sid, start, end):
+    row = conn.execute("SELECT key FROM slots WHERE id = ?", (sid,)).fetchone()
+    if not row:
+        raise ValueError("정한 시간이 없어졌어요 (화면을 새로 고쳐 주세요)")
+    conn.execute("UPDATE slots SET start = ?, end = ? WHERE id = ?", (start.isoformat(), end.isoformat(), sid))
+    log(conn, "slot_set", row["key"], start=start.isoformat(), end=end.isoformat(), id=sid)
+
+
+def delete_slots(conn, key=None, sid=None):
+    """하나(sid) 또는 그 일의 정한 시간 전부(key) → 다시 자동 배치."""
+    if sid is not None:
+        conn.execute("DELETE FROM slots WHERE id = ?", (sid,))
+    elif key is not None:
+        conn.execute("DELETE FROM slots WHERE key = ?", (key,))
+    log(conn, "slot_cleared", key, id=sid)

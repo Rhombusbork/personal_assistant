@@ -217,8 +217,9 @@ def signature(conn):
                         "WHERE status = 'open' AND (due IS NOT NULL OR slot_end IS NOT NULL) ORDER BY key").fetchall()
     tt = load_timetable()
     ses = conn.execute("SELECT COUNT(*), COALESCE(SUM(minutes), 0) FROM sessions").fetchone()
+    slots = [(r["key"], r["start"], r["end"], r["part"]) for r in db.slots(conn)]
     raw = json.dumps([[tuple(r) for r in rows], now().date().isoformat(), tt.get("planner"), tt.get("reminders"),
-                      tuple(ses), redo_days(conn)], sort_keys=True, default=str)
+                      tuple(ses), redo_days(conn), slots], sort_keys=True, default=str)
     return hashlib.sha1(raw.encode()).hexdigest()
 
 
@@ -263,7 +264,7 @@ def run(conn, service=None, write=True):
     old = {r["key"]: r for r in conn.execute("SELECT * FROM plan").fetchall()}
     pinned, pinned_task, missed = {}, {}, []
     for k, r in old.items():
-        if k.endswith(FIXED):  # 직접 정한 할 시간은 아래에서 tasks 의 slot_end 로 다시 넣는다
+        if FIXED in k:  # 직접 정한 할 시간은 아래에서 tasks 의 slot_end · slots 표로 다시 넣는다
             continue
         base = k.split("#")[0]
         s, e = parse_dt(r["start"]), parse_dt(r["end"])
@@ -288,6 +289,17 @@ def run(conn, service=None, write=True):
                                              minutes=int((t.slot_end - s).total_seconds() // 60))
         if t.key in by_key:  # 남은 양 = 0 → 자동 배치 안 함
             by_key[t.key].minutes = pinned_task[t.key + FIXED].minutes
+    # 시간 정하기·끌어 옮기기 (slots 표): Canvas 항목도. 겹쳐도 됨. part=0 이면 그 일 전체 → 자동 배치 안 함
+    for r in db.slots(conn, after=t_now):
+        t = by_key.get(r["key"]) or next(iter(db.tasks(conn, "key = ? AND status = 'open'", (r["key"],))), None)
+        if not t:
+            continue
+        s, e = parse_dt(r["start"]), parse_dt(r["end"])
+        k = f"{r['key']}{FIXED}{r['id']}"
+        pinned[k] = (s, e)
+        pinned_task[k] = replace(t, key=k, minutes=int((e - s).total_seconds() // 60))
+        if not r["part"] and r["key"] in by_key:
+            by_key[r["key"]].minutes = 0
 
     # --- 통신 (DB 쓰기 없음)
     service = service or get_service()
@@ -297,7 +309,7 @@ def run(conn, service=None, write=True):
     plan, failed, why = make_plan(items, busy, cfg, t_now, pinned)
     plan += [(pinned_task[k], s, e) for k, (s, e) in pinned.items()]
     for k in pinned:
-        why[k] = "직접 정한 시간" if k.endswith(FIXED) else "이미 시작한 블록이라 그대로 둠"
+        why[k] = "직접 정한 시간" if FIXED in k else "이미 시작한 블록이라 그대로 둠"
     plan.sort(key=lambda x: x[1])
     week_end = t_now + timedelta(days=7)
     slack = {"capacity": capacity(t_now, cfg, busy),
@@ -307,6 +319,7 @@ def run(conn, service=None, write=True):
     rows = sync_calendar(service, plan, old, t_now, remind, force=remind_changed) if write else None
 
     # --- DB 쓰기 (짧게)
+    conn.execute("DELETE FROM slots WHERE end < ?", ((t_now - timedelta(days=30)).isoformat(),))  # 한 달 지난 정한 시간
     for k, start in missed:
         db.log(conn, "plan_missed", k, start=start)
     conn.execute("DELETE FROM busy")
