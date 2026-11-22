@@ -225,13 +225,34 @@ def _download_watcher():
 
 
 def _auto_open():
-    from pa import autoopen
+    """30초마다: 계획 시간 자동 열기 · 끝난 블록 확인 · 자동 제출 (일하는 PC 만)."""
+    from pa import autoopen, autosubmit
     if not peer.is_leader():  # 두 PC 가 같이 켜져 있으면 일하는 PC 에서만 연다
         return
     conn = db.connect()
     try:
         for key in autoopen.check(conn, now()):
             log(f"계획 시간 — 열었음: {key}")
+        if autoopen.ended(conn, now()):  # 블록이 끝남 → 수강·제출을 바로 확인 (끝냈으면 완료로)
+            threading.Thread(target=lambda: _safe(_quick_check), daemon=True).start()
+        for key in autosubmit.tick(conn, now()):
+            log(f"자동 제출함 (확인 필요): {key}")
+            STATE["job_done"] = True  # 화면·휴대폰에 바로
+        try:
+            autosubmit.sync_calendar(conn)  # 확인 알림 (바뀌었을 때만 Google 에)
+        except Exception as e:
+            log(f"자동 제출 확인 알림 실패 (다음에 다시): {str(e)[:100]}")
+    finally:
+        conn.close()
+
+
+def _quick_check():
+    conn = db.connect()
+    try:
+        n = collect_canvas.quick_done(conn)
+        if n:
+            log(f"블록이 끝나 확인 — 끝낸 것 {n}개 완료")
+            STATE["job_done"] = True
     finally:
         conn.close()
 

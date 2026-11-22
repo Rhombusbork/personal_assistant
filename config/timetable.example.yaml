@@ -53,7 +53,8 @@ canvas:
 
 # 휴대폰 알림 — 비서가 Google Calendar 일정에 붙이는 알림 (휴대폰 Google Calendar 앱이 알려 줌, PC 꺼져도 됨)
 # 계획 시간 자동 열기 — '학습 계획' 블록이 시작되면 PC 가 그 일을 열어 준다 (PC 가 켜져 있을 때만, pa/autoopen.py).
-#   강의 → 강의 페이지 / 퀴즈 → 퀴즈 페이지 / 과제 → 초안 파일·탐색기·제출 페이지. 시청·풀이·제출은 직접.
+#   강의 → 강의 페이지 / 퀴즈 → 퀴즈 페이지 / 과제 → 초안 파일·탐색기·제출 페이지. 블록이 끝나면 수강·제출을 바로 확인.
+#   시청·풀이는 직접, 제출은 아래 auto_submit 대상만 자동.
 #   PC 가 꺼져 있으면 휴대폰에 캘린더 알림만 (reminders.plan_minutes_before 에 0 을 넣으면 '시작할 때' 알림)
 auto_open:
   enabled: false
@@ -64,6 +65,18 @@ auto_open:
   draft_hours_before: 3             # 과제 블록 몇 시간 전에 초안을 미리 쓸지 (0 이면 안 씀, 구독 사용량 씀)
   late_limit_minutes: 15            # 노트북이 늦게 깨면 이만큼 지난 블록까지만 연다
 
+
+# 자동 제출 (먼저 내고 나중에 확인 — pa/autosubmit.py). 대상: reserved = 시간을 정했거나 ⋯ '자동 제출 켜기' 한 Canvas 과제,
+#   all = 제외하지 않은 모든 Canvas 파일 제출 과제. 정한 시간이 끝날 때, 늦어도 마감 hours_before_due 시간 전에 낸다.
+#   보고서가 없으면 draft_lead_minutes 분 전에 AI 가 빈칸 없이 다 쓴다 (draft_if_missing). 낸 뒤 대시보드 '확인 필요' + 캘린더 알림.
+auto_submit:
+  enabled: true
+  scope: reserved
+  hours_before_due: 6
+  draft_if_missing: true
+  draft_lead_minutes: 90
+  remind_after_hours: 1             # 확인 안 했으면 다시 알림
+  remind_before_due_hours: 3
 # 퀴즈 도움 (AI 도움이 허용된 퀴즈만) — 퀴즈 페이지가 열리면 minutes 분 동안, 찍은 스크린샷(Win+Shift+S·PrtSc)을
 #   AI 에 보내 답·풀이를 받는다 → materials/<과목>/퀴즈풀이/ 에 사진과 함께 (pa/quizhelp.py). 답 체크·제출은 직접.
 #   그 시간 밖에 찍은 스크린샷은 보내지 않는다. 손으로: bin/pa quiz-help <키> | off

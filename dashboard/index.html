@@ -526,6 +526,9 @@ function menuItems(t) {
   if (t.url && t.kind !== "todo") g[0].push({ act: "open", label: openName, strong: P.act === "open" });
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) g[0].push({ act: "report", label: "보고서 작성", hint: "설명·자료·지침", strong: P.act === "report" });
   if (t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) g[0].push({ act: "submit", label: "📤 제출", hint: "확인 후 · .md 는 PDF 로" });
+  if (LIVE && t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) { const au = (D.autoSubmits || []).find(a => a.key === t.key);
+    g[0].push(au ? { act: "autosub-off", label: "📤 자동 제출 끄기", hint: `예정 ${label(ymd(au.at))} ${hm(au.at)}` }
+                 : { act: "autosub-on", label: "📤 자동 제출 켜기", hint: "늦어도 마감 6시간 전 · 초안 없으면 AI" }); }
   if (LIVE && t.status === "open") { const fx = (D.plan || []).find(p => p.task === t.key && p.fixed && dt(p.end) > new Date());
     g[0].push({ act: "slot", label: "시간 정하기…", hint: fx ? `${label(ymd(fx.start))} ${hm(fx.start)} 정함` : "그 시각에 자동으로 열기" }); }
   if (t.course) g[1].push({ act: "mat", label: "자료", hint: links(t).length ? `연결 ${links(t).length}` : "고르기" });
@@ -857,6 +860,19 @@ function critHtml(now) {
   }
   for (const j of (D.jobs || []).filter(j => j.status === "failed"))
     L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button>` : "" });
+  // 자동 제출 (먼저 내고 나중에 ✅ 완성): 확인할 것 · 못 낸 것 · 하루 안에 낼 것
+  for (const r of D.reviews || [])
+    L.push({ sev: 1, t: `📤 자동 제출함 — 확인해 주세요 · ${r.title}`, s: [r.course, r.name, r.pages ? r.pages + "쪽" : "", r.attempt ? r.attempt + "번째" : "", stamp(r.ts), "안 눌러도 제출은 그대로"].filter(Boolean).join(" · "),
+      b: `<button class="tbtn" data-act="open" data-key="${esc(r.key)}" data-url="${esc(r.url || "")}" data-label="Canvas 에서 보기">Canvas 에서 보기</button>`
+       + (LIVE ? `<button class="tbtn" data-act="review-ok" data-key="${esc(r.key)}" data-label="완성">✅ 완성</button>`
+       + (findTask(r.key) ? `<button class="tbtn gray" data-act="report" data-key="${esc(r.key)}" data-label="고쳐서 다시 내기">고쳐서 다시 내기</button>` : "") : "") });
+  for (const a of D.autoSubmits || []) {
+    if (a.state === "failed") L.push({ sev: 2, t: `📤 자동 제출 못 함 · ${a.title}`, s: `${a.why} · 마감 ${label(ymd(a.due))} ${hm(a.due)}`,
+      b: LIVE && findTask(a.key) ? `<button class="tbtn" data-act="submit" data-key="${esc(a.key)}" data-label="직접 제출">📤 직접 제출</button><button class="tbtn gray" data-act="autosub-on" data-key="${esc(a.key)}" data-label="다시 시도">다시 시도</button>` : "" });
+    else if (a.state !== "done" && a.state !== "skipped" && dt(a.at) - Date.now() < 864e5)
+      L.push({ sev: 0, t: `📤 자동 제출 예정 · ${a.title}`, s: `${label(ymd(a.at))} ${hm(a.at)} 에 냄${a.draft ? "" : " · 보고서가 아직 없어 먼저 AI 가 씀"}${a.state === "drafting" ? " (쓰는 중)" : ""} · 마감 ${label(ymd(a.due))} ${hm(a.due)}`,
+        b: LIVE ? `<button class="tbtn gray" data-act="autosub-off" data-key="${esc(a.key)}" data-label="자동 제출 끄기">끄기</button>` : "" });
+  }
   if (!L.length) return "";
   L.sort((a, b) => b.sev - a.sev);
   return `<div class="crit" role="region" aria-label="바로 처리할 것">${L.map(x => `<div class="cline ${x.sev === 0 ? "info" : x.sev < 2 ? "warn" : ""}${x.late ? " lateline" : ""}">
@@ -1787,6 +1803,8 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "submit-ok") { closeSheet(); await run(() => post("submit", { key }), r => r.message); return; }
+  if (act === "review-ok") { await run(() => post("submit-confirm", { key }), "✅ 완성으로 표시했어요"); return; }
+  if (act === "autosub-on" || act === "autosub-off") { closeMenu(false); closeSheet(); await run(() => post("autosubmit", { key, on: act === "autosub-on" }), r => r.message); return; }
   if (act === "slot" && t) { closeMenu(false); closeSheet(); slotSheet(t, b.dataset.pkey); return; }
   if (act === "slot-save") {
     const [s1, e1] = slotRange($("slDate").value, $("slFrom").value, $("slTo").value);

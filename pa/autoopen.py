@@ -71,6 +71,19 @@ def _play(title):
     autoplay.play_when_ready(title, log=log)
 
 
+def ended(conn, t_now, window=timedelta(minutes=10)):
+    """방금 끝난 강의·퀴즈·과제 블록의 할 일 키 (블록마다 한 번) → 엔진이 수강·제출을 바로 확인한다 ('끝날 때')."""
+    keys = []
+    for pkey, start, end, task in _blocks(conn):
+        if task["kind"] in ("lecture", "quiz", "assignment") and task["source"] == "canvas" and end <= t_now < end + window:
+            mark = f"autoopen:end:{pkey}:{end.isoformat()}"
+            if not db.get_meta(conn, mark):
+                db.set_meta(conn, mark, t_now.isoformat())
+                keys.append(task["key"])
+    conn.commit()
+    return keys
+
+
 def check(conn, t_now, opener=open_task):
     """지금 시작한 블록을 열고, 곧 시작할 과제 블록의 초안을 미리 맡긴다. 연 할 일 키 목록을 돌려준다."""
     c = cfg()

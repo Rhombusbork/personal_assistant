@@ -76,8 +76,9 @@ def check(conn, key, path=None):
             "problems": problems, "notes": notes}
 
 
-def submit(conn, key, path=None, reveal=True):
-    """확인을 통과하면 내고, Canvas 에서 다시 읽어 확인한 결과를 기록한다."""
+def submit(conn, key, path=None, reveal=True, auto=False):
+    """확인을 통과하면 내고, Canvas 에서 다시 읽어 확인한 결과를 기록한다.
+    auto: 자동 제출 (pa/autosubmit.py) → '확인 필요' 카드. 직접 낸 것(버튼·명령)은 본 것이므로 확인된 것으로."""
     info = check(conn, key, path)
     if info["problems"]:
         raise SubmitError("제출하지 않음: " + " / ".join(info["problems"]))
@@ -96,7 +97,7 @@ def submit(conn, key, path=None, reveal=True):
         raise SubmitError("올렸지만 Canvas 에서 확인되지 않음 — Canvas 제출 페이지에서 직접 확인해 주세요")
     result = {"file": str(file), "name": got[0].get("display_name"), "size": size,
               "pages": pdf.pages(file) if file.suffix.lower() == ".pdf" else None,
-              "attempt": after.get("attempt"), "late": bool(after.get("late")), "url": info["task"]["url"]}
+              "attempt": after.get("attempt"), "late": bool(after.get("late")), "url": info["task"]["url"], "auto": auto}
     db.log(conn, "submitted", key, **result)
     db.set_status(conn, key, "done", "submit")
     conn.commit()

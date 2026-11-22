@@ -73,6 +73,7 @@ def run_next(conn, quick=False):
     try:
         result = {"report": report_job, "report-force": lambda c, j: report_job(c, j, force=True),
                   "report-auto": lambda c, j: report_job(c, j, show=False),
+                  "report-submit": lambda c, j: report_job(c, j, show=False, fill=True),  # 자동 제출용: 빈칸 없이
                   "notices": notices_job, "summary": summary_job,
                   "quizhelp": quizhelp.job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
@@ -189,8 +190,9 @@ def blank_report(conn, key):
     return path
 
 
-def report_job(conn, job, force=False, show=True):
-    """show=False: 과제 블록 전에 미리 쓰는 초안 (pa/autoopen.py) — 지금 열지 않고 블록이 시작될 때 연다."""
+def report_job(conn, job, force=False, show=True, fill=False):
+    """show=False: 과제 블록 전에 미리 쓰는 초안 (pa/autoopen.py) — 지금 열지 않고 블록이 시작될 때 연다.
+    fill=True: 자동 제출할 초안 (pa/autosubmit.py) — 사람이 채울 빈칸을 남기지 않는다."""
     task = conn.execute("SELECT * FROM tasks WHERE key = ?", (job["key"],)).fetchone()
     if not task:
         raise ValueError("할 일을 찾지 못함")
@@ -230,7 +232,9 @@ def report_job(conn, job, force=False, show=True):
 
     _update(conn, job["id"], step=f"4/5 초안 쓰기 ({ai.name()}, 몇 분 걸림)")
     b = brief(conn, task["key"])
-    blanks = ("- 학생 자신의 생각, 관찰, 경험, 의견이 들어가야 할 자리는 지어내지 말고\n"
+    blanks = ("- 이 초안은 학생이 보기 전에 그대로 제출된다. 빈칸·자리표시([✍ …] 등)를 남기지 말고 모든 부분을 채운다.\n"
+              "  학생의 의견 부분은 노트·지침·자료를 근거로 무난하게 쓰고, 개인 경험은 지어내지 않는다." if fill else
+              "- 학생 자신의 생각, 관찰, 경험, 의견이 들어가야 할 자리는 지어내지 말고\n"
               "  [✍ 내 생각: 여기에 무엇을 쓰면 좋을지 한 줄 안내] 로 비워 둔다." if b["blanks"] else
               "- 학생의 의견 부분도 지침과 노트를 근거로 초안을 쓴다. 노트·지침에 없는 개인 경험은 지어내지 않는다.")
     sid, name = student()

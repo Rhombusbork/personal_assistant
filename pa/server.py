@@ -20,6 +20,8 @@ POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
 GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일 이름·있는지 · 저장한 작성 지침
 POST /api/submit-check, /api/submit  📤 Canvas 제출: 확인만 / 확인 후 제출 (휴대폰 대기열로도 — pa/submit.py)
+POST /api/submit-confirm {key} 자동 제출한 것 ✅ 완성 / POST /api/autosubmit {key, on} 과제마다 자동 제출 켜기·끄기 (pa/autosubmit.py)
+POST /api/move {key, start, end} 시간 정하기·옮기기 (겹쳐도 됨) / POST /api/unslot {key} 자동 배치로 되돌리기
 POST /api/report-pdf  보고서 .md → A4 PDF (쪽수 알려 줌) → 탐색기에서 선택해 보여 줌 / POST /api/reveal 탐색기에서 위치 보기
 POST /api/workspace  🗂 VSCode 새 창: 과제 → ~/report + 보고서 파일 / 강의 → ~/study_system + 맞는 노트
 POST /api/report-brief, /api/report-file   작성 지침 저장 / Claude 없이 규칙 이름의 빈 파일 만들고 열기
@@ -393,7 +395,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/submit-check", "/api/submit", "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest",
+                            "/api/submit-check", "/api/submit", "/api/submit-confirm", "/api/autosubmit", "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest",
                             "/api/open-request"):
                 out = self.side_action(action, body)
                 self._forward(action, body)
@@ -551,10 +553,22 @@ def side_action(action, body, remote=False, applied=None):
                             "attempt": c["attempt"], "allowed": c["allowed"], "previous": c["previous"],
                             "due": c["due"].isoformat() if c["due"] else None, "problems": c["problems"], "notes": c["notes"]}
                 r = submit.submit(conn, body["key"], reveal=not remote)
+                db.log(conn, "submit_confirmed", body["key"])  # 직접 낸 것 = 본 것
+                conn.commit()
             except (submit.SubmitError, RuntimeError, OSError) as e:  # Canvas 토큰 만료·연결 실패도 화면에 글로
                 raise ValueError(str(e)) from None
             return {"ok": True, **r, "message": f"제출됨: {r['name']} ({r['attempt']}번째" + (", 늦은 제출" if r["late"] else "")
                     + ") — Canvas 에서 다시 확인함" + ("" if remote else " · 탐색기에 띄움")}
+        if action in ("/api/submit-confirm", "/api/autosubmit"):  # 자동 제출: ✅ 완성(확인) / 과제마다 켜기·끄기
+            from pa import autosubmit
+            if action == "/api/submit-confirm":
+                autosubmit.confirm(conn, body["key"])
+                msg = "✅ 완성으로 표시했어요"
+            else:
+                autosubmit.set_flag(conn, body["key"], bool(body.get("on")))
+                msg = "자동 제출을 켰어요 — 정한 시간이 끝날 때, 늦어도 마감 6시간 전 (초안이 없으면 AI 가 씀)" if body.get("on") else "자동 제출을 껐어요"
+            conn.commit()
+            return {"ok": True, "message": msg}
         if action == "/api/report-pdf":  # .md → 제출용 PDF (Claude 안 씀) → 탐색기에서 보여 줌
             from pa import pdf
             row = conn.execute("SELECT * FROM tasks WHERE key = ?", (body["key"],)).fetchone()
