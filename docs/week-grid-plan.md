@@ -1,4 +1,4 @@
-# 주차별 시간표 보기 (계획 — 아직 안 만듦)
+# 주차별 시간표 · 예약 · 자동 제출 (계획)
 
 > 작성 2026-11-22 · 상태: **조사·계획**. 지금 [주차별]은 날짜별 목록 (`dashboard/index.html` 의 `weekView`).
 > 목표: 대학 시간표 앱처럼 월~일 × 시간 칸으로 한 주를 보여 주고, 계획 블록을 끌어서 옮긴다.
@@ -112,49 +112,81 @@
 
 ## 3-3. 자동 제출 (Canvas API — 2026-11-22 손으로 한 번 성공: 파일 올리기 3단계 → 제출)
 
-- `pa/canvas.py` 에 `post()` · `submit_file(course, assignment, path)` 추가. 제출 전에 Canvas 에서 확인:
-  남은 횟수(`allowed_attempts`), 허용 확장자, 잠김(`lock_at`), 이미 낸 파일과 같은지.
-- 보낼 파일: 보고서 .md → PDF (`pa/pdf.py`, 지금 대시보드 버튼과 같음), 이름은 report 규칙대로. **.md 는 절대 안 보냄** (이번 실수).
+- 보낼 파일: 보고서 .md → PDF (`pa/pdf.py`), 이름은 report 규칙대로. **.md 는 절대 안 보냄** (12주차 결과보고서를 .md 로 낸 실수).
+- 제출 전 확인 (하나라도 걸리면 안 냄): 제출 방식이 파일 올리기인지, 남은 횟수(`allowed_attempts`), 허용 확장자,
+  잠김(`lock_at`·`locked_for_user`), 파일이 있는지, 이미 낸 파일과 이름·크기가 같은지(같으면 "이미 냄"), .md 가 PDF 보다 새것이면 PDF 다시 만들기.
+- 제출 뒤 확인: Canvas 에서 다시 읽어 파일 이름·크기·몇 번째 제출인지 맞는지 → `events` 에 `submitted` 기록 →
+  **PC: 탐색기에서 그 파일 선택해 보여 주기** / **휴대폰: 대시보드 '제출 기록'에 파일·크기·쪽수·몇 번째·Canvas 링크** (gh-pages 데이터에 들어감).
 - 제출 방식 (과제마다, 기본은 ①):
   1. **확인 후 제출** — 준비가 되면 휴대폰·대시보드에 "PDF 3쪽 · 제출할까요? [제출] [열어 보기]"
-  2. **완성 표시한 것만 자동** — 보고서 파일에 ✅ 완성 표시(대시보드 버튼)를 한 것만, 예약 시각에 자동 제출
+  2. **완성 표시한 것만 자동** — 보고서에 ✅ 완성 표시를 한 것만, 예약 시각에 자동 제출
   3. **마감 안전망** — 마감 N시간 전까지 안 냈으면 ✅ 완성본을 자동 제출 (완성 표시 없으면 알림만)
-- AI 가 쓴 초안을 사람이 보지 않고 바로 내는 건 막는다 (완성 표시 필요). 제출 뒤엔 Canvas 에서 다시 읽어
-  파일 이름·크기가 맞는지 확인하고 기록. 다시 제출할 수 있으면 대시보드에 [다시 제출].
-
-## 3-4. 조사로 찾은 더 넣을 만한 기능 (사용자가 생각 못 한 것)
-
-- **남은 강의 시간 이어서**: 덜 들은 강의는 남은 분만큼 자동으로 다음 빈 시간에 (LearningX 진도)
-- **빈틈(버퍼)**: 수업·예약 앞뒤 10분 비우기, 이동 시간 (Reclaim 의 buffer·travel time)
-- **습관 블록**: "매일 1시간 복습"처럼 시간이 정해지지 않은 반복 — 빈 곳에 알아서, 바쁘면 옮겨감 (Reclaim Habits)
-- **놓친 블록 다시 짜기 버튼**: 지난 블록 중 안 끝낸 걸 한 번에 다음 빈 시간으로 (Structured Replan, Akiflow)
-- **하루 마무리**: 저녁에 "오늘 계획 vs 실제(⏱)" 비교 + 내일 확인 (Sunsama 저녁 정리) — 일요일 돌아보기를 매일 짧게
-- **간격 복습**: 강의를 들은 날 기준 1·3·7일 뒤 짧은 복습 블록 (시험 복습 규칙을 강의에도)
-- **집중 타이머**: 블록 시작 때 뽀모도로(25/5) 같이 켜기 — 지금 ⏱ 기록과 이어짐
-- **겹친 블록 중 '주'와 '곁'**: 강의(주) 틀어 두고 단순 작업(곁) — 재생은 하나만
-- **PC 깨우기**: 예약 시각 몇 분 전에 Windows 가 절전에서 깨어나게 (아래 3-5)
+- AI 가 쓴 초안을 사람이 보지 않고 바로 내는 건 막는다 (완성 표시 필요).
 
 ## 3-5. PC 전원 (원격 조종 · 절전)
 
 - Remote Control 은 PC 에서 claude 가 돌고 있어야 한다. 절전에서 깨면 다시 이어지지만, 깨어 있는데 인터넷이 10분 넘게
   끊기면 끝난다 (공식 문서).
-- **노트북은 휴대폰으로 원격 전원 켜기가 사실상 어렵다**: Wake-on-LAN 은 유선 랜 + 전원 연결이 필요하고 Wi-Fi 로는 불안정.
-- 되는 것: 엔진이 예약마다 **Windows 작업 스케줄러의 '이 작업을 실행하기 위해 컴퓨터 깨우기'** 작업을 만든다
-  (`schtasks` — 예약 5분 전 깨우기) + 전원 옵션의 '절전 해제 타이머 허용' 켜기. 덮개를 닫으면 안 깨는 노트북이 있으니 시험해 봐야 함.
+- **휴대폰 → 절전 들어가기: 된다.** PC 가 깨어 있으면 엔진이 휴대폰 입력을 몇 분마다 읽으므로, 휴대폰 화면에 [💤 PC 절전] 버튼 →
+  엔진이 `rundll32 powrprof.dll,SetSuspendState` (Windows). 진행 중인 AI 작업·제출이 있으면 끝난 뒤에.
+- **휴대폰 → 깨우기: 바로는 안 된다.** 자는 PC 는 아무것도 못 읽는다. Wake-on-LAN 은 유선 랜 + 전원 연결이 필요하고 Wi-Fi 로는 불안정.
+  대신 **주기적으로 잠깐 깨기**: 작업 스케줄러가 N분(예: 30분)마다 깨움 → 엔진이 휴대폰 입력에 [☀️ 깨어 있어]가 있으면 깨어 있고,
+  없으면 1~2분 뒤 다시 절전. 휴대폰에서 누르고 최대 N분 기다리면 Remote Control 을 쓸 수 있다. 배터리를 조금 쓰므로 충전 중일 때만 켜는 설정.
+- **예약 시각 깨우기**: 엔진이 예약마다 작업 스케줄러의 '이 작업을 실행하기 위해 컴퓨터 깨우기' 작업을 만든다 (예약 5분 전) +
+  전원 옵션 '절전 해제 타이머 허용'. 덮개를 닫으면 안 깨는 노트북이 있으니 시험해 봐야 함 (`powercfg /waketimers` 로 확인).
 - PC 가 필요 없는 일은 클라우드 세션(usage.md 'PC 가 꺼져 있을 때')으로.
 
-## 4. 만드는 순서
+## 4. 예약·자동 제출 구현 계획 (단계별 — 각 단계가 끝나면 쓸 수 있음)
 
-1. 시간표 그리기만 (범위 자동·sticky·지금 선·겹침·색·짧은 블록) — 끌기 없음
-2. ⋯ 메뉴 "시간 바꾸기" + `/api/move` + 되돌리기 (끌기 없이 옮기기 먼저, Canvas 항목도 할 시간 고정 가능하게)
-2-1. 쉬운 예약 (3-2, 종류별 기본 동작 + 강의 끝 확인) → 고급 예약 → 자동 제출 (3-3) → PC 깨우기 (3-5)
-3. 손잡이 끌기 (15분 맞춤·그림자·겹침 경고·Esc·자동 스크롤)
-4. 좁은 화면(3일·좌우 넘기기), 빈 시간 접기, 길이 바꾸기
+| 단계 | 만드는 것 | 파일 | 끝나면 되는 것 |
+|---|---|---|---|
+| **P1 제출 기반** ✅ 2026-11-22 | `pa/submit.py` (제출 전 확인 · PDF 만들기 · 올리기 · 다시 읽어 확인 · 기록), `bin/pa submit <키> [파일] [--yes]`, 제출 뒤 탐색기, 대시보드·휴대폰 '제출 기록' | `pa/submit.py`, `pa/canvas.py`, `pa/__main__.py`, `pa/render.py`, `dashboard/index.html`, `tests/test_submit.py` | 채팅·명령으로 안전하게 제출, 휴대폰에서 낸 파일 확인 |
+| P2 제출 버튼 | 과제 줄 ⋯ → [📤 제출] (확인 창: 파일·쪽수·몇 번째·마감) · 휴대폰 [제출] (대기열 → PC) · ✅ 완성 표시 | `pa/server.py`, `dashboard/index.html`, `pa/mobile.py` | 버튼으로 제출 |
+| P3 시간 정하기 | Canvas 항목에도 할 시간 고정 (`tasks.earliest/slot_end` 를 Canvas 확인이 덮어쓰지 않게), `POST /api/move`, ⋯ → "시간 정하기" | `pa/collect_canvas.py`, `pa/db.py`, `pa/server.py` | 강의를 원하는 시간에 → 기존 자동 열기·▶ 가 그 시각에 |
+| P4 쉬운 예약 | 종류별 기본 동작 (3-2 표): 미리(초안·자료) / 시작(열기·재생) / 끝(수강 확인·남은 시간 다시) | `pa/autoopen.py`, `pa/jobs.py` | 시간만 정하면 다 함 |
+| P5 시간표 화면 | 1·2·3 장 (범위 자동·겹침·손잡이 끌기·되돌리기) | `dashboard/index.html` | 주차별 시간표 |
+| P6 고급 예약 | `schedules` 표 + "+ 예약 추가" 창 (AI 프롬프트 · 만들어 둔 기능 고르기 · 반복) + 엔진 실행기 | `pa/schedules.py`, `pa/db.py`, `pa/server.py`, 화면 | 아무 작업이나 시각 예약 |
+| P7 자동 제출 | 과제마다 제출 방식 ①②③, 예약 끝에 제출 | `pa/submit.py`, `pa/autoopen.py` | 완성본 자동 제출 |
+| P8 PC 전원 | 휴대폰 [💤 절전]·[☀️ 깨어 있어], 주기적 깨기, 예약 전 깨우기 | `pa/power.py`, `pa/mobile.py` | 3-5 |
 
 ## 5. 정해야 할 것
 
 - 옮기기 켜는 방법: 블록마다 작은 손잡이 / 위의 '옮기기 모드' 버튼 (조사로는 손잡이가 흔하고 덜 번거로움)
-- Canvas 과제 블록도 옮기게 할지 (inbox 할 일만 먼저?)
+
+## 6. 나중에 이야기할 것 — 꼭 만들 것(4장)이 끝난 뒤 (사용자 2026-11-22)
+
+### 6-1. 디자인·버튼 구조 (생각 못 했을 것)
+- **블록 누르면 작은 창(팝오버)**: 큰 주 버튼 하나(▶ 강의 열기 / ✍ 초안 / 📤 제출) + [시간 바꾸기] + ⋯. 자세한 건 옆 패널.
+  바꾸고 나면 창이 저절로 닫혀 계속 시간표를 본다 (Apple HIG 의 캘린더 예시). 경고는 이 창 말고 따로 알림으로 (놓치기 쉬움).
+- **휴대폰은 아래에서 올라오는 시트**: 블록·빈 칸을 누르면 아래 시트, 아래로 밀면 닫힘 (Google Calendar Android). 오른쪽 아래 **+ 떠 있는 버튼** → 예약 시트.
+- **마우스 올리면 미리보기 카드**: 시간표 칸이 좁아 잘린 제목·강의실·마감·이유를 클릭 없이 (화면이 흔들리지 않게 위에 띄움).
+- **오른쪽 클릭 메뉴**: 완료 · 시간 바꾸기 · 예약 · 복제 · 제외 (블록마다 맞는 것만).
+- **빈 칸을 끌어서 새 블록**: 쓱 그으면 그 시간으로 "무엇을?" 작은 창 → 할 일 고르기 or 고급 예약 (Uday 시간표 앱: "원하는 시간 쓱 선택, 완료").
+- **할 일 서랍**: 옆에 아직 시간 안 정한 할 일 목록 → 시간표로 끌어 넣으면 예약 (Amie·Akiflow).
+- **확대·축소**: Ctrl+휠 · 핀치 · [−][+] 버튼으로 1시간 높이 바꾸기, 보던 시각이 가운데 유지 (Fantastical·Cron·Prisma). 마지막 크기 기억.
+- **넉넉 / 촘촘** 보기 (Google Calendar 2026-07).
+- **보는 날 수**: 7 · 5 · 3 · 1일, 휴대폰 기본 3일 (Fantastical 은 4일로 맞춰 칸을 넓게).
+- **과목 색 범례 = 필터**: 범례의 과목을 누르면 그 과목만 / 숨기기. 종류 필터 (수업·계획·예약·AI).
+- **예약 아이콘 + 상태 점**: ▶ ✍ 📄 🤖 📤 + 대기(회색) · 진행(파랑) · 끝(초록) · 실패(빨강).
+- **지금 선 옆에 "다음: 15:00 생화학 ▶ (12분 뒤)"** 칩.
+- **요일 머리줄에 하루 합계**: 계획 시간 / 남은 여유 작은 막대 (하루 최대 시간 넘으면 빨강).
+- **단축키**: t 오늘 · ←→ 주 · n 새 예약 · Alt+끌기 복제 (Cron) · Delete · Ctrl+Z 되돌리기 · ? 도움말.
+- **빠른 입력에 동작까지**: `생화학 17강 >수 15-16시 ▶` / `보고서 >토 10시 ✍ 📤`.
+
+### 6-2. 기능 (생각 못 했을 것)
+- **남은 강의 시간 이어서**: 덜 들은 강의는 남은 분만큼 자동으로 다음 빈 시간에 (LearningX 진도)
+- **빈틈(버퍼)**: 수업·예약 앞뒤 10분 비우기, 이동 시간 (Reclaim 의 buffer·travel time)
+- **습관 블록**: "매일 1시간 복습"처럼 시간이 정해지지 않은 반복 — 빈 곳에 알아서, 바쁘면 옮겨감 (Reclaim Habits)
+- **놓친 블록 다시 짜기 버튼**: 지난 블록 중 안 끝낸 걸 한 번에 다음 빈 시간으로 (Structured Replan, Akiflow)
+- **하루 마무리**: 저녁에 "오늘 계획 vs 실제(⏱)" 비교 + 내일 확인 (Sunsama 저녁 정리)
+- **간격 복습**: 강의를 들은 날 기준 1·3·7일 뒤 짧은 복습 블록 (시험 복습 규칙을 강의에도)
+- **집중 타이머**: 블록 시작 때 뽀모도로(25/5) 같이 켜기 — 지금 ⏱ 기록과 이어짐
+- **겹친 블록 중 '주'와 '곁'**: 강의(주) 틀어 두고 단순 작업(곁) — 재생은 하나만
+
+### 6-3. 장기: 마우스·키보드 자동 조작 (사용자 2026-11-22 — **이번 작업이 모두 끝난 뒤 리마인드**)
+- API 가 없는 일(학교 사이트의 버튼, 다른 프로그램)을 화면을 보고 마우스로. 느리고 비효율적이어도 할 수 있는 일이 늘어남.
+- 후보: Claude 의 computer use (스크린샷 → 클릭), Windows UI Automation (지금 ▶ 재생 버튼이 이 방식, `pa/autoplay.py`), Playwright (브라우저 안).
+- 지켜야 할 것: 출석·제출처럼 기록이 남는 동작은 확인 후, 하는 동안 화면에 "비서가 조작 중" 표시, Esc 로 멈춤.
 
 ## 출처
 
@@ -170,3 +202,6 @@
 - 자동 배치 앱: [Motion·Akiflow·Sunsama 비교](https://www.morgen.so/blog-posts/akiflow-vs-motion), [ClickUp 비교](https://clickup.com/blog/sunsama-vs-motion/)
 - 좁은 화면: [Mobiscroll 3일](https://forum.mobiscroll.com/t/how-to-show-only-3-day-in-a-week-in-mobile-view/1111), [PTC](https://support.ptc.com/help/servicemaxcore/en/articles/fsa/week-view.html)
 - 지금 선·고정 머리줄: [Google](https://workspaceupdates.googleblog.com/2007/06/google-calendar-adds-current-time-line.html?hl=en), [Prisma Calendar](https://real1tyy.github.io/Prisma-Calendar/configuration/calendar-ui)
+- 디자인·버튼 (6-1): [Apple HIG 팝오버](https://developer.apple.com/design/human-interface-guidelines/popovers.md), [Syncfusion 빠른 창](https://react.syncfusion.com/react-ui/scheduler/quick-popup/), [GNOME 팝오버 논의](https://gitlab.gnome.org/GNOME/gnome-calendar/-/issues/1090), [미리보기 카드 PR](https://github.com/BuilderIO/agent-native/pull/2598), [Google Calendar 시트](https://9to5google.com/2019/05/08/google-calendar-bottom-sheet/), [Material 시트](https://m1.material.io/components/bottom-sheets.html), [ServiceNow FAB](https://horizon.servicenow.com/native-mobile/components/mobile-component-floating-action-button), [Fantastical](https://apps.apple.com/app/fantastical/id975937182), [Amie](https://amie.so/best/calendar-apps), [Cron 밀도·확대](https://cron.com/changelog/2021-03-01-grid-density-and-resizing), [Cron 복제](https://cron.com/changelog/2021-02-15-mini-month-navigator-and-cut-copy-paste-duplicate), [Prisma 확대](https://real1tyy.github.io/Prisma-Calendar/features/calendar/calendar-view), [Google 밀도](https://workspaceupdates.googleblog.com/2026/07/updated-options-to-better-view-google-Calendar-on-large-monitors.html), [Uday](https://apps.apple.com/us/app/uday-%EC%8B%9C%EA%B0%84%ED%91%9C-%ED%95%99%EC%A0%90%EA%B4%80%EB%A6%AC-to-do-%ED%80%B5%EB%A9%94%EB%AA%A8/id1491180192?l=ko)
+- 전원 (3-5): [Remote Control](https://code.claude.com/docs/en/remote-control), [Modern Standby 깨우기](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/modern-standby-wake-sources), [Wi-Fi WoL 한계](https://tech.yahoo.com/computing/articles/want-see-magic-trick-turn-155238408.html), [작업 스케줄러 깨우기](https://learn.microsoft.com/en-us/answers/questions/651690/windows-11-does-not-wake-computer-to-run-scheduled?page=2)
+- 기능 (6-2): [Reclaim](https://help.reclaim.ai/en/articles/6210740-reclaim-s-features), [Structured](https://apps.apple.com/app/structured-daily-planner/id1499198946), [Amie 플래너 비교](https://amie.so/best/daily-planner-apps)

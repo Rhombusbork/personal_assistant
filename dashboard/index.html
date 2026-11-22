@@ -1049,6 +1049,11 @@ function moreHtml(now, today) {
     ${rd.map(t => `<div class="citem"><span class="tx">${esc(t.title)}<small>${[t.course && esc(t.course), KIND[t.kind], "끝냄 " + stamp(t.doneAt)].filter(Boolean).join(" · ")}</small></span>
       ${LIVE || MOB ? `<span class="ac"><button class="tbtn" data-act="revive" data-key="${esc(t.key)}" data-title="${esc(t.title)}" title="완료를 취소하고 다시 할 일로">되살리기</button></span>` : ""}</div>`).join("")}
     <p class="small">Canvas 에 이미 제출한 과제는 다음 Canvas 확인 때 다시 '완료'가 됩니다 (제출을 취소했다면 그대로 남음).</p></div></details>`;
+  const sb = D.submissions || [];  // 제출 기록 — 비서가 Canvas 에 낸 파일 (낸 뒤 Canvas 에서 다시 읽어 확인한 것)
+  if (sb.length) h += `<details data-k="sublist" ${det("sublist")}><summary><span class="ttl">제출 기록</span><span class="hint">최근 14일 ${sb.length}건 · 비서가 Canvas 에서 다시 확인함</span><span class="chev">›</span></summary><div class="inner">
+    ${sb.map(x => `<div class="citem"><span class="tx">📤 ${esc(x.title)}<small>${[x.course && esc(x.course), esc(x.name || ""), x.size ? Math.round(x.size / 1024) + "KB" : "", x.pages ? x.pages + "쪽" : "",
+      x.attempt ? x.attempt + "번째" : "", x.late ? `<span class="late">늦은 제출</span>` : "", stamp(x.ts)].filter(Boolean).join(" · ")}</small></span>
+      <span class="ac">${x.url ? `<button class="tbtn" data-act="open" data-key="${esc(x.key)}" data-url="${esc(x.url)}" title="Canvas 과제 페이지 (제출한 파일 보기)">Canvas</button>` : ""}</span></div>`).join("")}</div></details>`;
   h += `<details data-k="stats" ${det("stats")}><summary><span class="ttl">통계</span><span class="hint">학습량 · 과목별 진행 · 완료 추이 · 걸린 시간 · 돌아보기</span><span class="chev">›</span></summary><div class="inner">${statsHtml(today)}</div></details>`;
   return h;
 }
@@ -1773,7 +1778,7 @@ document.addEventListener("click", async e => {
   if (act === "ign-all-ok") { await run(() => post("ignore", { key, pattern: true }), r => r.message || "앞으로도 제외"); return; }
   if (act === "remove-ok") { await run(() => post("remove", { key }), "삭제했습니다"); return; }
   if (act === "relogin-ok") { await run(() => post("browser-login"), r => r.message || "로그인 창을 열었습니다"); return; }
-  if (act === "open") { if (MOB || REMOTE) { if (t && t.url) window.open(t.url, "_blank", "noopener"); return; } await run(() => api("open", { key }), "브라우저로 열었습니다"); return; }
+  if (act === "open") { if (MOB || REMOTE) { const u = (t && t.url) || b.dataset.url; if (u) window.open(u, "_blank", "noopener"); return; } await run(() => api("open", { key }), "브라우저로 열었습니다"); return; }
   if (act === "openquiz") { if (MOB || REMOTE) { window.open(D.quiz.url, "_blank", "noopener"); return; } await run(() => api("open-quiz")); return; }
   if (act === "start") { await run(() => post("timer/start", { key }), "시간 재기 시작"); return; }
   if (act === "stop") { await run(() => post("timer/stop", {}), "기록을 멈췄습니다"); return; }

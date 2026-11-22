@@ -240,6 +240,33 @@ def cmd_task(conn, args):
         print(("  ⚠️ 파일 없음 " if not x["exists"] else "  ") + x["p"])
 
 
+def cmd_submit(conn, args):
+    from pa import submit
+    try:
+        c = submit.check(conn, args.key, args.file)
+    except submit.SubmitError as e:
+        sys.exit(str(e))
+    print(f"{c['name']}  (마감 {c['due']:%m/%d %H:%M})" if c["due"] else c["name"])
+    print(f"  낼 파일: {c['file']}" + (" (원고에서 다시 만듦)" if c["remake"] else ""))
+    print(f"  지금까지 {c['attempt']}번 냄" + (f" / 최대 {c['allowed']}" if c["allowed"] > 0 else "")
+          + (f" — 마지막: {', '.join(c['previous'])}" if c["previous"] else ""))
+    for n in c["notes"]:
+        print("  · " + n)
+    if c["problems"]:
+        sys.exit("제출하지 않음:\n" + "\n".join("  ✗ " + x for x in c["problems"]))
+    if not args.yes:
+        if not sys.stdin.isatty():
+            sys.exit("확인 없이 내려면 --yes")
+        if input("Canvas 에 제출할까요? [y/N] ").strip().lower() not in ("y", "yes", "ㅛ"):
+            sys.exit("취소함")
+    try:
+        r = submit.submit(conn, args.key, args.file, reveal=not args.no_reveal)
+    except submit.SubmitError as e:
+        sys.exit(str(e))
+    print(f"✓ 제출됨 — {r['name']} · {r['size']:,}바이트" + (f" · {r['pages']}쪽" if r["pages"] else "")
+          + f" · {r['attempt']}번째" + (" · 늦은 제출" if r["late"] else "") + "\n  Canvas 에서 다시 읽어 확인함. 탐색기에 파일을 띄움.")
+
+
 def cmd_notices(conn, args):
     from datetime import timedelta
 
@@ -381,6 +408,12 @@ def main():
     sp.set_defaults(fn=cmd_time)
     sub.add_parser("lectures", help="이번 주 강의 목록·열기")
     sub.add_parser("sync-timetable", help="수업 시간표 → Google 캘린더 (--dry-run)")
+    sp = sub.add_parser("submit", help="Canvas 과제에 파일 제출 (확인 → .md 면 PDF 로 → 올리기 → 다시 읽어 확인)")
+    sp.add_argument("key")
+    sp.add_argument("file", nargs="?", help="없으면 그 과제의 보고서 파일 (.md → 옆의 .pdf)")
+    sp.add_argument("--yes", action="store_true", help="묻지 않고 제출")
+    sp.add_argument("--no-reveal", action="store_true", help="탐색기 안 띄움")
+    sp.set_defaults(fn=cmd_submit)
     sp = sub.add_parser("notices")
     sp.add_argument("--all", action="store_true")
     sp.set_defaults(fn=cmd_notices)

@@ -71,5 +71,9 @@ def make(md_path):
         page.set_content(to_html(src.read_text(encoding="utf-8")))
         page.pdf(path=str(out), format="A4", prefer_css_page_size=True)
         b.close()
-    pages = len(re.findall(rb"/Type\s*/Page[^s]", out.read_bytes()))
-    return out, pages
+    return out, pages(out)
+
+
+def pages(path):
+    """PDF 쪽수 (라이브러리 없이 /Type /Page 개수)."""
+    return len(re.findall(rb"/Type\s*/Page[^s]", Path(path).read_bytes()))
