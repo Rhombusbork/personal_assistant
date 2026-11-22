@@ -96,8 +96,8 @@ bin/pa open                   # 대시보드 열기 (VSCode 안 탭 — 비서 V
 ```
 
 - **VSCode 없이 늘 켜 두기 (Windows)**: `scripts/windows/register-task.ps1` 을 한 번 실행하면 로그인할 때 엔진이 창 없이 켜지고
-  VSCode 가 비서 폴더로 열리며 대시보드가 그 안 탭으로 뜬다. 탭을 닫아도 3분 뒤 다시 열린다
-  (`config/timetable.yaml` 의 `dashboard`: `mode: vscode`·`app`, `reopen_minutes`, `start_vscode` / 대시보드 아래 '오늘은 끄기').
+  대시보드 서버·자동 계획·알림이 돈다. 대시보드는 비서 폴더를 VSCode 로 열면 그 안 탭으로 뜨고, 닫으면 탭 줄 오른쪽 위 ✓ 버튼 ·
+  상태 줄 '비서' · `Ctrl+Alt+D` 로 다시 연다 (`config/timetable.yaml` 의 `dashboard.mode`: `vscode`·`app`).
 
 ### 알아 둘 것
 

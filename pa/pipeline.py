@@ -283,21 +283,6 @@ WINDOW_GRACE = 3    # 창이 뜬 뒤 이만큼 더 (그려지는 동안 겹치�
 STATE = {"full": False}  # 대시보드 상태 줄 '최신화 중' 표시용
 
 
-_reopen_memo = {"at": 0, "v": None}
-
-
-def reopen_minutes():
-    """대시보드 창이 없으면 몇 분 뒤 다시 열지 (config/timetable.yaml dashboard.reopen_minutes, 0 = 안 함). 1분 기억."""
-    if time.time() - _reopen_memo["at"] > 60 or _reopen_memo["v"] is None:
-        from pa.config import load_timetable
-        try:
-            m = float((load_timetable().get("dashboard") or {}).get("reopen_minutes", 3))
-        except (TypeError, ValueError):
-            m = 3
-        _reopen_memo.update(at=time.time(), v=max(0, m))
-    return _reopen_memo["v"]
-
-
 def dash_mode():
     """대시보드를 어디에: 'vscode' (VSCode 안 탭, 비서 확장이 엶) | 'app' (Edge 앱 창). config dashboard.mode"""
     from pa.config import load_timetable
@@ -305,27 +290,9 @@ def dash_mode():
     return m if m in ("vscode", "app") else "vscode"
 
 
-def start_vscode_ok():
-    from pa.config import load_timetable
-    return bool((load_timetable().get("dashboard") or {}).get("start_vscode", True))
-
-
-def dash_paused():
-    """대시보드에서 '오늘은 다시 열지 않기' 를 눌렀나."""
-    conn = db.connect()
-    try:
-        return db.get_meta(conn, "dash_pause") == now().date().isoformat()
-    finally:
-        conn.close()
-
-
-VIEWER_WINDOW = 180  # 숨기거나 최소화한 창은 브라우저가 신호를 1분에 한 번쯤으로 늦추므로 넉넉하게
-WIN = {"missing_since": None, "tick": time.time()}
-
-
 def open_dashboard(reason=""):
-    """mode=vscode: VSCode 가 켜져 있으면 안 탭(확장에게 요청). 꺼져 있으면 아무것도 안 함 (닫은 뜻 존중).
-    mode=app: Edge 앱 창."""
+    """bin/pa open 등 직접 열 때. mode=vscode: VSCode 가 켜져 있으면 안 탭(확장에게 요청 — 비서 폴더 창이 먼저).
+    꺼져 있으면 아무것도 안 함. mode=app: Edge 앱 창."""
     if dash_mode() == "vscode":
         if server.vscode_alive() and server.request_open():
             log(f"대시보드 탭 열기 (VSCode 안){' — ' + reason if reason else ''}")
@@ -334,48 +301,17 @@ def open_dashboard(reason=""):
     osutil.open_app(f"http://localhost:{server.PORT}/")
 
 
-def _keep_window(serving):
-    """창은 늘 하나: 신호를 보내는 대시보드 창이 reopen_minutes 동안 없으면 앱 창을 연다.
-    PC 가 잠들었다 깬 직후(루프가 1분 넘게 멈췄던 때)는 창이 신호를 다시 보낼 시간을 준다."""
-    t = time.time()
-    gap, WIN["tick"] = t - WIN["tick"], t
-    mins = reopen_minutes()
-    if not serving or not mins:
-        return
-    if (dash_mode() == "vscode" and time.time() - server.VSCODE_NEW["at"] < 60 and not server.viewer_count()
-            and t - server.VSCODE_NEW["at"] > 8 and not dash_paused()):  # VSCode 를 막 열었는데 탭이 없음 → 바로
-        server.VSCODE_NEW["at"] = 0
-        open_dashboard("VSCode 를 열어서")
-        return
-    if gap > 60 or server.viewer_count(VIEWER_WINDOW):
-        WIN["missing_since"] = None if server.viewer_count(VIEWER_WINDOW) else t
-        return
-    if WIN["missing_since"] is None:
-        WIN["missing_since"] = t
-    elif t - WIN["missing_since"] >= mins * 60 and not dash_paused():
-        open_dashboard(f"창이 {mins:g}분 동안 없어서")
-        WIN["missing_since"] = t  # 열리지 않았으면 다음 주기에 다시
-
-
 def _wait_for_window():
     """창이 먼저: 대시보드 탭이 신호를 보낼 때까지(최대 STARTUP_WAIT초) 기다린 뒤 최신화를 시작한다.
-    VSCode 없이 켰으면 창이 없으니 STARTUP_WAIT 뒤에 그냥 시작."""
+    VSCode 없이 켰으면 창이 없으니 STARTUP_WAIT 뒤에 그냥 시작. 창을 다시 열어 지키지는 않는다 (2026-11-23 사용자가 뺌)."""
     end = time.time() + STARTUP_WAIT
     while time.time() < end:
         if server.viewer_count():
             time.sleep(WINDOW_GRACE)
             return
         time.sleep(1)
-    if reopen_minutes() and not dash_paused():  # VSCode 없이 켬(로그온) → 창을 직접 연다
-        if dash_mode() == "vscode" and not server.vscode_alive():
-            if start_vscode_ok():
-                log("켤 때 VSCode 가 없어서 비서 폴더로 VSCode 를 엽니다 (대시보드는 그 안 탭으로)")
-                try:
-                    osutil.launch_vscode(ROOT)
-                except Exception as e:
-                    log(f"⚠️ VSCode 열기 실패: {e}")
-        else:
-            open_dashboard("켤 때 창이 없어서")
+    if dash_mode() == "app":  # 앱 창 모드: 켤 때 창이 없으면 한 번 연다 (VSCode 모드는 비서 폴더 창의 확장이 엶)
+        open_dashboard("켤 때 창이 없어서")
 
 
 def _was_restart():
@@ -503,7 +439,6 @@ def watch():
             if time.time() - last_code >= 5:
                 last_code = time.time()
                 _restart_if_code_changed(code_state)
-                _keep_window(serving)
             if time.time() - last_open >= AUTOOPEN_EVERY:
                 last_open = time.time()
                 _safe(_auto_open)

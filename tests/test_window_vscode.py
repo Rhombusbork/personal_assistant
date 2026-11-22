@@ -17,3 +17,4 @@ def test_vscode_mode_requests_tab_only_when_vscode_alive(monkeypatch):
     server.OPEN_REQ["served"] = first + 1                           # 확장이 방금 가져감
     pipeline.open_dashboard("또")
     assert server.OPEN_REQ["at"] == first                           # 20초 안 두 번째 요청은 무시 (탭 중복 방지)
+

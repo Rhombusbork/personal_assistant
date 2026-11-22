@@ -91,15 +91,20 @@ def remote_hosts():
         _remote_memo.update(at=time.time(), hosts={x for h in names for x in (h, f"{h}:443", f"{h}:{PORT}")})
     return _remote_memo["hosts"]
 VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
-FIRST_SEEN = {}  # 대시보드 탭 id → 처음 신호 시각 (먼저 열린 창이 '원래 창')
 VSCODE = {}      # VSCode 창 id (비서 확장) → 마지막 신호 시각
-VSCODE_NEW = {"at": 0}            # 새 VSCode 창이 처음 신호를 보낸 시각 (켤 때 안 탭을 바로 열게)
+VSCODE_HOME = {}                  # VSCode 창 id → 비서 폴더를 연 창인가 (bin/pa open 요청은 이 창이 먼저)
 OPEN_REQ = {"at": 0, "served": 0}  # 안 탭 열기 요청 (확장 하나가 가져가면 끝)
 
 
 def vscode_alive(window=30):
     cutoff = time.time() - window
     return any(t >= cutoff for t in VSCODE.values())
+
+
+def is_home(paths):
+    """확장이 알려 준 창의 폴더(uri.path) 중에 이 엔진의 폴더가 있나 (WSL '/home/…' · Windows '/c:/…')."""
+    mine = ROOT.resolve().as_posix().lstrip("/").lower()
+    return any(str(p).lstrip("/").rstrip("/").lower() == mine for p in paths or [])
 
 
 def request_open():
@@ -115,14 +120,6 @@ _DETACH = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if osutil.IS_WI
 def viewer_count(window=45):
     cutoff = time.time() - window
     return sum(1 for t in VIEWERS.values() if t >= cutoff)
-
-
-def is_duplicate(vid, window=45):
-    """이 탭보다 먼저 열려 지금도 신호를 보내는 대시보드 탭이 있나 → 이 탭은 겹친 창.
-    (VSCode 가 다시 열 때 뒤에 숨은 채 복원된 탭은 눌러 보기 전까지 신호를 못 보내서, 새 탭이 또 열릴 수 있다)"""
-    cutoff = time.time() - window
-    mine = FIRST_SEEN.get(vid, time.time())
-    return any(v != vid and t >= cutoff and FIRST_SEEN.get(v, 0) < mine for v, t in VIEWERS.items())
 
 
 def parse_add(body):
@@ -254,21 +251,25 @@ class Handler(SimpleHTTPRequestHandler):
                 conn.close()
         if self.path.startswith("/api/viewers"):
             return self._json(200, {"count": viewer_count(), "vscode": vscode_alive()})
-        if self.path.startswith("/api/vscode"):  # 비서 VSCode 확장: 살아 있음 + '열어야 하나?'
-            w = parse_qs(urlparse(self.path).query).get("w", [""])[0][:40]
-            if w and w not in VSCODE:
-                VSCODE_NEW["at"] = time.time()
+        if self.path.startswith("/api/vscode"):  # 비서 VSCode 확장: 살아 있음 + 비서 폴더 창인가 + 'bin/pa open 이 열라고 했나?'
+            q = parse_qs(urlparse(self.path).query)
+            w = q.get("w", [""])[0][:40]
+            try:
+                home = is_home(json.loads(q.get("f", ["[]"])[0]))
+            except ValueError:
+                home = False
             if w:
-                VSCODE[w] = time.time()
-            go = OPEN_REQ["at"] > OPEN_REQ["served"]
+                VSCODE[w], VSCODE_HOME[w] = time.time(), home
+            cutoff = time.time() - 30
+            home_alive = any(VSCODE_HOME.get(k) and t >= cutoff for k, t in VSCODE.items())
+            go = OPEN_REQ["at"] > OPEN_REQ["served"] and (home or not home_alive)  # 비서 폴더 창이 있으면 그 창이 가져감
             if go:
                 OPEN_REQ["served"] = time.time()
-            return self._json(200, {"open": go})
+            return self._json(200, {"open": go, "home": home})
         if self.path.startswith(("/api/ping", "/api/bye")):  # 창 신호 (입력 중·메뉴 열림과 상관없이 30초마다) / 창 닫힘
             vid = "" if self._remote() else parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid and self.path.startswith("/api/ping"):
                 VIEWERS[vid] = time.time()
-                FIRST_SEEN.setdefault(vid, time.time())
             elif vid:
                 VIEWERS.pop(vid, None)
             return self._json(200, {"ok": True})
@@ -276,16 +277,13 @@ class Handler(SimpleHTTPRequestHandler):
             vid = "" if self._remote() else parse_qs(urlparse(self.path).query).get("v", [""])[0][:40]
             if vid:
                 VIEWERS[vid] = time.time()
-                FIRST_SEEN.setdefault(vid, time.time())
             conn = db.connect()
             try:
                 data = render.dashboard_data(conn)
             finally:
                 conn.close()
-            data["duplicate"] = bool(vid) and is_duplicate(vid)
             from pa import pipeline  # 같은 프로세스의 엔진 상태 (켤 때·⟳ 최신화 중인지)
             data["syncing"] = pipeline.STATE["full"]
-            data["reopen"] = {"minutes": pipeline.reopen_minutes(), "paused": pipeline.dash_paused(), "mode": pipeline.dash_mode()}
             return self._json(200, data)
         return super().do_GET()
 
@@ -343,7 +341,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/submit-check", "/api/submit", "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause",
+                            "/api/submit-check", "/api/submit", "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest",
                             "/api/open-request"):
                 out = self.side_action(action, body)
                 self._forward(action, body)
@@ -455,11 +453,6 @@ def side_action(action, body, remote=False, applied=None):
             if alive:
                 request_open()
             return {"ok": True, "vscode": alive}
-        if action == "/api/dash-pause":  # 창 자동으로 다시 열기: 오늘은 끄기 / 다시 켜기
-            from pa.model import now as _now
-            db.set_meta(conn, "dash_pause", _now().date().isoformat() if body.get("pause") else "")
-            conn.commit()
-            return {"ok": True}
         if action == "/api/folders":  # 기본 할 일 폴더 입력: 하위 폴더 추천 (Tab 완성)
             from pa import folders
             return {"ok": True, "items": folders.complete(body.get("text", ""))}

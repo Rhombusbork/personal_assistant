@@ -41,13 +41,11 @@ planner:
     quiz: 20
     assignment: 60
 
-# 대시보드 창: 열린 창이 없으면 몇 분 뒤 다시 연다 (0 이면 안 함). 대시보드 아래 '오늘은 끄기' 로 그날만 끌 수 있음
-#   mode: vscode = VSCode 안 탭 (비서 확장 필요: bin/pa vscode-ext). VSCode 가 켜져 있을 때만 열고, 켤 때(로그인) VSCode 가 없으면 start_vscode 이면 VSCode 를 연다
-#         app    = 주소창 없는 Edge 앱 창
+# 대시보드 창 — mode: vscode = VSCode 안 탭 (비서 확장 필요: bin/pa vscode-ext). 비서 폴더 창에서 처음 한 번 자동, 그 밖에는
+#   탭 줄 오른쪽 위 ✓ 버튼 · 상태 줄 '비서' · Ctrl+Alt+D. 닫아도 다시 열지 않음
+#                  app    = 주소창 없는 Edge 앱 창 (엔진을 켤 때 한 번)
 dashboard:
   mode: vscode
-  reopen_minutes: 3
-  start_vscode: true
 
 # Canvas 전체 확인 (새 과제·마감 변경·공지·강의 자료). 비서를 켤 때는 항상 하고, 켜 둔 동안은 이 간격마다 (0 이면 대시보드 ⟳ 누를 때만)
 canvas:

@@ -1,6 +1,7 @@
 """비서 대시보드 VSCode 확장(vscode-extension/)을 .vsix 로 묶어 설치한다 — `bin/pa vscode-ext`.
 
-확장은 VSCode 안 탭 담당: 10초마다 엔진에 살아 있음을 알리고, 엔진이 열라고 하면 대시보드를 Simple Browser 탭으로 연다.
+확장은 VSCode 안 탭 담당: 비서 폴더 창은 처음 한 번 자동으로, 그 밖에는 탭 줄 오른쪽 위 버튼 · 상태 줄 '비서' · Ctrl+Alt+D 로
+대시보드를 Simple Browser 탭으로 연다. 10초마다 엔진에 살아 있음과 창의 폴더를 알린다 (vscode-extension/extension.js).
 'ui' 확장이라 VSCode 본체(WSL 이면 Windows 쪽)에 설치한다 → 로컬·WSL 어느 창에서든 동작.
 node·vsce 없이 파이썬 zipfile 로 .vsix 를 만든다 (형식이 단순한 zip).
 """
@@ -19,7 +20,7 @@ OUT = ROOT / "data" / "pa-dashboard.vsix"
 CONTENT_TYPES = """<?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension=".json" ContentType="application/json"/><Default Extension=".js" ContentType="application/javascript"/>
-<Default Extension=".md" ContentType="text/markdown"/><Default Extension=".vsixmanifest" ContentType="text/xml"/>
+<Default Extension=".md" ContentType="text/markdown"/><Default Extension=".svg" ContentType="image/svg+xml"/><Default Extension=".vsixmanifest" ContentType="text/xml"/>
 </Types>"""
 
 

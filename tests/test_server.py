@@ -71,5 +71,25 @@ def test_standby_forwards_shared_inputs(srv, monkeypatch):
     monkeypatch.setattr(peer, "get", lambda: type("P", (), {"queue": lambda self, a, b: queued.append((a, b))})())
     port, _ = srv
     assert req(port, "POST", "/api/worklog/add", {"title": "복습", "minutes": 20})[0] == 200
-    req(port, "POST", "/api/dash-pause", {"paused": True})
+    req(port, "POST", "/api/open-request", {})
     assert queued == [("/api/worklog/add", {"title": "복습", "minutes": 20})]
+
+
+def test_vscode_open_request_goes_to_assistant_folder_window(srv):
+    """확장 신호: 비서 폴더 창인지 알려 주고, bin/pa open 요청은 비서 폴더 창이 살아 있으면 그 창만 가져간다."""
+    import time
+    import urllib.parse
+    from pa.config import ROOT
+    port, _ = srv
+    server.VSCODE.clear()
+    server.VSCODE_HOME.clear()
+
+    def ping(w, folder):
+        return req(port, "GET", f"/api/vscode?w={w}&f=" + urllib.parse.quote(json.dumps([folder])))[1]
+    assert ping("other", "/home/x/report")["home"] is False
+    assert ping("home", ROOT.resolve().as_posix())["home"] is True
+    server.OPEN_REQ.update(at=time.time(), served=0)
+    assert ping("other", "/home/x/report")["open"] is False   # 비서 폴더 창이 있으니 다른 창은 못 가져감
+    assert ping("home", ROOT.resolve().as_posix())["open"] is True
+    assert ping("home", ROOT.resolve().as_posix())["open"] is False  # 한 번만
+    assert server.is_home(["/" + ROOT.resolve().as_posix().lstrip("/").upper()])  # Windows 의 '/C:/…' 꼴·대소문자
