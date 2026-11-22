@@ -404,6 +404,7 @@ PC 에서 도는 Claude Code 세션을 휴대폰 Claude 앱 › **Code** 에서 
 | `bin/pa task <키>` | 한 항목: 마감·주소·Canvas 과제 설명·보고서 파일 이름·연결된 자료 |
 | `bin/pa links [키]` / `link <키> <파일>…` / `unlink <키> <파일>…` | 연결된 자료 보기·연결·빼기 |
 | `bin/pa submit <키> [파일] [--yes]` | Canvas 과제에 파일 제출 (아래 '과제 제출') |
+| `bin/pa power …` | PC 전원 시험: 설정 보기 · 깨우기 예약 후 절전(`test-wake 3`) · 결과(`results`) · 절전(`sleep`) · 매직 패킷(`wol`) — 절차는 `docs/week-grid-plan.md` 3-5-1 |
 | `bin/pa notices [--all]` | 읽지 않은 공지 (`--all` 최근 2주 전부) |
 | `bin/pa done/ignore/unignore <키>` | 완료 / 계속 제외 / 제외 취소 |
 | `bin/pa time <키> <분>` | 예상 소요 시간 조정 |

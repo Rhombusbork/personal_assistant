@@ -365,6 +365,9 @@ def main():
         from pa import lectures
         sys.argv = [sys.argv[0]] + sys.argv[2:]
         return lectures.main()
+    if len(sys.argv) > 1 and sys.argv[1] == "power":
+        from pa import power
+        return power.main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "timetable":
         from pa import portal
         return portal.main(sys.argv[2:])
