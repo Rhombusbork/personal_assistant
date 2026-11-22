@@ -19,6 +19,7 @@ POST /api/open       항목의 Canvas 페이지를 평소 브라우저로 열기
 POST /api/sync       Canvas 까지 전체 동기화 (뒤에서 실행)
 GET  /api/links?key=…  📄 자료 창: 연결된 자료 + 추천 + 시작 폴더 (config/materials.yaml 범위)
 GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일 이름·있는지 · 저장한 작성 지침
+POST /api/submit-check, /api/submit  📤 Canvas 제출: 확인만 / 확인 후 제출 (휴대폰 대기열로도 — pa/submit.py)
 POST /api/report-pdf  보고서 .md → A4 PDF (쪽수 알려 줌) → 탐색기에서 선택해 보여 줌 / POST /api/reveal 탐색기에서 위치 보기
 POST /api/workspace  🗂 VSCode 새 창: 과제 → ~/report + 보고서 파일 / 강의 → ~/study_system + 맞는 노트
 POST /api/report-brief, /api/report-file   작성 지침 저장 / Claude 없이 규칙 이름의 빈 파일 만들고 열기
@@ -63,7 +64,7 @@ _remote_memo = {"at": 0.0, "hosts": set()}
 PC_ONLY = {"/api/open", "/api/open-quiz", "/api/notice/open", "/api/open-file", "/api/reveal", "/api/workspace",
            "/api/default-open", "/api/browser-login", "/api/google-login", "/api/open-request"}
 # GitHub 휴대폰 화면이 대기열(phone-inbox)로 맡길 수 있는 요청
-PHONE_ACTIONS = {"/api/sync", "/api/job/report", "/api/job/summary-for", "/api/job/notices", "/api/notice/read"}
+PHONE_ACTIONS = {"/api/sync", "/api/job/report", "/api/job/summary-for", "/api/job/notices", "/api/notice/read", "/api/submit"}
 
 
 def tailscale_name():
@@ -342,7 +343,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause",
+                            "/api/submit-check", "/api/submit", "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest", "/api/dash-pause",
                             "/api/open-request"):
                 out = self.side_action(action, body)
                 self._forward(action, body)
@@ -409,6 +410,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def side_action(self, action, body):
         return side_action(action, body, self._remote(), self._applied)
+
+
+def pdf_pages(path):
+    from pa import pdf
+    return pdf.pages(path) if str(path).lower().endswith(".pdf") else None
 
 
 def side_action(action, body, remote=False, applied=None):
@@ -489,6 +495,21 @@ def side_action(action, body, remote=False, applied=None):
             path = jobs.blank_report(conn, body["key"])
             materials.open_window(jobs.REPORT_DIR, path)
             return {"ok": True, "message": f"report 폴더를 VSCode 새 창으로 열었습니다 ({path.name})"}
+        if action in ("/api/submit-check", "/api/submit"):  # 📤 Canvas 제출 (pa/submit.py: 확인 → PDF → 올리기 → 다시 읽어 확인)
+            from pa import submit
+            try:
+                if action == "/api/submit-check":
+                    c = submit.check(conn, body["key"])
+                    f = c["file"]
+                    return {"ok": True, "name": c["name"], "file": f.name, "path": str(f), "remake": c["remake"],
+                            "pages": pdf_pages(f) if f.exists() and not c["remake"] else None,
+                            "attempt": c["attempt"], "allowed": c["allowed"], "previous": c["previous"],
+                            "due": c["due"].isoformat() if c["due"] else None, "problems": c["problems"], "notes": c["notes"]}
+                r = submit.submit(conn, body["key"], reveal=not remote)
+            except (submit.SubmitError, RuntimeError, OSError) as e:  # Canvas 토큰 만료·연결 실패도 화면에 글로
+                raise ValueError(str(e)) from None
+            return {"ok": True, **r, "message": f"제출됨: {r['name']} ({r['attempt']}번째" + (", 늦은 제출" if r["late"] else "")
+                    + ") — Canvas 에서 다시 확인함" + ("" if remote else " · 탐색기에 띄움")}
         if action == "/api/report-pdf":  # .md → 제출용 PDF (Claude 안 씀) → 탐색기에서 보여 줌
             from pa import pdf
             row = conn.execute("SELECT * FROM tasks WHERE key = ?", (body["key"],)).fetchone()

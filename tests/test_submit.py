@@ -15,6 +15,7 @@ def conn(tmp_path, monkeypatch):
     c = db.connect()
     db.sync_source(c, "canvas", [{"key": "a9", "kind": "assignment", "course": "약학실습Ⅱ 1", "title": "12주차 결과보고서",
                                   "due": "2099-01-01T11:00:00+09:00", "earliest": None, "minutes": 60, "url": URL}])
+    c.commit()
     return c
 
 
@@ -108,3 +109,18 @@ def test_unverified_is_not_marked_done(conn, fake, tmp_path, monkeypatch):
         submit.submit(conn, "a9", str(f), reveal=False)
     assert conn.execute("SELECT status FROM tasks WHERE key='a9'").fetchone()[0] == "open"
     assert submit.recent(conn) == []
+
+
+def test_server_check_then_submit_and_phone_queue(conn, fake, tmp_path, monkeypatch):
+    """대시보드 📤: 확인(아무것도 안 보냄) → 제출. 휴대폰 대기열로도 같은 요청이 된다. 막히면 글로 된 오류."""
+    from pa import jobs, server
+    f = tmp_path / "r.pdf"
+    f.write_bytes(b"%PDF /Type /Page x")
+    monkeypatch.setattr(jobs, "report_path", lambda t, c=None: f)
+    c = server.side_action("/api/submit-check", {"key": "a9"}, remote=True)
+    assert c["file"] == "r.pdf" and c["pages"] == 1 and c["problems"] == [] and fake["uploads"] == []
+    assert "/api/submit" in server.PHONE_ACTIONS
+    r = server.side_action("/api/submit", {"key": "a9"}, remote=True)  # remote: 탐색기 안 띄움
+    assert r["ok"] and r["attempt"] == 2 and "제출됨" in r["message"]
+    with pytest.raises(ValueError, match="이미 같은 파일"):
+        server.side_action("/api/submit", {"key": "a9"}, remote=True)
