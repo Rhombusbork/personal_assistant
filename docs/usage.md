@@ -176,6 +176,12 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - inbox 할 일은 inbox.md 줄의 할 시간(`>…`)으로 적히고, Canvas 항목은 `data/pa.db` 의 slots 표에 (Canvas 확인이 덮어쓰지 않음).
 - 나눈 조각(… (2/3)) 하나만 옮기면 그 조각만 고정, 나머지는 자동. 정한 시간이 지나도 안 끝났으면 다시 자동 배치.
 
+## 고급 예약 (`pa/schedules.py`) — 엔진 쪽만 완성, 화면은 다음 작업
+
+- 정한 시각에: AI 에게 지시(읽기만, 답은 `data/ai-results/` 파일 → 🤖 작업 칸) · 할 일 열기(강의 ▶) · 보고서 초안 · 자료 내용정리 ·
+  새 공지 정리 · Canvas 전체 확인 · 학교 시간표 읽기 · 링크·폴더 열기 · PC 깨어 있기. 반복: 한 번 · 매일 · 매주.
+- 엔진이 30초마다 확인 (일하는 PC 만). 15분 넘게 늦으면 건너뛰고 기록. 예약 5분 전에 PC 를 절전에서 깨운다 (`power`, 아래).
+
 ## 계획 시간 자동 열기 (`auto_open`)
 
 '학습 계획' 블록이 시작되면 엔진이 그 일을 PC 에서 열어 준다 (까먹지 않게). PC 가 켜져 있을 때만 — 꺼져 있으면

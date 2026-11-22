@@ -7,6 +7,7 @@ busy    계획 기간의 대면 수업·약속 (시각화용)
 sessions 실제로 한 시간 기록 (⏱) — 예상 시간 보정에 쓴다
 jobs    에이전트 작업 대기열과 결과 (🤖 작업 칸)
 notices Canvas 과목 공지
+schedules 고급 예약 (AI 지시 · 만들어 둔 기능 · PC 깨어 있기 — pa/schedules.py)
 slots   직접 정한 할 시간 (시간 정하기 · 시간표에서 끌어 옮기기) — 계획기가 옮기지 않고, 수업·다른 일과 겹쳐도 됨
 """
 import json
@@ -89,6 +90,18 @@ CREATE TABLE IF NOT EXISTS slots (              -- 직접 정한 할 시간. 계
   start TEXT NOT NULL,
   end TEXT NOT NULL,
   part INTEGER NOT NULL DEFAULT 0,              -- 0 = 그 일 전체를 이 시간에 (자동 배치 안 함) / n = 나눈 조각 하나만 옮김 (나머지는 자동)
+  created TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS schedules (          -- 고급 예약: 정한 시각에 AI 지시·만들어 둔 기능 (pa/schedules.py)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  start TEXT NOT NULL,                          -- 첫 회 시작 (반복이면 이 요일·시각으로)
+  end TEXT NOT NULL,
+  every TEXT NOT NULL DEFAULT '',               -- '' | daily | weekly
+  action TEXT NOT NULL,
+  args TEXT NOT NULL DEFAULT '{}',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_run TEXT,                                -- 마지막으로 실행(또는 건너뛴) 회차의 시작
   created TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS worklog (            -- 한 일 기록 (직접 적은 것: 무엇을 · 몇 분)

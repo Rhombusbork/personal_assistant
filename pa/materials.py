@@ -37,7 +37,8 @@ def course_dirs(course_name):
 
 def allowed_roots():
     cfg = _cfg()
-    return [cfg["root"].resolve(), (Path.home() / "report").resolve()]
+    from pa.config import ROOT  # 고급 예약 'AI 에게 지시'의 답 (data/ai-results)
+    return [cfg["root"].resolve(), (Path.home() / "report").resolve(), (ROOT / "data" / "ai-results").resolve()]
 
 
 def clues(title):

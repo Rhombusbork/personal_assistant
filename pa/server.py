@@ -22,6 +22,7 @@ GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일
 POST /api/submit-check, /api/submit  📤 Canvas 제출: 확인만 / 확인 후 제출 (휴대폰 대기열로도 — pa/submit.py)
 POST /api/submit-confirm {key} 자동 제출한 것 ✅ 완성 / POST /api/autosubmit {key, on} 과제마다 자동 제출 켜기·끄기 (pa/autosubmit.py)
 POST /api/move {key, start, end} 시간 정하기·옮기기 (겹쳐도 됨) / POST /api/unslot {key} 자동 배치로 되돌리기
+POST /api/schedule/save|delete|move|run  고급 예약 (AI 지시 · 만들어 둔 기능 · PC 깨어 있기 — pa/schedules.py)
 POST /api/report-pdf  보고서 .md → A4 PDF (쪽수 알려 줌) → 탐색기에서 선택해 보여 줌 / POST /api/reveal 탐색기에서 위치 보기
 POST /api/workspace  🗂 VSCode 새 창: 과제 → ~/report + 보고서 파일 / 강의 → ~/study_system + 맞는 노트
 POST /api/report-brief, /api/report-file   작성 지침 저장 / Claude 없이 규칙 이름의 빈 파일 만들고 열기
@@ -395,7 +396,8 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/notice/read", "/api/notice/open", "/api/suggest/dismiss", "/api/browser-login", "/api/open-quiz",
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
-                            "/api/submit-check", "/api/submit", "/api/submit-confirm", "/api/autosubmit", "/api/defaults", "/api/default-open", "/api/folders", "/api/folder-suggest",
+                            "/api/submit-check", "/api/submit", "/api/submit-confirm", "/api/autosubmit", "/api/defaults",
+                            "/api/schedule/save", "/api/schedule/delete", "/api/schedule/move", "/api/schedule/run", "/api/default-open", "/api/folders", "/api/folder-suggest",
                             "/api/open-request"):
                 out = self.side_action(action, body)
                 self._forward(action, body)
@@ -559,6 +561,31 @@ def side_action(action, body, remote=False, applied=None):
                 raise ValueError(str(e)) from None
             return {"ok": True, **r, "message": f"제출됨: {r['name']} ({r['attempt']}번째" + (", 늦은 제출" if r["late"] else "")
                     + ") — Canvas 에서 다시 확인함" + ("" if remote else " · 탐색기에 띄움")}
+        if action.startswith("/api/schedule/"):  # 고급 예약: 저장 · 지우기 · 옮기기 · 지금 실행 (pa/schedules.py)
+            from pa import schedules
+            sid = int(body.get("id") or 0)
+            if action == "/api/schedule/save":
+                body = {**body, "start": when(body["start"]).isoformat(), "end": when(body["end"]).isoformat()}
+                sid = schedules.save(conn, body)
+                msg = "예약했어요"
+            elif action == "/api/schedule/delete":
+                schedules.delete(conn, sid)
+                msg = "예약을 지웠어요"
+            elif action == "/api/schedule/move":
+                schedules.move(conn, sid, when(body["start"]), when(body["end"]), when(body["orig"]) if body.get("orig") else None)
+                msg = "예약을 옮겼어요" + (" (반복 예약은 모든 회차를 같이)" if (schedules.get(conn, sid) or {}).get("every") else "")
+            elif action == "/api/schedule/run":
+                r = schedules.get(conn, sid)
+                if not r:
+                    raise ValueError("예약이 없어요")
+                from pa.model import now as _now
+                what = schedules.run_action(conn, r, _now())
+                db.log(conn, "schedule_run", f"s{sid}", title=r["title"], result=str(what)[:200], manual=True)
+                msg = f"지금 실행: {what}"
+            else:
+                raise ValueError("없는 요청")
+            conn.commit()
+            return {"ok": True, "message": msg, "id": sid}
         if action in ("/api/submit-confirm", "/api/autosubmit"):  # 자동 제출: ✅ 완성(확인) / 과제마다 켜기·끄기
             from pa import autosubmit
             if action == "/api/submit-confirm":

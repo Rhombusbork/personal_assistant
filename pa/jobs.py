@@ -74,7 +74,7 @@ def run_next(conn, quick=False):
         result = {"report": report_job, "report-force": lambda c, j: report_job(c, j, force=True),
                   "report-auto": lambda c, j: report_job(c, j, show=False),
                   "report-submit": lambda c, j: report_job(c, j, show=False, fill=True),  # 자동 제출용: 빈칸 없이
-                  "notices": notices_job, "summary": summary_job,
+                  "notices": notices_job, "summary": summary_job, "prompt": _prompt_job,
                   "quizhelp": quizhelp.job}[row["kind"]](conn, row)
         _update(conn, row["id"], status="done", step="완료", result=str(result))
         db.log(conn, "job_done", row["key"], kind=row["kind"], result=str(result))
@@ -83,6 +83,11 @@ def run_next(conn, quick=False):
         db.log(conn, "job_failed", row["key"], kind=row["kind"], error=str(e)[:200])
     conn.commit()
     return True
+
+
+def _prompt_job(conn, job):
+    from pa import schedules  # 고급 예약의 'AI 에게 지시'
+    return schedules.prompt_job(conn, job)
 
 
 def reset_stuck(conn):

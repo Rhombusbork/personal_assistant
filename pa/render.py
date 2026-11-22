@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pa import ai, autosubmit, calibrate, db, jobs, materials, quiz, submit
+from pa import ai, autosubmit, calibrate, db, jobs, materials, quiz, schedules, submit
 from pa.config import ROOT, load_timetable
 from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
@@ -269,6 +269,10 @@ def dashboard_data(conn):
         "submissions": [dict(x, course=short_course(x["course"])) for x in submit.recent(conn)],  # 제출 기록 (휴대폰에서도 확인)
         "reviews": autosubmit.reviews(conn),          # 자동으로 냈고 ✅ 완성을 기다리는 것
         "autoSubmits": autosubmit.upcoming(conn, t_now),  # 자동 제출 예정·결과
+        "schedules": schedules.listing(conn, t_now),       # 고급 예약 목록
+        "scheduleBlocks": schedules.blocks(conn, t_now - timedelta(days=t_now.weekday() + 7), t_now + timedelta(days=28)),
+        "scheduleMeta": {"actions": schedules.ACTIONS, "every": schedules.EVERY, "folders": list(schedules.folders()),
+                         "needsTask": sorted(schedules.NEEDS_TASK)},
     }
 
 

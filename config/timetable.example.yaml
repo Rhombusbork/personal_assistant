@@ -91,3 +91,14 @@ reminders:
   # 마감 직전 촘촘한 알림: N분 전부터 M분마다 (0 이면 끔, 최대 60분). 같은 때 마감은 알림 하나로 합친다
   dense_from_minutes: 0
   dense_every_minutes: 2
+
+# PC 전원 (pa/power.py) — 내가 정한 예약(고급 예약·시간을 정한 강의/퀴즈/과제) wake_before_minutes 분 전에 절전에서 깨운다
+#   (Windows 작업 스케줄러 'PA-Wake', 깨면 10분 동안 절전하지 않음). 전원 옵션 '절전 모드 해제 타이머 허용'이 '사용'이어야 함
+power:
+  wake_for_reservations: true
+  wake_before_minutes: 5
+
+# 고급 예약 'AI 에게 지시'의 작업 폴더 (없으면 비서·study_system·report·퀴즈·hra 중 있는 것). AI 는 읽기만, 답은 data/ai-results/
+# schedules:
+#   folders:
+#     공부: ~/study_system

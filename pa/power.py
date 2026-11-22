@@ -140,6 +140,81 @@ def wol(mac, to="255.255.255.255"):
     print(f"매직 패킷 보냄 → {mac} ({to}, 포트 9·7)" if ok else "보내지 못함: " + out)
 
 
+# ---- 예약과 함께 (P8): 예약 시각 전에 깨우기 · 그동안 깨어 있기 ------------------------------------------------
+
+WAKE_TASK = "PA-Wake"
+AWAKE = ("Add-Type -Name P -Namespace W -MemberDefinition "
+         "'[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f);';"
+         "[W.P]::SetThreadExecutionState(0x80000001) | Out-Null; Start-Sleep -Seconds {secs};"  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+         "[W.P]::SetThreadExecutionState(0x80000000) | Out-Null")
+
+
+def keep_awake(minutes):
+    """그 시간 동안 절전하지 않게 — 숨은 PowerShell 이 잡고 있다가 끝나면 놓는다 (화면은 꺼져도 됨). Windows·WSL 만."""
+    import subprocess
+    if not (osutil.IS_WINDOWS or osutil.IS_WSL) or minutes <= 0:
+        return False
+    exe = "powershell.exe" if osutil.IS_WSL else "powershell"
+    subprocess.Popen([exe, "-NoProfile", "-WindowStyle", "Hidden", "-Command", AWAKE.format(secs=int(minutes) * 60)],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=not osutil.IS_WINDOWS,
+                     **({"cwd": "/mnt/c"} if osutil.IS_WSL else {}))
+    return True
+
+
+def cfg():
+    from pa.config import load_timetable
+    return {"wake_for_reservations": True, "wake_before_minutes": 5, **(load_timetable().get("power") or {})}
+
+
+def wake_times(conn, t_now=None, days=7):
+    """깨울 시각: 내가 정한 것만 — 고급 예약 회차 + 시간을 정한 강의·퀴즈·과제 (계획기가 자동으로 넣은 블록은 빼고)."""
+    from datetime import timedelta
+    from pa import db, schedules
+    from pa.model import now, parse_dt
+    t_now = t_now or now()
+    before = timedelta(minutes=float(cfg()["wake_before_minutes"]))
+    until = t_now + timedelta(days=days)
+    starts = [parse_dt(b["start"]) for b in schedules.blocks(conn, t_now, until)]
+    for r in db.slots(conn, after=t_now):
+        row = conn.execute("SELECT kind FROM tasks WHERE key = ? AND status = 'open'", (r["key"],)).fetchone()
+        if row and row["kind"] in ("lecture", "quiz", "assignment", "review"):
+            starts.append(parse_dt(r["start"]))
+    return sorted({s - before for s in starts if s - before > t_now + timedelta(minutes=1)})[:40]
+
+
+def register_wakes(times):
+    """깨우기 작업을 그 시각들로 (없으면 지움). 깨면 숨은 스크립트가 10분 동안 절전을 막는다."""
+    if not times:
+        _ps(f"Unregister-ScheduledTask -TaskName '{WAKE_TASK}' -Confirm:$false -ErrorAction SilentlyContinue")
+        return
+    trig = ", ".join(f"(New-ScheduledTaskTrigger -Once -At '{t:%Y-%m-%dT%H:%M:%S}')" for t in times)
+    ok, out = _ps(
+        "$f = Join-Path $env:LOCALAPPDATA 'pa-awake.ps1'\n"
+        "@'\n" + AWAKE.format(secs=600) + "\n'@ | Set-Content -Path $f -Encoding UTF8\n"
+        f"$t = @({trig})\n"
+        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"' + $f + '\"')\n"
+        "$s = New-ScheduledTaskSettingsSet -WakeToRun -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries\n"
+        f"Register-ScheduledTask -TaskName '{WAKE_TASK}' -Action $a -Trigger $t -Settings $s -Force | Out-Null; 'ok'")
+    if not ok or not out.endswith("ok"):
+        raise RuntimeError("깨우기 작업을 만들지 못함: " + out[-200:])
+
+
+def sync_wakes(conn):
+    """작업 스케줄러 'PA-Wake' 를 깨울 시각들로 맞춘다 (바뀌었을 때만). 깨면 10분 동안 절전하지 않아 엔진이 예약을 실행한다."""
+    import hashlib
+    from pa import db
+    if not (osutil.IS_WINDOWS or osutil.IS_WSL):
+        return None
+    times = wake_times(conn) if cfg()["wake_for_reservations"] else []
+    sig = hashlib.sha1(",".join(t.isoformat() for t in times).encode()).hexdigest()
+    if db.get_meta(conn, "wake_sig") == sig:
+        return None
+    register_wakes(times)
+    db.set_meta(conn, "wake_sig", sig)
+    conn.commit()
+    return len(times)
+
+
 def main(argv):
     a = argv[0] if argv else "status"
     if a == "status":

@@ -226,7 +226,7 @@ def _download_watcher():
 
 def _auto_open():
     """30초마다: 계획 시간 자동 열기 · 끝난 블록 확인 · 자동 제출 (일하는 PC 만)."""
-    from pa import autoopen, autosubmit
+    from pa import autoopen, autosubmit, power, schedules
     if not peer.is_leader():  # 두 PC 가 같이 켜져 있으면 일하는 PC 에서만 연다
         return
     conn = db.connect()
@@ -242,8 +242,23 @@ def _auto_open():
             autosubmit.sync_calendar(conn)  # 확인 알림 (바뀌었을 때만 Google 에)
         except Exception as e:
             log(f"자동 제출 확인 알림 실패 (다음에 다시): {str(e)[:100]}")
+        for sid, title, what in schedules.tick(conn, now()):  # 고급 예약
+            log(f"예약 실행: {title} — {what}")
+            STATE["job_done"] = True
+        if time.time() - _wake_memo["at"] > WAKE_EVERY:  # 예약 전에 PC 깨우기 (작업 스케줄러, 바뀌었을 때만)
+            _wake_memo["at"] = time.time()
+            try:
+                n = power.sync_wakes(conn)
+                if n is not None:
+                    log(f"예약 전 깨우기 {n}개로 맞춤")
+            except Exception as e:
+                log(f"⚠️ 예약 전 깨우기 실패: {str(e)[:120]}")
     finally:
         conn.close()
+
+
+_wake_memo = {"at": 0}
+WAKE_EVERY = 300
 
 
 def _quick_check():
