@@ -139,6 +139,20 @@ powershell -ExecutionPolicy Bypass -File "$HOME\personal_assistant\scripts\windo
 - 결과는 `data/pa.log`, 실패하면 대시보드·TODAY.md 에 "마지막 동기화 실패"
 - 지우기: 같은 폴더의 `unregister-task.ps1`
 
+## 두 번째 PC (복사해서 두 대 다 쓰기)
+
+WSL 을 통째로 복사해 두 대에서 쓴다. **엔진은 한 대(엔진 PC)만** — 둘 다 돌면 캘린더·휴대폰 화면을 서로 덮어쓴다.
+
+- 복사 (USB 없이, 같은 와이파이): `scripts/windows/wsl-send.ps1`·`wsl-receive.ps1` 을 Windows 폴더(예: `C:\pa-transfer`)에 복사 →
+  VSCode 를 닫고 엔진 PC 의 관리자 PowerShell 에서 `powershell -ExecutionPolicy Bypass -File C:\pa-transfer\wsl-send.ps1`.
+  비서를 잠시 멈추고 `wsl --export` → 다시 켜고 → 비밀 주소로 같은 와이파이에만 받기 서버를 열고, 받는 PC 에 칠 한 줄을 보여 준다.
+  받는 PC 는 그 한 줄로 받기·`wsl --import`·`.env` 에 `PA_ENGINE=off` 까지 (WSL 이 없으면 설치 → 재부팅 → 같은 한 줄 다시).
+  다 받으면 서버·방화벽 규칙을 닫고 복사본(비밀번호·토큰이 들어 있음)을 지운다
+- `.env` 의 `PA_ENGINE=off`: 그 PC 에서는 `watch`·`run`·`plan`·`timetable`·`sync-timetable` 이 그냥 끝난다 (VSCode 를 열어도 엔진이 안 켜짐).
+  작업 스케줄러 등록(`register-task.ps1`)도 하지 않는다
+- 두 번째 PC 에서: 일정·할 일은 휴대폰 화면(`pages_url`)에서. 공부·보고서·퀴즈는 시작할 때 `bin/pa pull`, 끝나면 커밋·push.
+  git 에 없는 것(강의 자료 `materials/`, `추가자료/`, Claude 대화 기록 `~/.claude/projects`)은 저절로 맞춰지지 않는다
+
 ## 계획 시간 자동 열기 (`auto_open`)
 
 '학습 계획' 블록이 시작되면 엔진이 그 일을 PC 에서 열어 준다 (까먹지 않게). PC 가 켜져 있을 때만 — 꺼져 있으면

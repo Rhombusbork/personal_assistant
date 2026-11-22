@@ -28,6 +28,7 @@
   bin/pa vscode-ext           비서 VSCode 확장 설치 (대시보드를 VSCode 안 탭으로 — 창 늘 하나·다시 열기)
 """
 import argparse
+import os
 import sys
 
 from pa import collect_canvas, db, inbox, pipeline, plan, render
@@ -261,7 +262,20 @@ def cmd_time(conn, args):
     print(f"{args.key} → {args.minutes}분")
 
 
+# .env 의 PA_ENGINE=off 인 PC(두 번째 노트북)에서 막는 명령 — 일정·캘린더·휴대폰 화면은 엔진 PC 한 대만 고친다
+ENGINE_ONLY = ("watch", "run", "plan", "timetable", "sync-timetable", "dashboard-check")
+
+
+def engine_off():
+    from pa import config
+    config.load_env()
+    return os.environ.get("PA_ENGINE", "").strip().lower() == "off"
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ENGINE_ONLY and engine_off():
+        print("이 PC 는 엔진을 끈 PC 입니다 (.env 의 PA_ENGINE=off) — 일정·할 일은 엔진 PC 나 휴대폰 화면에서")
+        sys.exit(1 if sys.argv[1] == "dashboard-check" else 0)  # 서버 대기는 실패로 → 대시보드 열기를 건너뜀
     for s in (sys.stdout, sys.stderr):  # Windows 콘솔·파이프에서도 한글·이모지가 깨지지 않게
         if s and hasattr(s, "reconfigure") and (s.encoding or "").lower().replace("-", "") != "utf8":
             s.reconfigure(encoding="utf-8", errors="replace")

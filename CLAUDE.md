@@ -34,6 +34,9 @@
 
 일정 관리는 코드가 자동으로 한다. Claude 는 직접 판단하기보다 아래 파일·명령을 쓴다.
 
+- **`.env` 에 `PA_ENGINE=off` 인 PC(두 번째 노트북)는 엔진을 안 돌린다** — `watch`·`run`·`plan`·시간표는 그냥 끝나고,
+  그 PC 의 `TODAY.md`·`inbox.md`·`data/` 는 복사한 날에 멈춘 것이다. 일정·할 일은 휴대폰 화면(`config/mobile.yaml` 의 `pages_url`)에서
+  보고 고친다. 공부·보고서·퀴즈는 그대로 하되 시작할 때 `bin/pa pull`, 끝나면 커밋·push (자세한 건 docs/usage.md '두 번째 PC')
 - **현황은 `TODAY.md` 를 읽는다** (감시기가 자동 갱신). 오래됐으면 `bin/pa run` (Canvas 까지면 `--full`).
 - **할 일 추가·완료·제외는 `inbox.md` 를 고친다** (문법은 docs/usage.md). 저장하면 감시기가 반영한다.
   감시기가 꺼져 있을 수 있으니 고친 뒤 `bin/pa run` 을 실행한다.
