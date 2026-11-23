@@ -178,6 +178,11 @@
   .cline .tx small { display: block; color: var(--text2); font-size: 13px; }
   .cline .tbtn { min-height: var(--hit); padding: 0 12px; }
   .cline.lateline { grid-template-columns: 20px minmax(0, 1fr); }
+  .cline > span:last-child:not(:empty) { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  @media (max-width: 600px) {  /* 휴대폰: 버튼은 글 아래 줄로 (글이 세로로 찌그러지지 않게) */
+    .cline { grid-template-columns: 20px minmax(0, 1fr); }
+    .cline > span:last-child:not(:empty) { grid-column: 2; justify-content: flex-start; margin-top: 6px; }
+  }
   .cline.lateline > span:last-child { grid-column: 2; }
   .lacts { display: flex; flex-wrap: wrap; gap: 0 2px; margin-left: -12px; }
   .lacts .tbtn { min-height: 36px; }
@@ -970,7 +975,7 @@ function critHtml(now) {
     L.push({ sev: 0, t: awake ? `🖥 PC 깨어 있음 · ${hm(pc.awakeUntil)} 까지` : pc.sleepAsked ? "🖥 PC 절전 요청 보냄" : age > 20 ? `🖥 PC 소식 ${age}분 전 — 절전 중일 수 있어요` : `🖥 PC 켜져 있음 (${age}분 전)`,
       s: `깨워 두기를 누르면 PC 가 다음 확인 때(충전 중이면 ${pc.checkEvery || 30}분 안) 깨어서 그 시간 동안 안 잠들어요 — Remote Control 쓸 때`,
       b: `<button class="tbtn" data-act="pc-awake" data-min="60">☀️ 1시간 깨워 두기</button><button class="tbtn" data-act="pc-awake" data-min="180">3시간</button>`
-       + `<button class="tbtn gray" data-act="pc-sleep">💤 절전</button>` });
+       + `<button class="tbtn" data-act="pc-wake-at">⏰ 켜기 예약</button><button class="tbtn gray" data-act="pc-sleep">💤 절전</button>` });
   }
   // 자동 제출 (먼저 내고 나중에 ✅ 완성): 확인할 것 · 못 낸 것 · 하루 안에 낼 것
   for (const r of D.reviews || [])
@@ -1614,7 +1619,7 @@ function schedListHtml() {
         <button class="tbtn gray" data-act="sched-del" data-id="${r.id}" data-label="지우기" aria-label="지우기: ${esc(r.title)}">✕</button></span>` : ""}</div>`).join("")
       || `<p class="empty">아직 없음 — ＋ 예약 추가 (예: 매주 토 9시 "이번 주 노트로 퀴즈 10문제")</p>`}</div></section>`;
 }
-function schedSheet(r, at) {  // r = 고칠 예약, at = 시간표에서 고른 시각
+function schedSheet(r, at, act0) {  // r = 고칠 예약, at = 시간표에서 고른 시각, act0 = 처음 고를 동작
   const M = D.scheduleMeta || { actions: {}, every: {}, folders: [], needsTask: [] }, a = r ? r.args : {};
   const st = r ? dt(r.start) : at || new Date(Math.ceil(Date.now() / 9e5) * 9e5), en = r ? dt(r.end) : new Date(st.getTime() + 30 * 6e4);
   const p2 = n => String(n).padStart(2, "0"), hmOf = d => `${p2(d.getHours())}:${p2(d.getMinutes())}`;
@@ -1627,7 +1632,7 @@ function schedSheet(r, at) {  // r = 고칠 예약, at = 시간표에서 고른 
         <input class="field" type="time" name="from" step="900" value="${hmOf(st)}" aria-label="시작"><span>~</span>
         <input class="field" type="time" name="to" step="900" value="${hmOf(en)}" aria-label="끝">
         <select class="field" name="every" aria-label="반복">${opts(M.every, r ? r.every : "")}</select></div>
-      <label class="fl">무엇을<select class="field" name="act">${opts(M.actions, r ? r.action : "prompt")}</select></label>
+      <label class="fl">무엇을<select class="field" name="act">${opts(M.actions, r ? r.action : act0 || "prompt")}</select></label>
       <div class="f-prompt"><label class="fl">AI 에게 할 말<textarea class="field" name="prompt" rows="4" placeholder="예) 이번 주 생화학 노트로 퀴즈 10문제 만들어줘">${esc(a.prompt || "")}</textarea></label>
         <label class="fl">작업 폴더 (그 폴더의 규칙을 따름)<select class="field" name="folder">${(M.folders || []).map(f => `<option ${f === a.folder ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></label>
         <p class="small">AI(${AI()})는 읽기만 해요. 답은 파일로 저장돼 🤖 작업 칸에서 열 수 있어요.</p></div>
@@ -2449,6 +2454,7 @@ document.addEventListener("click", async e => {
   $("ctx")?.remove();
   if (act === "popmenu") { openMenu(b, key); return; }
   if (act === "pc-awake") { await run(() => post("pc-awake", { minutes: +b.dataset.min }), `PC 에 깨워 두기 ${b.dataset.min}분 요청 — PC 가 확인하면 위에 '깨어 있음'`); return; }
+  if (act === "pc-wake-at") { schedSheet(null, null, "awake"); return; }  // 그 시각 5분 전에 깨우고 그동안 깨어 있기 (PC 가 다음 확인 때 예약을 받음)
   if (act === "pc-sleep") { if (confirm("PC 를 절전시킬까요? (진행 중인 AI 작업이 끝난 뒤)")) await run(() => post("pc-sleep", {}), "절전 요청 보냄"); return; }
   if (act === "memo-save") { const ta = $("sheet").querySelector("textarea[data-memo]"); await run(() => post("note", { key: b.dataset.key, memo: ta.value }), "메모 저장 — PC 가 반영하면 보여요"); return; }
   if (act === "habit-done") { await run(() => post("habit-done", { key }), "했음 — 그날은 끝"); return; }
