@@ -175,7 +175,7 @@ Wi-Fi 카드(Intel 8265)는 **'깨우기 가능 장치'** 이고 드라이버에
 | **P3 시간 정하기** ✅ 2026-11-23 | Canvas 항목에도 할 시간 고정 (`tasks.earliest/slot_end` 를 Canvas 확인이 덮어쓰지 않게), `POST /api/move`, ⋯ → "시간 정하기" | `pa/collect_canvas.py`, `pa/db.py`, `pa/server.py` | 강의를 원하는 시간에 → 기존 자동 열기·▶ 가 그 시각에 |
 | **P4 쉬운 예약** ✅ 2026-11-23 (종류별 기본 동작은 자동 열기 그대로 + 블록이 끝나면 수강·제출 바로 확인. 자료 미리 받기는 Canvas 확인이 이미 함) | 종류별 기본 동작 (3-2 표): 미리(초안·자료) / 시작(열기·재생) / 끝(수강 확인·남은 시간 다시) | `pa/autoopen.py`, `pa/jobs.py` | 시간만 정하면 다 함 |
 | P5 시간표 화면 | 1·2·3 장 (범위 자동·겹침·손잡이 끌기·되돌리기) | `dashboard/index.html` | 주차별 시간표 |
-| P6 고급 예약 — **엔진 쪽 ✅ 2026-11-23** (`pa/schedules.py`, `/api/schedule/*`, 30초마다 실행, 테스트), **화면 남음** | `schedules` 표 + "+ 예약 추가" 창 (AI 프롬프트 · 만들어 둔 기능 고르기 · 반복) + 엔진 실행기 | `pa/schedules.py`, `pa/db.py`, `pa/server.py`, 화면 | 아무 작업이나 시각 예약 |
+| **P6 고급 예약** ✅ 2026-11-23 (엔진 + 주차별 '예약' 칸·추가 창) | `schedules` 표 + "+ 예약 추가" 창 (AI 프롬프트 · 만들어 둔 기능 고르기 · 반복) + 엔진 실행기 | `pa/schedules.py`, `pa/db.py`, `pa/server.py`, 화면 | 아무 작업이나 시각 예약 |
 | **P7 자동 제출** ✅ 2026-11-23 | 먼저 자동 제출 → '확인 필요' 카드 + 휴대폰 알림 → 사용자 ✅ 완성 / 다시 제출 (3-3) | `pa/submit.py`, `pa/autoopen.py`, `pa/gcal.py` | 시간만 정하면 제출까지 |
 | P8 PC 전원 — **예약 전 깨우기·깨어 있기 ✅ 2026-11-23** (`pa/power.py` sync_wakes·keep_awake), 휴대폰 부분은 계획만 | ① 예약 깨우기("이때 켜져 있어" + 예약 5분 전) · 💤 휴대폰 절전 · ②-1 대기 PC 가 매직 패킷 대신 보내기 · ③ 주기적 깨기 | `pa/power.py`, `pa/mobile.py`, `config/power.example.yaml` | 3-5 |
 

@@ -287,6 +287,8 @@
   .sw:not(.ex) em { visibility: hidden; }
   .strip-note { font-size: 12px; color: var(--text3); margin: 0; }
   .kind-h { font-size: 13px; color: var(--text2); margin: var(--s2) 0 0; }
+  .schform .fl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text2); margin-top: 12px; }
+  .schform textarea { min-height: 84px; resize: vertical; font: inherit; }
 
   /* ---- 아래 접힌 것들 */
   .more { margin-top: var(--s6); border-top: 1px solid var(--line); }
@@ -1010,6 +1012,7 @@ function weekView(now, today) {
     <div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""} ${x.items.some(y => y.exam) ? "ex" : ""}" data-wk="${j}"
       title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}"><em></em><i style="height:${Math.max(3, Math.round(x.minutes / maxMin * 32))}px"></i><span>${j + 1}</span></button>`).join("")}</div>
     <p class="strip-note">막대 = 그 주에 남은 일의 양 · 빨간 점 = 시험</p></section>`;
+  h += schedListHtml();
 
   h += `<section class="sec"><div class="sec-h"><h2>날짜별 일정</h2><span class="aside">계획은 2주 앞까지</span></div><div class="rows">`;
   for (const d of days) {
@@ -1043,6 +1046,68 @@ function weekView(now, today) {
     <div class="done-l" style="padding-left:20px">${doneIts.map(x => `<div>${esc(x.title)}</div>`).join("")}</div></details>`;
   return h + `</div></section>`;
 }
+
+// ---- 고급 예약 (주차별): 정한 시각에 AI 지시 · 만들어 둔 기능 · PC 깨어 있기 (pa/schedules.py)
+const SCH_ICON = { prompt: "🤖", open_task: "▶", report_draft: "✍", summary: "📄", notices: "📢", sync: "⟳", timetable: "🗓", open_link: "🔗", awake: "☀️" };
+function schedLast(l) {
+  if (!l) return "";
+  if (l.type === "schedule_failed") return `<span class="late">실패 ${stamp(l.ts)}: ${esc(l.error || "")}</span>`;
+  if (l.type === "schedule_missed") return `건너뜀 ${stamp(l.ts)} (PC 가 늦게 깸)`;
+  return `마지막 ${stamp(l.ts)}${l.result ? " · " + esc(l.result) : ""}`;
+}
+function schedListHtml() {
+  const L = D.schedules || [];
+  if (!LIVE && !L.length) return "";
+  return `<section class="sec"><div class="sec-h"><h2>예약</h2><span class="aside">정한 시각에 비서가 실행 · 끝나면 결과가 여기에</span>
+    ${LIVE ? `<button class="tbtn" data-act="sched-new" data-label="예약 추가">＋ 예약 추가</button>` : ""}</div><div class="rows">
+    ${L.map(r => `<div class="citem"><span class="tx">${SCH_ICON[r.action] || "⏰"} ${esc(r.title)}<small>${[esc(r.actionName), r.everyName,
+      r.next ? `다음 ${label(ymd(r.next))} ${hm(r.next)}` : "끝남", schedLast(r.last)].filter(Boolean).join(" · ")}</small></span>
+      ${LIVE ? `<span class="ac"><button class="tbtn" data-act="sched-run" data-id="${r.id}" data-label="지금 실행">지금 실행</button>
+        <button class="tbtn" data-act="sched-edit" data-id="${r.id}" data-label="고치기">고치기</button>
+        <button class="tbtn gray" data-act="sched-del" data-id="${r.id}" data-label="지우기" aria-label="지우기: ${esc(r.title)}">✕</button></span>` : ""}</div>`).join("")
+      || `<p class="empty">아직 없음 — ＋ 예약 추가 (예: 매주 토 9시 "이번 주 노트로 퀴즈 10문제")</p>`}</div></section>`;
+}
+function schedSheet(r, at) {  // r = 고칠 예약, at = 시간표에서 고른 시각
+  const M = D.scheduleMeta || { actions: {}, every: {}, folders: [], needsTask: [] }, a = r ? r.args : {};
+  const st = r ? dt(r.start) : at || new Date(Math.ceil(Date.now() / 9e5) * 9e5), en = r ? dt(r.end) : new Date(st.getTime() + 30 * 6e4);
+  const p2 = n => String(n).padStart(2, "0"), hmOf = d => `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  const opts = (o, cur) => Object.entries(o).map(([k, v]) => `<option value="${esc(k)}" ${k === cur ? "selected" : ""}>${esc(v)}</option>`).join("");
+  const tasks = (D.tasks || []).filter(t => t.status === "open");
+  openSheet(sheetTop(r ? "예약 고치기" : "예약 추가", "정한 시각에 비서가 실행해요 — PC 가 켜져 있거나, 절전이면 5분 전에 깨워서") + `
+    <form data-form="sched" class="schform" data-id="${r ? r.id : ""}">
+      <label class="fl">이름<input class="field" name="t" value="${esc(r ? r.title : "")}" placeholder="비우면 하는 일 이름으로"></label>
+      <div class="frow" style="margin-top:12px"><input class="field" type="date" name="date" value="${ymdOf(st)}" aria-label="날짜">
+        <input class="field" type="time" name="from" step="900" value="${hmOf(st)}" aria-label="시작"><span>~</span>
+        <input class="field" type="time" name="to" step="900" value="${hmOf(en)}" aria-label="끝">
+        <select class="field" name="every" aria-label="반복">${opts(M.every, r ? r.every : "")}</select></div>
+      <label class="fl">무엇을<select class="field" name="act">${opts(M.actions, r ? r.action : "prompt")}</select></label>
+      <div class="f-prompt"><label class="fl">AI 에게 할 말<textarea class="field" name="prompt" rows="4" placeholder="예) 이번 주 생화학 노트로 퀴즈 10문제 만들어줘">${esc(a.prompt || "")}</textarea></label>
+        <label class="fl">작업 폴더 (그 폴더의 규칙을 따름)<select class="field" name="folder">${(M.folders || []).map(f => `<option ${f === a.folder ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></label>
+        <p class="small">AI(${AI()})는 읽기만 해요. 답은 파일로 저장돼 🤖 작업 칸에서 열 수 있어요.</p></div>
+      <div class="f-task"><label class="fl">할 일<select class="field" name="key">${tasks.map(t => `<option value="${esc(t.key)}" ${t.key === a.key ? "selected" : ""}>${esc((t.course ? t.course + " · " : "") + t.title)}</option>`).join("")}</select></label></div>
+      <div class="f-link"><label class="fl">링크 또는 폴더<input class="field" name="target" value="${esc(a.target || "")}" placeholder="https://… 또는 ~/폴더 (VSCode 새 창)"></label></div>
+      <div class="confirm-acts"><button class="btn" type="button" data-ui="sheetclose">취소</button><button class="btn primary" type="submit">${r ? "저장" : "예약"}</button></div>
+    </form>`);
+  schedShow();
+}
+function schedShow() {  // 고른 동작에 필요한 칸만
+  const f = document.querySelector('form[data-form="sched"]');
+  if (!f) return;
+  const act = f.elements.namedItem("act").value, need = (D.scheduleMeta || {}).needsTask || [];
+  f.querySelector(".f-prompt").hidden = act !== "prompt";
+  f.querySelector(".f-task").hidden = !need.includes(act);
+  f.querySelector(".f-link").hidden = act !== "open_link";
+}
+document.addEventListener("change", e => { if (e.target.form?.dataset.form === "sched" && e.target.name === "act") schedShow(); });
+document.addEventListener("submit", async e => {
+  if (e.target.dataset.form !== "sched") return;
+  e.preventDefault();
+  const f = e.target, v = n => (f.elements.namedItem(n) || {}).value || "", act = v("act");
+  const [start, end] = slotRange(v("date"), v("from"), v("to"));
+  const args = act === "prompt" ? { prompt: v("prompt"), folder: v("folder") } : act === "open_link" ? { target: v("target") }
+    : ((D.scheduleMeta || {}).needsTask || []).includes(act) ? { key: v("key") } : {};
+  if (await run(() => post("schedule/save", { id: f.dataset.id || null, title: v("t"), start, end, every: v("every"), action: act, args }), r => r.message)) closeSheet();
+});
 
 // ---- 맨 아래: 하고 싶은 일 · 제외한 것 · 통계 (모두 접힘)
 function moreHtml(now, today) {
@@ -1803,6 +1868,10 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "submit-ok") { closeSheet(); await run(() => post("submit", { key }), r => r.message); return; }
+  if (act === "sched-new") { schedSheet(null); return; }
+  if (act === "sched-edit") { schedSheet((D.schedules || []).find(r => String(r.id) === b.dataset.id)); return; }
+  if (act === "sched-run") { await run(() => post("schedule/run", { id: +b.dataset.id }), r => r.message); return; }
+  if (act === "sched-del") { if (confirm("이 예약을 지울까요?")) await run(() => post("schedule/delete", { id: +b.dataset.id }), "예약을 지웠어요"); return; }
   if (act === "review-ok") { await run(() => post("submit-confirm", { key }), "✅ 완성으로 표시했어요"); return; }
   if (act === "autosub-on" || act === "autosub-off") { closeMenu(false); closeSheet(); await run(() => post("autosubmit", { key, on: act === "autosub-on" }), r => r.message); return; }
   if (act === "slot" && t) { closeMenu(false); closeSheet(); slotSheet(t, b.dataset.pkey); return; }
