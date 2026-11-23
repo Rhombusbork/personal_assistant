@@ -89,3 +89,43 @@ def test_inbox_task_slot_goes_to_inbox_line(conn):
     inbox.sync(conn)
     server.clear_block(conn, k)
     assert ">" not in inbox.PATH.read_text(encoding="utf-8").split("발표 준비")[1].split("\n")[0]
+
+
+def test_move_and_unslot_through_http(conn, monkeypatch):
+    """대시보드 요청 그대로 (do_POST 안의 이름 겹침 같은 실수를 잡는다)."""
+    import http.client
+    import json
+    import threading
+    from http.server import ThreadingHTTPServer
+    monkeypatch.setattr(server.Handler, "on_change", None)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    def post(path, body):
+        c = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=10)
+        c.request("POST", path, json.dumps(body), {"Host": "localhost:8765", "X-PA": "1", "Content-Type": "application/json"})
+        r = c.getresponse()
+        return r.status, json.loads(r.read())
+    try:
+        st, r = post("/api/move", {"key": "m1", "start": at(1).isoformat(), "end": at(2).isoformat()})
+        assert st == 200 and r["key"].startswith("m1#고정")
+        st, r = post("/api/unslot", {"key": r["key"]})
+        assert st == 200 and not db.slots(db.connect())
+        sid = post("/api/schedule/save", {"title": "공지", "start": at(3).isoformat(), "end": at(4).isoformat(), "every": "", "action": "notices", "args": {}})[1]["id"]
+        st, r = post("/api/schedule/move", {"id": sid, "start": at(5).isoformat(), "end": at(6).isoformat(), "orig": at(3).isoformat()})
+        assert st == 200 and r["ok"]
+    finally:
+        httpd.shutdown()
+
+
+def test_change_during_planning_is_not_lost(conn, monkeypatch):
+    """계획을 짜는 동안(캘린더 통신 중) 바뀐 입력은 다음에 다시 짠다 — 지문은 짜기 전에 찍는다."""
+    k = server.move_block(conn, "m1", at(1), at(2))
+    def slow_calendar(service, p, old, t_now, remind=0, force=False):  # 통신하는 사이에 사용자가 되돌리기
+        server.clear_block(conn, k)
+        conn.commit()
+        return []
+    monkeypatch.setattr(plan, "sync_calendar", slow_calendar)
+    monkeypatch.setattr(plan, "reminders", lambda: {"plan": 0})
+    plan.run(conn, service=object(), write=True)
+    assert plan.needed(conn)  # 되돌린 것이 반영되도록 다시 짜야 함

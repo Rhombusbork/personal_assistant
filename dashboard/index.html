@@ -21,6 +21,7 @@
     --lecture: #0f8a7e; --quiz: #7c3aed; --assignment: #d97706; --todo: #8e8e93; --review: #db2777; --busy: #c7c7cc;
     --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s5: 40px; --s6: 48px;
     --hit: 44px;  /* Apple HIG 44pt · WCAG 2.5.5 */
+    --ev-s: 70%; --ev-l: 88%; --ev-l2: 95%; --ev-fg: 22%;  /* 시간표 블록 (과목마다 색: hsl(--h)) */
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -28,6 +29,7 @@
       --line: rgba(255, 255, 255, .1); --fill: rgba(255, 255, 255, .05); --fill2: rgba(255, 255, 255, .09);
       --accent: #2997ff; --accent-fill: #0a6cd6; --danger: #ff6961; --warn: #fbbf24; --busy: #48484a; --shadow: 0 8px 32px rgba(0, 0, 0, .5);
       --lecture: #2dd4bf; --quiz: #a78bfa; --assignment: #fbbf24; --todo: #8e8e93; --review: #f472b6;
+      --ev-s: 30%; --ev-l: 26%; --ev-l2: 20%; --ev-fg: 88%;
     }
   }
   :root[data-theme="dark"] {
@@ -35,6 +37,7 @@
     --line: rgba(255, 255, 255, .1); --fill: rgba(255, 255, 255, .05); --fill2: rgba(255, 255, 255, .09);
     --accent: #2997ff; --accent-fill: #0a6cd6; --danger: #ff6961; --warn: #fbbf24; --busy: #48484a; --shadow: 0 8px 32px rgba(0, 0, 0, .5);
     --lecture: #2dd4bf; --quiz: #a78bfa; --assignment: #fbbf24; --todo: #8e8e93; --review: #f472b6;
+    --ev-s: 30%; --ev-l: 26%; --ev-l2: 20%; --ev-fg: 88%;
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
@@ -287,6 +290,45 @@
   .sw:not(.ex) em { visibility: hidden; }
   .strip-note { font-size: 12px; color: var(--text3); margin: 0; }
   .kind-h { font-size: 13px; color: var(--text2); margin: var(--s2) 0 0; }
+  .seg.mini { margin-left: var(--s1); } .seg.mini button { padding: 2px 10px; font-size: 13px; white-space: nowrap; }
+  .sec-h { flex-wrap: wrap; row-gap: 4px; } .sec-h h2 { white-space: nowrap; }
+  .ttnav { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s1); font-size: 13px; color: var(--text2); }
+  .tt { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-top: var(--s1); }
+  .tt-head, .tt-grid { display: grid; grid-template-columns: 44px repeat(var(--n), minmax(0, 1fr)); }
+  .tt-head { border-bottom: 1px solid var(--line); background: var(--elev); }
+  .tt-corner { display: flex; align-items: center; justify-content: center; }
+  .tt-dh { padding: 6px 4px; font-size: 13px; text-align: center; border-left: 1px solid var(--line); min-width: 0; position: relative; }
+  .tt-dh.today b, .tt-dh.today .num { color: var(--accent); font-weight: 700; }
+  .tt-dh .dl { display: block; width: 100%; margin-top: 3px; padding: 1px 4px; border: 0; border-radius: 4px; background: var(--fill2); color: var(--text2);
+    font-size: 11px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tt-dh .dlmore { font-size: 11px; color: var(--text3); }
+  .tt-body { max-height: min(70vh, 760px); overflow-y: auto; overscroll-behavior: contain; }
+  .tt-grid { position: relative; }
+  .tt-times { position: relative; }
+  .tt-times span { position: absolute; right: 6px; font-size: 11px; color: var(--text3); transform: translateY(-50%); }
+  .tt-times span:first-child { transform: none; }
+  .tt-col { position: relative; border-left: 1px solid var(--line);
+    background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--fill) 1px, transparent 1px);
+    background-size: 100% var(--hpx), 100% calc(var(--hpx) / 2); }
+  .tt-col.today { background-color: var(--fill); }
+  .ev { position: absolute; box-sizing: border-box; border-radius: 6px; padding: 2px 22px 2px 7px; overflow: hidden; font-size: 12px; line-height: 1.25;
+    background: hsl(var(--h) var(--ev-s) var(--ev-l)); color: hsl(var(--h) 45% var(--ev-fg)); border-left: 3px solid hsl(var(--h) 60% 48%); cursor: pointer; }
+  .ev.busy { cursor: default; }
+  .ev.plan { background: hsl(var(--h) var(--ev-s) var(--ev-l2)); outline: 1px dashed hsl(var(--h) 45% 55%); outline-offset: -1px; }
+  .ev.plan.fixed { outline-style: solid; }
+  .ev.sched { background: var(--fill2); color: var(--text); border-left-color: var(--accent); }
+  .ev.past { opacity: .5; } .ev.dragging { opacity: .35; }
+  .ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 3; }
+  .ev-t { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: keep-all; }
+  .ev-m { font-size: 11px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev.short { display: flex; gap: 6px; align-items: center; } .ev.short .ev-t { -webkit-line-clamp: 1; flex: 0 1 auto; } .ev.short .ev-m { flex: 1; }
+  .hdl { position: absolute; top: 1px; right: 1px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent;
+    color: inherit; opacity: .55; cursor: grab; touch-action: none; font-size: 14px; line-height: 22px; }
+  .hdl:hover, .hdl:focus-visible { opacity: 1; background: var(--fill2); }
+  .ghost { position: absolute; left: 2px; right: 2px; z-index: 5; box-sizing: border-box; padding: 2px 6px; border: 2px dashed var(--accent); border-radius: 6px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 11px; font-weight: 600; pointer-events: none; }
+  .nowline { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 4; pointer-events: none; }
+  .nowline::before { content: ""; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
   .schform .fl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text2); margin-top: 12px; }
   .schform textarea { min-height: 84px; resize: vertical; font: inherit; }
 
@@ -692,6 +734,7 @@ function statusHtml(now) {
 
 function render() {
   if (!D) { $("eyebrow").textContent = "데이터 없음 — bin/pa run"; return; }
+  if (DRAG.on) { render.pending = true; return; }  // 끄는 중에는 다시 그리지 않음 (끝나면 그림)
   const now = new Date(), today = ymdOf(now);
   document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
   document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
@@ -714,6 +757,7 @@ function render() {
 
   const keep = document.activeElement?.closest?.("[data-row]")?.dataset.row;  // 30초 새로 고침에도 키보드 위치를 잃지 않게
   $("view").innerHTML = view === "week" ? weekView(now, today) : todayView(now, today);
+  if (view === "week") gridAfterRender();
   $("title").textContent = view === "week" ? "주차별" : "오늘";
   $("more").innerHTML = moreHtml(now, today);
   $("pageFoot").innerHTML = `계획 ${stamp(D.plannedAt)} · Canvas ${stamp(D.canvasSynced)} · <a href="legacy.html" style="color:inherit">예전 화면</a> <button class="kbhint" data-ui="keys">단축키 ?</button>`;
@@ -1014,7 +1058,11 @@ function weekView(now, today) {
     <p class="strip-note">막대 = 그 주에 남은 일의 양 · 빨간 점 = 시험</p></section>`;
   h += schedListHtml();
 
-  h += `<section class="sec"><div class="sec-h"><h2>날짜별 일정</h2><span class="aside">계획은 2주 앞까지</span></div><div class="rows">`;
+  const seg = `<span class="seg mini" role="tablist" aria-label="보기">${[["grid", "시간표"], ["list", "목록"]].map(([m, n]) =>
+    `<button data-act="wkmode" data-mode="${m}" role="tab" class="${wkMode() === m ? "on" : ""}" aria-selected="${wkMode() === m}">${n}</button>`).join("")}</span>`;
+  if (wkMode() === "grid") h += `<section class="sec"><div class="sec-h"><h2>시간표</h2>${seg}<span class="aside">${LIVE && !MOB ? "⠿ 를 끌어 옮기기 · 블록 누르면 메뉴 · 빈 칸 두 번 누르면 예약" : "계획은 2주 앞까지"}</span></div>${gridHtml(days, now, today, w)}</section>`;
+  else {
+  h += `<section class="sec"><div class="sec-h"><h2>날짜별 일정</h2>${seg}<span class="aside">계획은 2주 앞까지</span></div><div class="rows">`;
   for (const d of days) {
     const items = [...D.busy.filter(b => ymd(b.start) === d).map(b => ({ busy: true, ...b })), ...D.plan.filter(p => ymd(p.start) === d)].sort((a, b) => dt(a.start) - dt(b.start));
     const rd = relDay(d, today), dd = new Date(d + "T12:00:00");
@@ -1029,6 +1077,7 @@ function weekView(now, today) {
     }
   }
   h += `</div></section>`;
+  }
 
   const its = w.items, openIts = its.filter(x => x.status === "open"), doneIts = its.filter(x => x.status === "done");
   h += `<section class="sec"><div class="sec-h"><h2>이 주에 마감</h2><span class="aside">${openIts.length}개 남음 / 전체 ${its.length}개</span></div><div class="rows">`;
@@ -1046,6 +1095,165 @@ function weekView(now, today) {
     <div class="done-l" style="padding-left:20px">${doneIts.map(x => `<div>${esc(x.title)}</div>`).join("")}</div></details>`;
   return h + `</div></section>`;
 }
+
+// ---- 주차별 시간표 (docs/week-grid-plan.md 1~3장): 요일 × 시간 칸 · 범위는 그 주 일정에 맞춤 · 겹치면 나란히 · 손잡이 ⠿ 로 끌기
+const HOUR_PX = 48, SNAP = 15;
+const wkMode = () => { try { return localStorage.getItem("pa.wkmode") || "grid"; } catch { return "grid"; } };
+const hueOf = str => { let h = 7; for (const c of String(str || "")) h = (h * 31 + c.codePointAt(0)) % 360; return h; };
+const courseName = str => String(str || "").replace(/^[^\p{L}\p{N}]+/u, "").split(/\s*[·(\[]/)[0].trim();
+const minOf = d => d.getHours() * 60 + d.getMinutes();
+function gridEvents() {
+  const ev = [];
+  for (const b of D.busy || []) ev.push({ type: "busy", start: b.start, end: b.end, title: b.label.replace(/^\S*🏫\s*/u, ""), course: courseName(b.label) });
+  for (const p of D.plan || []) {
+    const t = findTask(p.task);
+    ev.push({ type: "plan", key: p.key, start: p.start, end: p.end, fixed: p.fixed, kind: p.kind, t, why: p.why,
+              title: t ? t.title : p.summary.replace(/^\[[^\]]+\]\s*/, ""), course: t ? t.course : "" });
+  }
+  for (const r of D.scheduleBlocks || []) ev.push({ type: "sched", id: r.id, start: r.start, end: r.end, title: r.title, action: r.action, every: r.every, course: "" });
+  return ev;
+}
+function gridPieces(ev, d) {  // 그날 칸에 들어갈 조각 (자정을 넘으면 나눔) — s·e 는 그날 0시부터 분
+  const d0 = new Date(d + "T00:00:00"), d1 = new Date(d0.getTime() + 864e5), out = [];
+  for (const x of ev) {
+    const s = Math.max(dt(x.start), d0), e = Math.min(dt(x.end), d1);
+    if (e > s) out.push({ x, s: (s - d0) / 6e4, e: (e - d0) / 6e4 });
+  }
+  out.sort((a, b) => a.s - b.s || b.e - a.e);  // 겹치면 나란히: 묶음마다 칸 나누기
+  let group = [], ends = [], gEnd = -1;
+  const flush = () => { group.forEach(p => p.n = ends.length); group = []; ends = []; };
+  for (const p of out) {
+    if (group.length && p.s >= gEnd) flush();
+    let c = ends.findIndex(e => e <= p.s);
+    if (c < 0) { c = ends.length; ends.push(0); }
+    ends[c] = p.e; p.c = c; group.push(p); gEnd = Math.max(gEnd, p.e);
+  }
+  flush();
+  return out;
+}
+function evIcon(x) {
+  if (x.type === "sched") return (SCH_ICON[x.action] || "⏰") + " ";
+  if (x.type !== "plan") return "";
+  const au = x.t && (D.autoSubmits || []).some(a => a.key === x.t.key);
+  return (x.fixed ? "📌" : "") + ({ lecture: "▶", quiz: "❓", review: "🔁" }[x.kind] || "") + (au ? "📤" : "") + (x.fixed || x.kind === "lecture" || au ? " " : "");
+}
+function gridHtml(allDays, now, today, w) {
+  const narrow = window.innerWidth < 700, ev = gridEvents();
+  let days = allDays;
+  if (narrow) {  // 좁은 화면: 3일씩 (‹ › 로 넘기기)
+    if (UI.ttOff == null) UI.ttOff = Math.max(0, Math.min(4, allDays.indexOf(today)));
+    UI.ttOff = Math.max(0, Math.min(4, UI.ttOff));
+    days = allDays.slice(UI.ttOff, UI.ttOff + 3);
+  }
+  const per = days.map(d => gridPieces(ev, d)), all = per.flat();
+  let h0 = 9, h1 = 18;  // 일정이 없으면 9~18시
+  if (all.length) {
+    h0 = Math.max(0, Math.floor((Math.min(...all.map(p => p.s)) - 30) / 60));
+    h1 = Math.min(24, Math.ceil((Math.max(...all.map(p => p.e)) + 30) / 60));
+    if (h1 - h0 < 4) h1 = Math.min(24, h0 + 4);
+  }
+  const px = HOUR_PX / 60, top = m => (m - h0 * 60) * px, n = days.length, canMove = LIVE && !MOB;
+  const open = w.items.filter(x => x.status === "open");
+  const nav = narrow ? `<div class="ttnav"><button class="icon-btn" data-act="ttoff" data-step="-3" ${UI.ttOff ? "" : "disabled"} aria-label="앞 3일">‹</button>
+    <span class="num">${label(days[0])} – ${label(days[n - 1])}</span><button class="icon-btn" data-act="ttoff" data-step="3" ${UI.ttOff >= 4 ? "disabled" : ""} aria-label="다음 3일">›</button></div>` : "";
+  let hd = `<div class="tt-head" style="--n:${n}"><div class="tt-corner"></div>`;
+  days.forEach((d, i) => {
+    const dd = new Date(d + "T12:00:00"), dl = open.filter(x => ymd(x.due) === d).sort((a, b) => dt(a.due) - dt(b.due));
+    hd += `<div class="tt-dh${d === today ? " today" : ""}"><b>${WD[dd.getDay()]}</b> <span class="num">${dd.getMonth() + 1}/${dd.getDate()}</span>
+      ${dl.slice(0, 3).map(x => `<button class="dl" data-act="evtask" data-key="${esc(x.key)}" title="마감 ${hm(x.due)} · ${esc(x.title)}">⏰ ${hm(x.due)} ${esc(x.title)}</button>`).join("")}
+      ${dl.length > 3 ? `<span class="dlmore">+${dl.length - 3}</span>` : ""}</div>`;
+  });
+  hd += `</div>`;
+  let body = `<div class="tt-body" id="ttBody"><div class="tt-grid" style="--n:${n};--hpx:${HOUR_PX}px;height:${(h1 - h0) * HOUR_PX}px" data-h0="${h0}">
+    <div class="tt-times">${Array.from({ length: h1 - h0 }, (_, i) => `<span style="top:${i * HOUR_PX}px">${String(h0 + i).padStart(2, "0")}</span>`).join("")}</div>`;
+  days.forEach((d, i) => {
+    body += `<div class="tt-col${d === today ? " today" : ""}" data-day="${d}">`;
+    for (const p of per[i]) {
+      const x = p.x, hgt = Math.max((p.e - p.s) * px, 18), past = dt(x.end) <= now;
+      const movable = canMove && !past && (x.type === "sched" || (x.type === "plan" && x.t && x.t.status === "open"));
+      const tip = [x.title, `${hm(x.start)}–${hm(x.end)}`, x.course, x.t && x.t.due ? "마감 " + label(ymd(x.t.due)) + " " + hm(x.t.due) : "", x.why, x.fixed ? "직접 정한 시간" : ""].filter(Boolean).join(" · ");
+      body += `<div class="ev ${x.type}${x.fixed ? " fixed" : ""}${past ? " past" : ""}${hgt < 32 ? " short" : ""}" tabindex="0" title="${esc(tip)}"
+        style="top:${top(p.s)}px;height:${hgt}px;left:calc(${p.c / p.n * 100}% + 2px);width:calc(${100 / p.n}% - 4px);--h:${hueOf(x.course || x.title)}"
+        ${x.type === "busy" ? "" : `data-act="evopen"`} data-type="${x.type}" data-key="${esc(x.key || (x.t ? x.t.key : ""))}" data-id="${x.id || ""}"
+        data-start="${x.start}" data-end="${x.end}" data-fixed="${x.fixed ? 1 : ""}">${movable ? `<button class="hdl" aria-label="끌어서 옮기기: ${esc(x.title)}" title="끌어서 옮기기 (15분 단위 · Esc 취소)">⠿</button>` : ""}
+        <div class="ev-t">${evIcon(x)}${esc(x.title)}</div><div class="ev-m">${hm(x.start)}–${hm(x.end)}${x.course ? " · " + esc(x.course) : ""}</div></div>`;
+    }
+    if (d === today && minOf(now) >= h0 * 60 && minOf(now) <= h1 * 60) body += `<div class="nowline" style="top:${top(minOf(now))}px"></div>`;
+    body += `</div>`;
+  });
+  return `${nav}<div class="tt">${hd}${body}</div></div></div>`;
+}
+function gridAfterRender() {  // 30초마다 다시 그려도 보던 위치 그대로. 처음엔 지금 시각이 보이게
+  const tb = $("ttBody");
+  if (!tb) return;
+  const g = tb.querySelector(".tt-grid"), h0 = +g.dataset.h0;
+  tb.scrollTop = UI.ttScroll != null ? UI.ttScroll : Math.max(0, (minOf(new Date()) - h0 * 60 - 60) * HOUR_PX / 60);
+  tb.onscroll = () => { UI.ttScroll = tb.scrollTop; };
+}
+// 끌기: 손잡이에서만 (몸통은 눌러서 메뉴·휴대폰 스크롤). 5px 넘게 움직여야 시작, 15분 맞춤, 다른 요일로도, Esc 취소, 끝 근처에서 자동 스크롤
+const DRAG = { on: false };
+function dragEnd(commit) {
+  const g = DRAG;
+  DRAG.on = false;
+  if (commit && g.moved && g.ns && g.ghost?.parentNode) {  // 놓자마자 그 자리로 (저장·다시 계획은 뒤에서)
+    g.ghost.parentNode.appendChild(g.ev);
+    Object.assign(g.ev.style, { top: g.ghost.style.top, left: "2px", width: "calc(100% - 4px)" });
+    g.ev.classList.add("fixed");
+    const m = g.ev.querySelector(".ev-m");
+    if (m) m.textContent = `${hm(g.ns.toISOString())}–${hm(g.ne.toISOString())} · 저장 중…`;
+  }
+  g.ghost?.remove();
+  g.ev?.classList.remove("dragging");
+  if (g.moved) g.done = Date.now();  // 끈 뒤 손을 뗄 때 생기는 클릭은 무시 (취소했어도)
+  if (!commit || !g.moved || !g.ns) { if (render.pending) { render.pending = false; render(); } return; }
+  const s = g.ns.toISOString(), e = g.ne.toISOString();
+  if (g.type === "sched")
+    run(() => post("schedule/move", { id: +g.ev.dataset.id, start: s, end: e, orig: g.start.toISOString() })).then(r => r &&
+      toast(r.message, () => post("schedule/move", { id: +g.ev.dataset.id, start: g.start.toISOString(), end: g.end.toISOString(), orig: s })));
+  else moveBlock(g.ev.dataset.key, s, e, g.ev.dataset.fixed ? [g.start.toISOString(), g.end.toISOString()] : null);
+}
+document.addEventListener("pointerdown", e => {
+  const hd = e.target.closest(".hdl");
+  if (!hd || e.button !== 0) return;
+  const ev = hd.closest(".ev"), body = ev.closest(".tt-body");
+  e.preventDefault(); e.stopPropagation();
+  hd.setPointerCapture(e.pointerId);
+  Object.assign(DRAG, { on: true, moved: false, ev, body, pid: e.pointerId, x0: e.clientX, y0: e.clientY, st0: body.scrollTop, ghost: null, ns: null,
+    type: ev.dataset.type, start: dt(ev.dataset.start), end: dt(ev.dataset.end), cols: [...body.querySelectorAll(".tt-col")],
+    col0: ev.closest(".tt-col"), h0: +body.querySelector(".tt-grid").dataset.h0 });
+});
+document.addEventListener("pointermove", e => {
+  if (!DRAG.on || e.pointerId !== DRAG.pid) return;
+  const g = DRAG, dy0 = e.clientY - g.y0;
+  if (!g.moved && Math.hypot(e.clientX - g.x0, dy0) < 5) return;
+  if (!g.moved) { g.moved = true; g.ev.classList.add("dragging"); }
+  const r = g.body.getBoundingClientRect();  // 위·아래 끝 40px 안 → 가까울수록 빠르게 스크롤
+  if (e.clientY < r.top + 40) g.body.scrollTop -= (r.top + 40 - e.clientY) / 2;
+  else if (e.clientY > r.bottom - 40) g.body.scrollTop += (e.clientY - r.bottom + 40) / 2;
+  const mins = Math.round((dy0 + g.body.scrollTop - g.st0) / (HOUR_PX / 60) / SNAP) * SNAP;
+  const col = g.cols.find(c => { const b = c.getBoundingClientRect(); return e.clientX >= b.left && e.clientX < b.right; }) || g.col0;
+  const days = (new Date(col.dataset.day + "T00:00:00") - new Date(g.col0.dataset.day + "T00:00:00")) / 864e5;
+  const dur = g.end - g.start;
+  g.ns = new Date(g.start.getTime() + mins * 6e4 + days * 864e5); g.ne = new Date(g.ns.getTime() + dur);
+  if (!g.ghost) { g.ghost = document.createElement("div"); g.ghost.className = "ghost"; }
+  if (g.ghost.parentNode !== col) col.appendChild(g.ghost);
+  const d0 = new Date(col.dataset.day + "T00:00:00"), sm = (g.ns - d0) / 6e4;
+  const hit = (D.busy || []).filter(b => dt(b.start) < g.ne && g.ns < dt(b.end)).map(b => b.label.replace(/^\S*🏫\s*/u, ""));
+  Object.assign(g.ghost.style, { top: (sm - g.h0 * 60) * HOUR_PX / 60 + "px", height: Math.max(dur / 6e4 * HOUR_PX / 60, 18) + "px" });
+  g.ghost.textContent = `${WD[g.ns.getDay()]} ${hm(g.ns.toISOString())}–${hm(g.ne.toISOString())}${hit.length ? " · " + hit.join(", ") + " 수업과 겹침 (괜찮아요)" : ""}`;
+});
+document.addEventListener("pointerup", e => { if (DRAG.on && e.pointerId === DRAG.pid) dragEnd(DRAG.ns && DRAG.ns > new Date()); });
+document.addEventListener("pointercancel", () => { if (DRAG.on) dragEnd(false); });
+document.addEventListener("keydown", e => { if (DRAG.on && e.key === "Escape") { e.preventDefault(); dragEnd(false); toast("옮기기 취소"); } }, true);
+document.addEventListener("dblclick", e => {  // 빈 칸 두 번 → 그 시각으로 예약 추가
+  const col = e.target.classList?.contains("tt-col") ? e.target : null;
+  if (!col || !LIVE || MOB) return;
+  const h0 = +col.closest(".tt-grid").dataset.h0, m = Math.floor((e.offsetY / (HOUR_PX / 60) + h0 * 60) / SNAP) * SNAP;
+  const at = new Date(col.dataset.day + "T00:00:00"); at.setMinutes(m);
+  schedSheet(null, at);
+});
+let ttResize;
+window.addEventListener("resize", () => { clearTimeout(ttResize); ttResize = setTimeout(() => { if (view === "week" && D) render(); }, 200); });
 
 // ---- 고급 예약 (주차별): 정한 시각에 AI 지시 · 만들어 둔 기능 · PC 깨어 있기 (pa/schedules.py)
 const SCH_ICON = { prompt: "🤖", open_task: "▶", report_draft: "✍", summary: "📄", notices: "📢", sync: "⟳", timetable: "🗓", open_link: "🔗", awake: "☀️" };
@@ -1868,13 +2076,22 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "submit-ok") { closeSheet(); await run(() => post("submit", { key }), r => r.message); return; }
+  if (act === "wkmode") { try { localStorage.setItem("pa.wkmode", b.dataset.mode); } catch {} render(); return; }
+  if (act === "ttoff") { UI.ttOff = (UI.ttOff || 0) + +b.dataset.step; render(); return; }
+  if (act === "evopen" || act === "evtask") {  // 시간표 블록 · 마감 칩: 할 일은 행동 시트, 예약은 고치기 (끈 직후의 클릭은 무시)
+    if (DRAG.done && Date.now() - DRAG.done < 400) return;
+    if (b.dataset.type === "sched") { schedSheet((D.schedules || []).find(r => String(r.id) === b.dataset.id)); return; }
+    const tk = findTask(b.dataset.key);
+    if (tk) { if (act === "evopen" && LIVE && !MOB && b.dataset.key.includes("#")) UI.pkey = b.dataset.key; actionSheet(tk); }
+    return;
+  }
   if (act === "sched-new") { schedSheet(null); return; }
   if (act === "sched-edit") { schedSheet((D.schedules || []).find(r => String(r.id) === b.dataset.id)); return; }
   if (act === "sched-run") { await run(() => post("schedule/run", { id: +b.dataset.id }), r => r.message); return; }
   if (act === "sched-del") { if (confirm("이 예약을 지울까요?")) await run(() => post("schedule/delete", { id: +b.dataset.id }), "예약을 지웠어요"); return; }
   if (act === "review-ok") { await run(() => post("submit-confirm", { key }), "✅ 완성으로 표시했어요"); return; }
   if (act === "autosub-on" || act === "autosub-off") { closeMenu(false); closeSheet(); await run(() => post("autosubmit", { key, on: act === "autosub-on" }), r => r.message); return; }
-  if (act === "slot" && t) { closeMenu(false); closeSheet(); slotSheet(t, b.dataset.pkey); return; }
+  if (act === "slot" && t) { closeMenu(false); closeSheet(); slotSheet(t, b.dataset.pkey || UI.pkey); UI.pkey = null; return; }
   if (act === "slot-save") {
     const [s1, e1] = slotRange($("slDate").value, $("slFrom").value, $("slTo").value);
     closeSheet(); await moveBlock(key, s1, e1, b.dataset.old ? b.dataset.old.split("|") : null); return;

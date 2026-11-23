@@ -245,6 +245,7 @@ def run(conn, service=None, write=True):
     Google 과 통신하는 동안에는 DB 에 쓰지 않는다 — 쓰기 잠금을 오래 잡으면
     대시보드 버튼이 그동안 기다리게 되기 때문. 쓰기는 맨 끝에 한꺼번에.
     """
+    sig = signature(conn)  # 읽기 전에 — 짜는 동안(Google 통신 수십 초) 바뀐 입력은 다음 순환에서 다시 짜게
     cfg = load_timetable()["planner"]
     t_now = now()
     horizon = t_now + timedelta(days=cfg["horizon_days"])
@@ -331,7 +332,7 @@ def run(conn, service=None, write=True):
     db.set_meta(conn, "plan_failed", ",".join(t.key for t in failed))
     db.set_meta(conn, "plan_why", json.dumps(why, ensure_ascii=False))
     if write:
-        db.set_meta(conn, "plan_sig", signature(conn))
+        db.set_meta(conn, "plan_sig", sig)
     if rows is not None:
         db.set_meta(conn, "plan_reminder", str(remind))
     db.set_meta(conn, "slack", json.dumps(slack))

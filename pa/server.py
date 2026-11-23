@@ -125,7 +125,7 @@ def viewer_count(window=45):
     return sum(1 for t in VIEWERS.values() if t >= cutoff)
 
 
-def when(text):
+def parse_when(text):
     """화면에서 온 시각 (ISO, 시간대 없으면 한국 시각) → 분 단위 datetime."""
     t = datetime.fromisoformat(str(text).replace("Z", "+00:00"))
     return (t if t.tzinfo else t.replace(tzinfo=KST)).astimezone(KST).replace(second=0, microsecond=0)
@@ -373,7 +373,7 @@ class Handler(SimpleHTTPRequestHandler):
                 conn = db.connect()
                 try:
                     if action == "/api/move":
-                        extra["key"] = move_block(conn, body["key"], when(body["start"]), when(body["end"]))
+                        extra["key"] = move_block(conn, body["key"], parse_when(body["start"]), parse_when(body["end"]))
                         msg = "시간을 정했어요"
                     else:
                         clear_block(conn, body["key"]); msg = "자동 배치로 되돌렸어요"
@@ -565,14 +565,14 @@ def side_action(action, body, remote=False, applied=None):
             from pa import schedules
             sid = int(body.get("id") or 0)
             if action == "/api/schedule/save":
-                body = {**body, "start": when(body["start"]).isoformat(), "end": when(body["end"]).isoformat()}
+                body = {**body, "start": parse_when(body["start"]).isoformat(), "end": parse_when(body["end"]).isoformat()}
                 sid = schedules.save(conn, body)
                 msg = "예약했어요"
             elif action == "/api/schedule/delete":
                 schedules.delete(conn, sid)
                 msg = "예약을 지웠어요"
             elif action == "/api/schedule/move":
-                schedules.move(conn, sid, when(body["start"]), when(body["end"]), when(body["orig"]) if body.get("orig") else None)
+                schedules.move(conn, sid, parse_when(body["start"]), parse_when(body["end"]), parse_when(body["orig"]) if body.get("orig") else None)
                 msg = "예약을 옮겼어요" + (" (반복 예약은 모든 회차를 같이)" if (schedules.get(conn, sid) or {}).get("every") else "")
             elif action == "/api/schedule/run":
                 r = schedules.get(conn, sid)
