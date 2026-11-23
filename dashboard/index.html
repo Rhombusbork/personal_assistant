@@ -973,9 +973,8 @@ function critHtml(now) {
   if (MOB && D.pc) {  // 휴대폰: PC 상태 + 깨워 두기·절전 (PC 는 충전 중 checkEvery 분마다 잠깐 깨어 요청을 읽음)
     const pc = D.pc, awake = pc.awakeUntil && dt(pc.awakeUntil) > new Date(), age = Math.round((Date.now() - dt(D.generated)) / 6e4);
     L.push({ sev: 0, t: awake ? `🖥 PC 깨어 있음 · ${hm(pc.awakeUntil)} 까지` : pc.sleepAsked ? "🖥 PC 절전 요청 보냄" : age > 20 ? `🖥 PC 소식 ${age}분 전 — 절전 중일 수 있어요` : `🖥 PC 켜져 있음 (${age}분 전)`,
-      s: `깨워 두기를 누르면 PC 가 다음 확인 때(충전 중이면 ${pc.checkEvery || 30}분 안) 깨어서 그 시간 동안 안 잠들어요 — Remote Control 쓸 때`,
-      b: `<button class="tbtn" data-act="pc-awake" data-min="60">☀️ 1시간 깨워 두기</button><button class="tbtn" data-act="pc-awake" data-min="180">3시간</button>`
-       + `<button class="tbtn" data-act="pc-wake-at">⏰ 켜기 예약</button><button class="tbtn gray" data-act="pc-sleep">💤 절전</button>` });
+      b: `<button class="tbtn" data-act="pc-awake" data-min="60" title="1시간 깨워 두기 (PC 가 다음 확인 때)">☀️ 1시간</button><button class="tbtn" data-act="pc-awake" data-min="180" title="3시간 깨워 두기">☀️ 3시간</button>`
+       + `<button class="tbtn" data-act="pc-wake-at" title="켜기 예약">⏰ 예약</button><button class="tbtn gray" data-act="pc-sleep" title="절전">💤 절전</button>` });
   }
   // 자동 제출 (먼저 내고 나중에 ✅ 완성): 확인할 것 · 못 낸 것 · 하루 안에 낼 것
   for (const r of D.reviews || [])
