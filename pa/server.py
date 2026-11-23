@@ -602,12 +602,17 @@ def side_action(action, body, remote=False, applied=None):
             md = jobs.report_path(dict(row), conn) if row else None
             if not md or not md.exists():
                 raise ValueError("아직 보고서 파일이 없습니다")
-            out, pages = pdf.make(md)
+            try:
+                out, pages = pdf.make(md)
+            except FileNotFoundError as e:  # 그림 파일이 없으면 PDF 를 만들지 않음
+                raise ValueError(str(e)) from None
+            left = pdf.warnings(md)
+            warn = (" · ⚠️ 변환 안 된 마크다운: " + " / ".join(f"{n} ({ex})" for n, ex in left)) if left else ""
             if remote:
-                return {"ok": True, "path": str(out), "pages": pages, "message": f"PDF {pages}쪽: {out.name}"}
+                return {"ok": True, "path": str(out), "pages": pages, "message": f"PDF {pages}쪽: {out.name}{warn}"}
             materials.reveal(out)
             return {"ok": True, "path": str(out), "pages": pages,
-                    "message": f"PDF {pages}쪽: {out.name} — 탐색기에서 열었습니다"}
+                    "message": f"PDF {pages}쪽: {out.name} — 탐색기에서 열었습니다{warn}"}
         if action == "/api/reveal":  # 탐색기에서 파일 위치 보기
             path = Path(body["path"]).resolve()
             if not any(r == path or r in path.parents for r in materials.allowed_roots()) or not path.exists():

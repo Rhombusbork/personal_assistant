@@ -355,8 +355,11 @@ def main():
         from pa import materials, pdf
         path = sys.argv[2]
         if sys.argv[1] == "pdf":
-            path, pages = pdf.make(path)
+            md = path
+            path, pages = pdf.make(md)
             print(f"{path} ({pages}쪽)")
+            for name, ex in pdf.warnings(md):
+                print(f"⚠️ 변환 안 된 마크다운: {name} — {ex}")
         return materials.reveal(path)
     if len(sys.argv) > 1 and sys.argv[1] == "browser":
         from pa import browser

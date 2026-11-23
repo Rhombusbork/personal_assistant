@@ -68,6 +68,14 @@ def check(conn, key, path=None):
             problems.append("이미 같은 파일을 냈음 (크기가 같음)")
     if remake:
         notes.append("원고(.md)가 PDF 보다 새것 → PDF 를 다시 만들어 냄")
+        try:  # 새로 만들 PDF 에 글자로 남는 마크다운(그림 등)이 있으면 안 낸다
+            problems += [f"PDF 에 변환 안 된 마크다운: {name} — {ex}" for name, ex in pdf.warnings(md)]
+        except FileNotFoundError as e:
+            problems.append(str(e))
+    elif md and md.exists() and file.exists():  # 이미 있는 PDF: 원고의 그림보다 작으면 그림이 빠졌을 수 있음
+        figs = [md.parent / m[2] for m in map(pdf.RE_IMG.match, md.read_text(encoding="utf-8").splitlines()) if m]
+        if figs and file.stat().st_size < sum(f.stat().st_size for f in figs if f.exists()):
+            notes.append("PDF 가 원고의 그림 파일들보다 작음 → 그림이 빠졌을 수 있음 (PDF 를 열어 확인)")
     due = a.get("due_at") and datetime.fromisoformat(a["due_at"].replace("Z", "+00:00")).astimezone(KST)
     if due and due < now():
         notes.append("마감이 지남 → 늦은 제출로 표시될 수 있음")

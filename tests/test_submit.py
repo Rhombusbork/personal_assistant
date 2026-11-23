@@ -124,3 +124,16 @@ def test_server_check_then_submit_and_phone_queue(conn, fake, tmp_path, monkeypa
     assert r["ok"] and r["attempt"] == 2 and "제출됨" in r["message"]
     with pytest.raises(ValueError, match="이미 같은 파일"):
         server.side_action("/api/submit", {"key": "a9"}, remote=True)
+
+
+def test_new_pdf_with_leftover_markdown_is_not_sent(conn, fake, tmp_path):
+    """원고에서 PDF 를 새로 만들 때 그림 파일이 없거나 글자로 남는 문법이 있으면 안 낸다 (12주 보고서 사고)."""
+    md = tmp_path / "r.md"
+    md.write_text("# 보고서\n![peak](그림/없음.png)\n", encoding="utf-8")
+    c = submit.check(conn, "a9", str(md))
+    assert c["remake"] and any("그림 없음" in p for p in c["problems"])
+    md.write_text("# 보고서\n그래프는 ![peak](그림/a.png) 참고\n", encoding="utf-8")
+    assert any("변환 안 된 마크다운" in p for p in submit.check(conn, "a9", str(md))["problems"])
+    with pytest.raises(submit.SubmitError):
+        submit.submit(conn, "a9", str(md), reveal=False)
+    assert fake["uploads"] == []
