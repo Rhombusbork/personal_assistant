@@ -1,6 +1,6 @@
 ﻿# 개인 비서: VSCode 를 열지 않아도 엔진이 늘 켜져 있고, 따로 하루 몇 번 최신화도 한다.
 #   PersonalAssistant-Engine  Windows 로그인할 때 엔진(bin/pa watch)을 창 없이 켜 둔다 — 대시보드 서버, 자동 계획·알림,
-#                             대시보드는 비서 폴더를 VSCode 로 열면 그 안 탭으로 (app 모드면 켤 때 앱 창 한 번). 꺼지면 1분 뒤 다시 켬.
+#                             대시보드는 저절로 열지 않음 (VSCode 의 ✓ 버튼 · Ctrl+Alt+D). 꺼지면 1분 뒤 다시 켬.
 #   PersonalAssistant-Sync    매일 07:00, 13:00, 19:00 (+ 로그인할 때) bin/pa run --full — 엔진이 꺼져 있을 때의 보험.
 #                             엔진과 겹쳐도 한 번에 하나만 실행됨.
 #   비서가 WSL 안에 있으면 wscript + .vbs 로 WSL 을 깨워 실행, Windows 폴더에 있으면 .venv 의 pythonw 로 바로 (둘 다 창 없음)

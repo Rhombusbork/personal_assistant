@@ -176,7 +176,7 @@ def cmd_open(conn, args):
 def cmd_vscode_ext(conn, args):
     from pa import vscode_ext
     name, _ = vscode_ext.install()
-    print(f"설치됨: {name} — VSCode 를 열면 대시보드가 그 안 탭으로 열립니다 (이미 연 창은 몇 초 안에 적용)")
+    print(f"설치됨: {name} — VSCode 탭 줄 오른쪽 위 ✓ 버튼 · 상태 줄 '비서' · Ctrl+Alt+D 로 대시보드를 엽니다 (안 보이면 Developer: Reload Window)")
 
 
 def cmd_shortcut(conn, args):

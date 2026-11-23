@@ -339,15 +339,13 @@ def open_dashboard(reason=""):
 
 def _wait_for_window():
     """창이 먼저: 대시보드 탭이 신호를 보낼 때까지(최대 STARTUP_WAIT초) 기다린 뒤 최신화를 시작한다.
-    VSCode 없이 켰으면 창이 없으니 STARTUP_WAIT 뒤에 그냥 시작. 창을 다시 열어 지키지는 않는다 (2026-11-23 사용자가 뺌)."""
+    창이 없으면 STARTUP_WAIT 뒤에 그냥 시작. 창은 저절로 열지 않는다 — 버튼으로만 (2026-11-23 사용자가 정함)."""
     end = time.time() + STARTUP_WAIT
     while time.time() < end:
         if server.viewer_count():
             time.sleep(WINDOW_GRACE)
             return
         time.sleep(1)
-    if dash_mode() == "app":  # 앱 창 모드: 켤 때 창이 없으면 한 번 연다 (VSCode 모드는 비서 폴더 창의 확장이 엶)
-        open_dashboard("켤 때 창이 없어서")
 
 
 def _was_restart():

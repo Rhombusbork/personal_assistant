@@ -1,8 +1,8 @@
 {
   "name": "pa-dashboard",
   "displayName": "개인 비서 대시보드",
-  "description": "비서 대시보드를 VSCode 안 탭(Simple Browser)으로 연다: 비서 폴더 창은 처음 한 번 자동, 그 밖에는 탭 줄 오른쪽 위 버튼 · 상태 줄 '비서' · Ctrl+Alt+D.",
-  "version": "0.2.0",
+  "description": "비서 대시보드를 VSCode 안 탭(Simple Browser)으로 연다: 탭 줄 오른쪽 위 버튼 · 상태 줄 '비서' · Ctrl+Alt+D (저절로 열지 않음).",
+  "version": "0.3.0",
   "publisher": "personal-assistant",
   "license": "MIT",
   "engines": { "vscode": "^1.80.0" },
@@ -20,8 +20,7 @@
     "configuration": {
       "title": "개인 비서",
       "properties": {
-        "paDashboard.url": { "type": "string", "default": "http://localhost:8765/", "description": "비서 대시보드 주소" },
-        "paDashboard.autoOpen": { "type": "boolean", "default": true, "description": "비서 폴더를 연 창에서 처음 한 번 대시보드 탭을 자동으로 연다" }
+        "paDashboard.url": { "type": "string", "default": "http://localhost:8765/", "description": "비서 대시보드 주소" }
       }
     }
   }

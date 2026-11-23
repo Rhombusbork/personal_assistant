@@ -1,16 +1,13 @@
 // 개인 비서 대시보드 — VSCode 안 탭 담당 (작게: 판단은 엔진이 한다).
-// - 비서 폴더(엔진이 도는 폴더)를 연 창: 처음 한 번 대시보드 탭을 자동으로 연다. 이미 탭이 있으면(복원 등) 그대로.
-// - 어느 창이든: 탭 줄 오른쪽 위 버튼 · 아래 상태 줄 '비서' · Ctrl+Alt+D 로 연다. 닫아도 다시 열지 않는다.
+// - 저절로 열지 않는다 (2026-11-23 사용자가 정함). 어느 창이든 탭 줄 오른쪽 위 버튼 · 아래 상태 줄 '비서' · Ctrl+Alt+D 로 연다.
 // - 엔진이 꺼져 있을 때 누르면: 비서 폴더 창이면 '비서: 자동 감시' 작업으로 켠 뒤 연다.
 // - 10초마다 엔진에 '이 창이 살아 있음' + 이 창의 폴더를 알린다 (bin/pa open 요청은 비서 폴더 창이 가져감).
 const vscode = require("vscode");
 
 const EVERY = 10 * 1000;
-const AUTO_WINDOW = 3 * 60 * 1000;  // 창을 연 뒤 이 안에 엔진이 응답하면 자동으로 연다 (늦게 켜진 엔진이 갑자기 탭을 띄우지 않게)
 const ENGINE_TASK = "비서: 자동 감시";
 const ID = Math.random().toString(36).slice(2, 10);  // 이 VSCode 창의 id
-const started = Date.now();
-let bar, autoPending = true, home = false;
+let bar;
 
 function base() {
   const u = vscode.workspace.getConfiguration("paDashboard").get("url") || "http://localhost:8765/";
@@ -18,11 +15,6 @@ function base() {
 }
 
 const folders = () => (vscode.workspace.workspaceFolders || []).map(f => f.uri.path);
-
-function hasTab() {  // 이 창에 Simple Browser 탭(대시보드)이 이미 있나
-  return vscode.window.tabGroups.all.some(g => g.tabs.some(t =>
-    t.input instanceof vscode.TabInputWebview && /simpleBrowser/i.test(t.input.viewType)));
-}
 
 function show() {  // Simple Browser 는 창마다 탭 하나를 다시 쓴다 (있으면 그 탭을 앞으로)
   return vscode.commands.executeCommand("simpleBrowser.show", base());
@@ -49,13 +41,7 @@ async function poll() {
     return;
   }
   setBar("on");
-  home = !!j.home;
-  if (autoPending) {
-    autoPending = false;
-    const auto = vscode.workspace.getConfiguration("paDashboard").get("autoOpen", true);
-    if (auto && home && Date.now() - started < AUTO_WINDOW && !hasTab()) await show();
-  }
-  if (j.open) await show();
+  if (j.open) await show();  // bin/pa open (직접 연 것)
 }
 
 async function startEngine() {

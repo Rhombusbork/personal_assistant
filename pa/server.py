@@ -95,7 +95,7 @@ def remote_hosts():
     return _remote_memo["hosts"]
 VIEWERS = {}  # 대시보드 탭 id → 마지막 신호 시각
 VSCODE = {}      # VSCode 창 id (비서 확장) → 마지막 신호 시각
-VSCODE_HOME = {}                  # VSCode 창 id → 비서 폴더를 연 창인가 (bin/pa open 요청은 이 창이 먼저)
+VSCODE_HOME = {}                  # VSCode 창 id → 비서 폴더를 연 창인가 (bin/pa open 으로 직접 열 때 이 창이 먼저)
 OPEN_REQ = {"at": 0, "served": 0}  # 안 탭 열기 요청 (확장 하나가 가져가면 끝)
 
 
