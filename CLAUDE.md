@@ -63,7 +63,7 @@
 | 강의 공부 · 질문 · 기록 · 자료 요약 | 채팅 `study` | ~/study_system/CLAUDE.md, 연결된 자료, materials/<과목>/요약/ |
 | 보고서·과제 초안 | 대시보드 ✍ (초안) → 채팅 `assignment` (다듬기) | ~/report/CLAUDE.md, `bin/pa task <키>` |
 | 퀴즈 만들기 | 대시보드 🧩 로 요청 복사 → 채팅 `quiz` | 퀴즈 프로젝트 CLAUDE.md·QUIZ_PLANNING_METHOD.md·과목 PLAN |
-| 자료 고르기 (할 일마다) | 대시보드 📄 자료 창 (Claude 안 씀) | config/materials.yaml, docs/materials-linking-plan.md |
+| 자료 고르기 (할 일마다) | 대시보드 📄 자료 창 (Claude 안 씀) | config/materials.yaml, docs/usage.md '자료 연결' |
 | 규칙 바꾸기 (요일·시간·알림·범위·과목) | 채팅 `rules` — 확인받고 설정 파일만 고침 | config/*.yaml |
 | 남은 개발 작업 | docs/TODO.md | |
 
