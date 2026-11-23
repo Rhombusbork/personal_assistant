@@ -1103,12 +1103,13 @@ function weekView(now, today) {
   const strip = `<section class="sec"><div class="sec-h"><h2>학기</h2><span class="aside">주차를 누르면 그 주로</span></div><div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""} ${x.items.some(y => y.exam) ? "ex" : ""}" data-wk="${j}"
       title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}"><em></em><i style="height:${Math.max(3, Math.round(x.minutes / maxMin * 32))}px"></i><span>${j + 1}</span></button>`).join("")}</div>
     <p class="strip-note">막대 = 그 주에 남은 일의 양 · 빨간 점 = 시험</p></section>`;
-  let h = critHtml(now) + nav;  // 맨 위: 주 이동 → 시간표 → 학기 띠 → 예약 → 마감 (2026-11-23 사용자: 시간표를 맨 위로)
+  let h = critHtml(now);  // 맨 위: 주 이동 → 시간표 → 학기 띠 → 예약 → 마감 (2026-11-23 사용자: 시간표를 맨 위로)
 
   const seg = `<span class="seg mini" role="tablist" aria-label="보기">${[["grid", "시간표"], ["list", "목록"]].map(([m, n]) =>
     `<button data-act="wkmode" data-mode="${m}" role="tab" class="${wkMode() === m ? "on" : ""}" aria-selected="${wkMode() === m}">${n}</button>`).join("")}</span>`;
-  if (wkMode() === "grid") h += `<section class="sec"><div class="sec-h"><h2>시간표</h2>${seg}<span class="aside">${LIVE && !MOB ? "⠿ 를 끌어 옮기기 · 블록 누르면 메뉴 · 빈 칸 두 번 누르면 예약" : "계획은 2주 앞까지"}</span></div>${gridHtml(days, now, today, w)}</section>`;
+  if (wkMode() === "grid") h += `<section class="sec tt-top">${gridHtml(days, now, today, w)}</section>` + `<div class="sec-h" style="margin-top:8px">${seg}<span class="aside">${LIVE && !MOB ? "⠿ 를 끌어 옮기기 · 블록 누르면 작은 창 · 빈 칸 두 번 누르면 예약" : "계획은 2주 앞까지"}</span></div>` + nav;
   else {
+  h += nav;
   h += `<section class="sec"><div class="sec-h"><h2>날짜별 일정</h2>${seg}<span class="aside">계획은 2주 앞까지</span></div><div class="rows">`;
   for (const d of days) {
     const items = [...D.busy.filter(b => ymd(b.start) === d).map(b => ({ busy: true, ...b })), ...D.plan.filter(p => ymd(p.start) === d)].sort((a, b) => dt(a.start) - dt(b.start));
@@ -1316,7 +1317,7 @@ function gridHtml(allDays, now, today, w) {
     if (d === today && minOf(now) >= h0 * 60 && minOf(now) <= h1 * 60) body += `<div class="nowline" style="top:${minToY(minOf(now))}px"></div>`;
     body += `</div>`;
   });
-  return `${tools}${missed}${nav}<div class="tt-wrap${canMove ? "" : " nodrawer"}">${canMove ? drawerHtml(now) : ""}<div class="tt${dense ? " dense" : ""}">${hd}${body}</div></div></div></div>`;
+  return `${nav}<div class="tt-wrap${canMove ? "" : " nodrawer"}">${canMove ? drawerHtml(now) : ""}<div class="tt${dense ? " dense" : ""}">${hd}${body}</div></div></div></div>${tools}${missed}`;  // 시간표가 맨 위, 도구·범례는 아래
 }
 function gridAfterRender() {  // 30초마다 다시 그려도 보던 위치 그대로. 처음엔 지금 시각이 보이게
   const tb = $("ttBody");
