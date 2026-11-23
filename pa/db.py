@@ -122,13 +122,21 @@ CREATE TABLE IF NOT EXISTS worklog (            -- 한 일 기록 (직접 적은
 FIELDS = ("kind", "course", "title", "due", "earliest", "slot_end", "minutes", "url")
 
 
+_READY = set()  # 이 프로세스에서 표를 이미 만든 DB 경로 (화면이 30초마다 읽을 때 매번 다시 만들지 않게)
+
+
 def connect():
     PATH.parent.mkdir(exist_ok=True)
-    conn = sqlite3.connect(PATH)
+    conn = sqlite3.connect(PATH, timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
-    if "slot_end" not in {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}:  # 예전 DB
-        conn.execute("ALTER TABLE tasks ADD COLUMN slot_end TEXT")
+    # WAL: 엔진이 쓰는 동안에도 화면이 기다리지 않고 읽는다. NORMAL: 커밋마다 디스크 동기화는 안 함 (WAL 에선 안전)
+    conn.execute("PRAGMA synchronous = NORMAL")
+    if str(PATH) not in _READY:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.executescript(SCHEMA)
+        if "slot_end" not in {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}:  # 예전 DB
+            conn.execute("ALTER TABLE tasks ADD COLUMN slot_end TEXT")
+        _READY.add(str(PATH))
     return conn
 
 

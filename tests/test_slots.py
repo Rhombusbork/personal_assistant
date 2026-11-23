@@ -118,6 +118,19 @@ def test_move_and_unslot_through_http(conn, monkeypatch):
         httpd.shutdown()
 
 
+def test_moved_block_shows_at_new_place_before_replanning(conn):
+    """옮기자마자 화면이 읽는 계획표에도 새 자리 (뒤에서 다시 짜기 전에 옛 자리로 돌아가 보이지 않게). 캘린더 일정 id 는 이어 받는다."""
+    conn.execute("INSERT INTO plan VALUES ('a1#2', ?, ?, '[과제] 보고서', 'ev9')", (at(0).isoformat(), at(1, 30).isoformat()))
+    k = server.move_block(conn, "a1#2", at(3), at(4, 30))
+    server.patch_plan(conn, "a1#2", k, at(3), at(4, 30))
+    rows = {r["key"]: r for r in conn.execute("SELECT * FROM plan")}
+    assert "a1#2" not in rows and rows[k]["start"] == at(3).isoformat() and rows[k]["event_id"] == "ev9"
+    c = server.move_block(conn, k, at(6), at(7), copy=True)  # 복제는 원래 블록을 남기고 새 일정
+    server.patch_plan(conn, k, c, at(6), at(7), copy=True)
+    rows = {r["key"]: r for r in conn.execute("SELECT * FROM plan")}
+    assert k in rows and rows[c]["event_id"] is None
+
+
 def test_change_during_planning_is_not_lost(conn, monkeypatch):
     """계획을 짜는 동안(캘린더 통신 중) 바뀐 입력은 다음에 다시 짠다 — 지문은 짜기 전에 찍는다."""
     k = server.move_block(conn, "m1", at(1), at(2))

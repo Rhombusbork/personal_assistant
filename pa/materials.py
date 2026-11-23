@@ -189,6 +189,8 @@ def scan_downloads(conn):
                     entries.append((Path(e.path), e.stat()))
             except OSError:
                 continue
+    SEEN_DOWNLOADS.clear()
+    SEEN_DOWNLOADS.update(str(f) for f, _ in entries)
     from pa import links
     links.update_recent_downloads(entries)
     since = float(db.get_meta(conn, "downloads_since") or 0)
@@ -209,8 +211,14 @@ def scan_downloads(conn):
         conn.commit()
 
 
+SEEN_DOWNLOADS = set()  # 엔진이 마지막으로 읽은 다운로드 폴더의 파일들 (화면이 읽을 때 Windows 쪽을 다시 보지 않게)
+
+
 def pending_downloads(conn):
-    return [p for p in json.loads(db.get_meta(conn, "downloads_pending") or "[]") if Path(p["path"]).exists()]
+    pend = json.loads(db.get_meta(conn, "downloads_pending") or "[]")
+    if SEEN_DOWNLOADS:
+        return [p for p in pend if p["path"] in SEEN_DOWNLOADS]
+    return [p for p in pend if Path(p["path"]).exists()]
 
 
 def _drop_pending(conn, path):

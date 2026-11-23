@@ -736,9 +736,17 @@ function mobileSettings() {
 let WARN = [];  // 보여 줄 알림 (휴대폰에서 [확인] 한 것은 뺌)
 async function load() {
   if (MOB) { await loadMobile(); if (D) render(); return; }
-  try { const r = await fetch("/api/data?v=" + VIEWER, { cache: "no-store" }); if (!r.ok) throw 0; D = await r.json(); LIVE = true; }
-  catch { LIVE = false; D = D || window.PA_DATA || null; }
-  render();
+  let same = false;
+  try {
+    const r = await fetch("/api/data?v=" + VIEWER, { cache: "no-store" }); if (!r.ok) throw 0;
+    const text = await r.text(), sig = text.replace(/"generated":\s*"[^"]*"/, ""), minute = Math.floor(Date.now() / 6e4);
+    same = LIVE && D && sig === load.sig && minute === load.minute && !render.pending;  // 그대로면 다시 그리지 않음 (같은 분 안에서)
+    D = JSON.parse(text); LIVE = true; load.sig = sig;
+    if (!same) load.minute = minute;
+  }
+  catch { LIVE = false; D = D || window.PA_DATA || null; load.sig = null; }
+  if (same) $("status").innerHTML = statusHtml(new Date());
+  else render();
   if (D?.syncing || (D?.jobs || []).some(j => j.status === "queued" || j.status === "running")) { clearTimeout(load.t); load.t = setTimeout(load, 5000); }  // 진행 중이면 자주
 }
 async function api(action, body) {  // 엔진에 요청만 (화면 다시 읽기 없음)

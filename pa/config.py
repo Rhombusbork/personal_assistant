@@ -1,4 +1,5 @@
 """프로젝트 설정 로딩 (.env, config/*.yaml)."""
+import copy
 import os
 from pathlib import Path
 
@@ -21,7 +22,19 @@ def load_yaml(name):
     p = ROOT / "config" / f"{name}.yaml"
     if not p.exists():
         p = ROOT / "config" / f"{name}.example.yaml"
-    return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    try:
+        st = p.stat()
+    except OSError:
+        st = None
+    sig = (str(p), st.st_mtime_ns, st.st_size) if st else None
+    hit = _YAML.get(name)
+    if sig is None or hit is None or hit[0] != sig:  # 파일이 바뀌었을 때만 다시 읽는다 (화면이 30초마다 여러 번 읽음)
+        hit = _YAML[name] = (sig, yaml.load(p.read_text(encoding="utf-8"), Loader=_Loader) or {})
+    return copy.deepcopy(hit[1])  # 받은 쪽이 고쳐도 기억해 둔 것은 그대로
+
+
+_YAML = {}
+_Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)  # C 로 만든 읽기 (있으면 몇 배 빠름)
 
 
 def load_timetable():
