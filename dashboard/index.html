@@ -341,8 +341,9 @@
   .tt-missed { margin-top: var(--s1); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .tt-wrap { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--s1); align-items: start; }
   .tt-wrap.nodrawer { grid-template-columns: minmax(0, 1fr); }
-  @media (max-width: 1000px) { .tt-wrap { grid-template-columns: minmax(0, 1fr); } .tt-drawer { max-height: 220px; } }
-  .tt-drawer { border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; margin-top: var(--s1); max-height: min(70vh, 760px); overflow: auto; font-size: 13px; }
+
+  .tt-drawer { border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; margin-top: var(--s1); max-height: 320px; overflow: auto; font-size: 13px; }
+  .tt-drawer[open] .dr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 8px; }
   .tt-drawer summary { font-weight: 600; cursor: pointer; }
   .dr-it { display: grid; grid-template-columns: 16px 1fr; gap: 0 6px; padding: 5px 6px; margin-top: 4px; border-radius: 6px; cursor: grab; touch-action: none;
     background: hsl(var(--h) var(--ev-s) var(--ev-l2)); border-left: 3px solid hsl(var(--h) 60% 48%); user-select: none; }
@@ -780,7 +781,7 @@ function statusHtml(now) {
 
 function render() {
   if (!D) { $("eyebrow").textContent = "데이터 없음 — bin/pa run"; return; }
-  if (DRAG.on) { render.pending = true; return; }  // 끄는 중에는 다시 그리지 않음 (끝나면 그림)
+  if (DRAG.on || render.hold) { render.pending = true; return; }  // 끄는 중에는 다시 그리지 않음 (끝나면 그림)
   const now = new Date(), today = ymdOf(now);
   document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
   document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
@@ -952,7 +953,7 @@ function critHtml(now) {
        + `<button class="tbtn gray" data-act="ign-one" data-key="${k}" data-vanish title="이 과제만 제외 (되돌리기 가능)">안 함</button></span>` });
   }
   for (const j of (D.jobs || []).filter(j => j.status === "failed"))
-    L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button>` : "" });
+    L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button><button class="tbtn gray" data-act="jobdel" data-id="${j.id}" data-vanish data-label="알림 지우기">지우기</button>` : "" });
   // 자동 제출 (먼저 내고 나중에 ✅ 완성): 확인할 것 · 못 낸 것 · 하루 안에 낼 것
   for (const r of D.reviews || [])
     L.push({ sev: 1, t: `📤 자동 제출함 — 확인해 주세요 · ${r.title}`, s: [r.course, r.name, r.pages ? r.pages + "쪽" : "", r.attempt ? r.attempt + "번째" : "", stamp(r.ts), "안 눌러도 제출은 그대로"].filter(Boolean).join(" · "),
@@ -1247,15 +1248,15 @@ function drawerItems(now) {
     .filter((t, i, a) => a.findIndex(x => x.key === t.key) === i).slice(0, 40);
 }
 function drawerHtml(now) {
-  const L = drawerItems(now), open = lsGet("pa.drawer", "1") === "1";
+  const L = drawerItems(now), open = lsGet("pa.drawer", "0") === "1";
   return `<details class="tt-drawer" ${open ? "open" : ""} data-drawer><summary>할 일 서랍 <span class="meta">${L.length}</span></summary>
     <p class="small">시간 안 정한 일 — 끌어서 시간표에 놓으면 그 시간에 📌</p>
     <form class="inline" data-form="habit"><input class="field" name="h" placeholder="＋ 습관: 복습 ~1h 매일 저녁" aria-label="습관 추가 (예: 운동 ~40m 주3회 · 영어 ~20m 매주:월,수 아침)"
       title="이름 ~길이 매일|주N회|매주:월,수 [아침|오후|저녁|19-22시] — 바쁜 날은 건너뜀"><button class="btn" type="submit" style="height:32px">추가</button></form>
-    ${L.map(t => `<div class="dr-it" data-key="${esc(t.key)}" data-min="${t.minutes || 60}" style="--h:${hueFor(t.course)}" title="${esc(t.title)}">
+    <div class="dr-list">${L.map(t => `<div class="dr-it" data-key="${esc(t.key)}" data-min="${t.minutes || 60}" style="--h:${hueFor(t.course)}" title="${esc(t.title)}">
       <span class="dr-h" aria-hidden="true">⠿</span><span class="dr-t">${esc((D.short || {})[t.key] || t.title)}</span>
       <span class="meta">${[t.course && esc(t.course), t.due ? "마감 " + label(ymd(t.due)) : "기한 없음", dur(t.minutes || 60)].filter(Boolean).join(" · ")}</span></div>`).join("")
-      || `<p class="empty">모두 시간이 잡혀 있어요</p>`}</details>`;
+      || `<p class="empty">모두 시간이 잡혀 있어요</p>`}</div></details>`;
 }
 function gridHtml(allDays, now, today, w) {
   const narrow = window.innerWidth < 700, ev = gridEvents(), canMove = LIVE && !MOB;
@@ -1317,7 +1318,7 @@ function gridHtml(allDays, now, today, w) {
     if (d === today && minOf(now) >= h0 * 60 && minOf(now) <= h1 * 60) body += `<div class="nowline" style="top:${minToY(minOf(now))}px"></div>`;
     body += `</div>`;
   });
-  return `${nav}<div class="tt-wrap${canMove ? "" : " nodrawer"}">${canMove ? drawerHtml(now) : ""}<div class="tt${dense ? " dense" : ""}">${hd}${body}</div></div></div></div>${tools}${missed}`;  // 시간표가 맨 위, 도구·범례는 아래
+  return `${nav}<div class="tt-wrap nodrawer"><div class="tt${dense ? " dense" : ""}">${hd}${body}</div></div></div></div>${canMove ? drawerHtml(now) : ""}${tools}${missed}`;  // 서랍은 시간표 바로 아래, 평소 접힘  // 시간표가 맨 위, 도구·범례는 아래
 }
 function gridAfterRender() {  // 30초마다 다시 그려도 보던 위치 그대로. 처음엔 지금 시각이 보이게
   const tb = $("ttBody");
@@ -2194,7 +2195,13 @@ function slotRange(date, from, to) {  // 화면 입력 → [시작, 끝] ISO (�
   return [s.toISOString(), e.toISOString()];
 }
 async function moveBlock(key, start, end, old) {  // 옮기고 '되돌리기' (원래 자동 블록이었으면 고정 풀기)
-  const r = await run(() => post("move", { key, start, end }));
+  if (MOB) return moveBlockDone(await run(() => post("move", { key, start, end })), old);
+  render.hold = (render.hold || 0) + 1;  // 저장이 끝날 때까지 옛 데이터로 다시 그리지 않음 (놓은 자리에 그대로)
+  const r = await run(() => api("move", { key, start, end })).finally(() => { render.hold--; });
+  load(); setTimeout(load, 8000);  // 엔진이 옮긴 자리를 바로 적어 두므로 첫 읽기부터 새 자리 · 8초 뒤 주변 자동 블록
+  return moveBlockDone(r, old);
+}
+function moveBlockDone(r, old) {
   if (!r) return null;
   const nk = r.key;
   toast("시간을 정했어요", old ? () => post("move", { key: nk, start: old[0], end: old[1] }) : () => post("unslot", { key: nk }));
@@ -2538,6 +2545,7 @@ document.addEventListener("click", async e => {
     const k = b.dataset.kind, call = k === "notices" ? ["job/notices", {}] : k === "summary" ? ["job/summary", { path: key }] : ["job/report", { key, force: k === "report-force" }];
     await run(() => post(...call), "다시 시작합니다"); return;
   }
+  if (act === "jobdel") { await run(() => post("job-dismiss", { id: b.dataset.id }), "지웠어요"); return; }
   if (act === "ritualclose") { UI.open.delete("check"); render(); return; }
   toast("알 수 없는 동작: " + act);
 });
@@ -2623,10 +2631,11 @@ function tickTimer() {
   for (const id of ["elapsed", "elapsed2"]) { const el = $(id); if (el) el.textContent = txt; }
 }
 load();
-setInterval(() => {  // 30초마다(휴대폰은 5분) 새 데이터 — 메뉴·시트를 보고 있거나 입력 중이면 건너뜀
-  if ($("menu").hidden && $("scrim").hidden && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) load();
+setInterval(() => {  // 30초마다(휴대폰은 5분) 새 데이터 — 탭이 숨었거나 메뉴·시트를 보고 있거나 입력 중이면 건너뜀
+  if (!document.hidden && $("menu").hidden && $("scrim").hidden && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) load();
 }, (MOB ? 300 : 30) * 1000);
-setInterval(tickTimer, 1000);
+setInterval(() => { if (!document.hidden) tickTimer(); }, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { tickTimer(); load(); } });  // 다시 보이면 바로 새로
 // 창 신호: 입력 중·메뉴가 열려 있어 새로 읽기를 건너뛰어도 엔진이 '창이 있다'고 알게 (엔진은 창이 없으면 다시 연다)
 setInterval(() => { if (LIVE) fetch("/api/ping?v=" + VIEWER, { cache: "no-store" }).catch(() => {}); }, 30 * 1000);
 addEventListener("pagehide", () => { if (LIVE) fetch("/api/bye?v=" + VIEWER, { keepalive: true }).catch(() => {}); });
