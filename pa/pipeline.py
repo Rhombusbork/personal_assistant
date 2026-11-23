@@ -233,6 +233,8 @@ def _auto_open():
     try:
         for key in autoopen.check(conn, now()):
             log(f"계획 시간 — 열었음: {key}")
+        if autoopen.review_due(conn, now()):  # 하루 마무리 시간 → 대시보드를 띄움 (마무리 카드)
+            open_dashboard("하루 마무리 시간")
         if autoopen.ended(conn, now()):  # 블록이 끝남 → 수강·제출을 바로 확인 (끝냈으면 완료로)
             threading.Thread(target=lambda: _safe(_quick_check), daemon=True).start()
         for key in autosubmit.tick(conn, now()):

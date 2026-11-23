@@ -129,3 +129,13 @@ def test_change_during_planning_is_not_lost(conn, monkeypatch):
     monkeypatch.setattr(plan, "reminders", lambda: {"plan": 0})
     plan.run(conn, service=object(), write=True)
     assert plan.needed(conn)  # 되돌린 것이 반영되도록 다시 짜야 함
+
+
+def test_recurring_inbox_instance_goes_to_slots(conn):
+    inbox.PATH.write_text("## 할 일\n- [ ] 텍스트 정리 ~1h 매주:수\n", encoding="utf-8")
+    inbox.sync(conn)
+    key = conn.execute("SELECT key FROM tasks WHERE key LIKE 'i:텍스트 정리@%' AND status = 'open' ORDER BY key LIMIT 1").fetchone()[0]
+    k = server.move_block(conn, key, at(1), at(2))
+    assert "#고정" in k and db.slots(conn, key=key) and ">" not in inbox.PATH.read_text(encoding="utf-8")
+    server.clear_block(conn, k)
+    assert not db.slots(conn)

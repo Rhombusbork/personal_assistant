@@ -128,8 +128,8 @@ def parse_line(text, today, default_minutes):
 
 
 def read_sections():
-    """inbox.md → {'todo': [(줄번호, 체크여부, 내용)], 'done': [...], 'ignore': [...]}"""
-    out = {"todo": [], "done": [], "ignore": []}
+    """inbox.md → {'todo': [(줄번호, 체크여부, 내용)], 'done': [...], 'ignore': [...], 'habit': [...]} (습관은 pa/habits.py)"""
+    out = {"todo": [], "done": [], "ignore": [], "habit": []}
     section, in_comment = "todo", False
     for no, line in enumerate(PATH.read_text(encoding="utf-8").splitlines(), 1):
         # <!-- 주석 --> 안의 줄은 무시
@@ -137,7 +137,7 @@ def read_sections():
             in_comment = "-->" not in line
             continue
         if line.startswith("#"):
-            section = "done" if "완료" in line else "ignore" if "제외" in line else "todo"
+            section = "done" if "완료" in line else "ignore" if "제외" in line else "habit" if "습관" in line else "todo"
             continue
         if section == "todo":
             m = RE_CHECK.match(line)
@@ -152,7 +152,7 @@ def read_sections():
 
 # ---- 쓰기 (대시보드 입력 → inbox.md) ----------------------------------------
 
-SECTION_HEAD = {"todo": "## 할 일", "done": "## 완료", "ignore": "## 제외"}
+SECTION_HEAD = {"todo": "## 할 일", "done": "## 완료", "ignore": "## 제외", "habit": "## 습관"}
 KO_DAYS = "월화수목금토일"
 
 
@@ -378,6 +378,14 @@ def set_slot(key, start, end):
     minutes = it["minutes"] if start or not it["slot_end"] else int((it["slot_end"] - it["earliest"]).total_seconds() // 60)
     lines[i] = format_line(it["title"], it["due"], minutes, it["course"], it["every"], start, end)
     PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def add_habit(text):
+    """'## 습관' 에 한 줄 (pa/habits.py 문법). 잘못된 줄은 ValueError."""
+    from pa import habits
+    h = habits.parse(text)
+    _insert("habit", "- " + " ".join(text.split()))
+    return f"습관 추가: {h['title']}"
 
 
 def remove(key):

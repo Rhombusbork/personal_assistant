@@ -15,7 +15,7 @@ import re
 from dataclasses import replace
 from datetime import datetime, time, timedelta
 
-from pa import calibrate, db
+from pa import calibrate, habits, db
 from pa.config import load_timetable, popup, reminders
 from pa.gcal import get_or_create_calendar, get_service
 from pa.model import KIND_LABEL, KST, label, now, parse_dt
@@ -219,7 +219,7 @@ def signature(conn):
     ses = conn.execute("SELECT COUNT(*), COALESCE(SUM(minutes), 0) FROM sessions").fetchone()
     slots = [(r["key"], r["start"], r["end"], r["part"]) for r in db.slots(conn)]
     raw = json.dumps([[tuple(r) for r in rows], now().date().isoformat(), tt.get("planner"), tt.get("reminders"),
-                      tuple(ses), redo_days(conn), slots], sort_keys=True, default=str)
+                      tuple(ses), redo_days(conn), slots, habits.signature(conn), _played(conn)], sort_keys=True, default=str)
     return hashlib.sha1(raw.encode()).hexdigest()
 
 
@@ -233,6 +233,21 @@ def needed(conn, max_age_minutes=60):
         return True
     return bool(conn.execute("SELECT 1 FROM plan WHERE end > ? AND end <= ? LIMIT 1",
                              (planned.isoformat(), t_now.isoformat())).fetchone())
+
+
+def _played(conn):
+    """{강의 키: 비서가 틀어 준 분} — 자동 열기로 ▶ 재생한 블록의 (시작~끝, 지금까지) 합. 아직 안 끝낸 강의만."""
+    out = {}
+    t_now = now()
+    for r in conn.execute("SELECT e.key, e.detail FROM events e JOIN tasks t ON t.key = e.key "
+                          "WHERE e.type = 'autoopen' AND t.kind = 'lecture' AND t.status = 'open'"):
+        d = json.loads(r["detail"] or "{}")
+        if "재생" not in (d.get("opened") or []) or not d.get("start") or not d.get("end"):
+            continue
+        s, e = parse_dt(d["start"]), min(parse_dt(d["end"]), t_now)
+        if e > s:
+            out[r["key"]] = out.get(r["key"], 0) + int((e - s).total_seconds() // 60)
+    return out
 
 
 def summary(t):
@@ -254,12 +269,15 @@ def run(conn, service=None, write=True):
     # 예상 시간: 직접 정한 값(time 명령)은 그대로, 아니면 ⏱ 기록으로 보정. 이미 한 시간은 뺀다.
     fs = calibrate.factors(conn)
     spent = calibrate.tracked(conn)
+    played = _played(conn)
     fixed = {r["key"] for r in conn.execute("SELECT key FROM tasks WHERE minutes_override IS NOT NULL")}
     for t in items:
         t.factor = 1.0 if t.key in fixed else calibrate.factor_for(fs, t.kind, t.course)
         t.minutes = round(t.minutes * t.factor)
         if spent.get(t.key):
             t.minutes = max(15, t.minutes - spent[t.key])
+        if t.kind == "lecture" and played.get(t.key):  # 덜 들은 강의: 비서가 틀어 준 만큼 빼고 남은 분만 (LearningX 에 들은 분이 없음)
+            t.minutes = max(10, t.minutes - played[t.key])
     by_key = {t.key: t for t in items}
 
     old = {r["key"]: r for r in conn.execute("SELECT * FROM plan").fetchall()}
@@ -309,6 +327,9 @@ def run(conn, service=None, write=True):
     busy = fetch_busy(service, week_start, horizon + timedelta(days=1))
     plan, failed, why = make_plan(items, busy, cfg, t_now, pinned)
     plan += [(pinned_task[k], s, e) for k, (s, e) in pinned.items()]
+    hplan, hwhy = habits.plan(conn, busy, cfg, t_now, plan)  # 습관·하루 마무리: 남은 빈 곳에 (바쁘면 건너뜀)
+    plan += hplan
+    why.update(hwhy)
     for k in pinned:
         why[k] = "직접 정한 시간" if FIXED in k else "이미 시작한 블록이라 그대로 둠"
     plan.sort(key=lambda x: x[1])

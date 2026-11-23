@@ -102,3 +102,10 @@ power:
 # schedules:
 #   folders:
 #     공부: ~/study_system
+
+# 하루 마무리 — 습관 블록 하나 (pa/habits.py). window 시간대 안의 빈 곳에 minutes 분, 바쁜 날은 건너뜀. 그 시간이 되면 대시보드를 띄워
+#   맨 위에 마무리 카드 (오늘 계획 vs 실제 · 못 끝낸 일 · 내일 미리보기). 습관은 inbox.md 의 '## 습관' 에 (예: - 복습 ~1h 매일 저녁)
+daily_review:
+  enabled: true
+  minutes: 15
+  window: "21-23"

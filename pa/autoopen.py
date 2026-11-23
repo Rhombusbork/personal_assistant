@@ -84,6 +84,18 @@ def ended(conn, t_now, window=timedelta(minutes=10)):
     return keys
 
 
+def review_due(conn, t_now):
+    """하루 마무리 블록이 막 시작됨 (블록마다 한 번) → 엔진이 대시보드를 띄운다 (사용자가 정함: 그 시간이 되면 띄워 주기)."""
+    for p in conn.execute("SELECT key, start, end FROM plan WHERE key LIKE 'h:하루 마무리@%'"):
+        s, e = parse_dt(p["start"]), parse_dt(p["end"])
+        mark = f"autoopen:{p['key']}"
+        if s <= t_now < e and not db.get_meta(conn, mark):
+            db.set_meta(conn, mark, t_now.isoformat())
+            conn.commit()
+            return True
+    return False
+
+
 def check(conn, t_now, opener=open_task):
     """지금 시작한 블록을 열고, 곧 시작할 과제 블록의 초안을 미리 맡긴다. 연 할 일 키 목록을 돌려준다."""
     c = cfg()
@@ -112,7 +124,7 @@ def check(conn, t_now, opener=open_task):
             continue
         try:
             what = opener(conn, task)
-            db.log(conn, "autoopen", task["key"], opened=what)
+            db.log(conn, "autoopen", task["key"], opened=what, start=start.isoformat(), end=end.isoformat())
             done.append(task["key"])
         except Exception as e:  # 열기 실패해도 엔진은 계속
             db.log(conn, "autoopen_failed", task["key"], error=str(e)[:200])

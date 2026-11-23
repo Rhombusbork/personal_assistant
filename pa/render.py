@@ -7,7 +7,8 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pa import ai, autosubmit, calibrate, db, jobs, materials, quiz, schedules, submit
+from pa import ai, autosubmit, calibrate, db, habits, jobs, materials, names, quiz, schedules, submit
+from pa import plan as plan_mod
 from pa.config import ROOT, load_timetable
 from pa.model import KIND_LABEL, kday, label, now, parse_dt, short_course
 
@@ -38,6 +39,19 @@ def load_plan(conn):
             for r in conn.execute("SELECT * FROM plan ORDER BY start")]
 
 
+def missed(conn, t_now):
+    """지난 이틀 동안 시간이 지났는데 안 끝낸 블록의 할 일 [{key, title, start}] (같은 일은 한 번)."""
+    out, seen = [], set()
+    rows = conn.execute("SELECT e.key, e.detail, t.title FROM events e JOIN tasks t ON t.key = e.key "
+                        "WHERE e.type = 'plan_missed' AND e.ts >= ? AND t.status = 'open' ORDER BY e.id DESC",
+                        ((t_now - timedelta(days=2)).isoformat(),)).fetchall()
+    for r in rows:
+        if r["key"] not in seen:
+            seen.add(r["key"])
+            out.append({"key": r["key"], "title": r["title"], "start": json.loads(r["detail"] or "{}").get("start")})
+    return out
+
+
 def today_md(conn):
     t_now = now()
     cfg = load_timetable()["planner"]
@@ -59,7 +73,7 @@ def today_md(conn):
 
     # 주의할 것
     warns = [w for k in ("inbox_warnings", "repo_warnings") for w in (db.get_meta(conn, k) or "").split("\n") if w]
-    warns += portal_warnings(conn) + peer_notes(conn)
+    warns += portal_warnings(conn) + peer_notes(conn) + [f"습관 줄을 읽지 못함: {w}" for w in habits.load()[1]]
     failed = [tasks[k] for k in (db.get_meta(conn, "plan_failed") or "").split(",") if k in tasks]
     if warns or failed:
         L += ["## ⚠️ 확인 필요", ""]
@@ -171,7 +185,7 @@ def dashboard_data(conn):
     why = json.loads(db.get_meta(conn, "plan_why") or "{}")
     plan = [{"key": k, "task": k.split("#")[0], "start": s.isoformat(), "end": e.isoformat(), "summary": summ,
              "why": why.get(k, ""), "kind": by_key[k.split("#")[0]].kind if k.split("#")[0] in by_key else "todo",
-             "fixed": "#고정" in k}  # 직접 정한 시간 (계획기가 옮기지 않음)
+             "fixed": "#고정" in k, "habit": k.startswith("h:")}  # 직접 정한 시간 (계획기가 옮기지 않음) · 습관
             for k, s, e, summ in load_plan(conn)]
     busy = [{"start": r["start"], "end": r["end"], "label": r["label"]} for r in conn.execute("SELECT * FROM busy")]
 
@@ -268,6 +282,11 @@ def dashboard_data(conn):
         "worklog": worklog(conn, by_key, t_now),
         "submissions": [dict(x, course=short_course(x["course"])) for x in submit.recent(conn)],  # 제출 기록 (휴대폰에서도 확인)
         "reviews": autosubmit.reviews(conn),          # 자동으로 냈고 ✅ 완성을 기다리는 것
+        "notes": db.notes(conn),                       # 작은 창의 짧은 이름·메모
+        "short": {t.key: names.short_name(t.title, short_course(t.course)) for t in all_tasks if t.status == "open"},
+        "courseColors": json.loads(db.get_meta(conn, "course_colors") or "{}"),
+        "played": plan_mod._played(conn),              # 강의: 비서가 틀어 준 분 (남은 분 짐작)
+        "missed": missed(conn, t_now),                 # 놓친 블록 (다시 짜기 버튼)
         "autoSubmits": autosubmit.upcoming(conn, t_now),  # 자동 제출 예정·결과
         "schedules": schedules.listing(conn, t_now),       # 고급 예약 목록
         "scheduleBlocks": schedules.blocks(conn, t_now - timedelta(days=t_now.weekday() + 7), t_now + timedelta(days=28)),

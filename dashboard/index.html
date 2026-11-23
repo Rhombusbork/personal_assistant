@@ -49,6 +49,7 @@
          font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "NanumBarunGothic", "NanumGothic", system-ui, sans-serif;
          -webkit-font-smoothing: antialiased; }
   main { max-width: 720px; margin: 0 auto; padding: var(--s5) var(--s3) 96px; }
+  body.ttwide main { max-width: 1320px; }  /* 주차별 시간표: 넓게 (서랍 + 7일) */
   @media (max-width: 600px) { main { padding: var(--s3) var(--s2) 96px; } }
   button, input, select, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; }
@@ -329,6 +330,51 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 11px; font-weight: 600; pointer-events: none; }
   .nowline { position: absolute; left: 0; right: 0; border-top: 2px solid var(--danger); z-index: 4; pointer-events: none; }
   .nowline::before { content: ""; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+
+  /* 시간표 도구·범례·서랍·작은 창·우클릭 */
+  .tt-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); margin: var(--s1) 0 0; }
+  .tt-legend { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+  .lg { border: 0; border-radius: 999px; padding: 2px 10px 2px 8px; font-size: 12px; cursor: pointer; user-select: none;
+    background: hsl(var(--h) var(--ev-s) var(--ev-l)); color: hsl(var(--h) 45% var(--ev-fg)); border-left: 4px solid hsl(var(--h) 60% 48%); }
+  .lg.solo { outline: 2px solid hsl(var(--h) 60% 48%); font-weight: 700; } .lg.hide { opacity: .4; text-decoration: line-through; }
+  .tt-zoom { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .tt-missed { margin-top: var(--s1); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .tt-wrap { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--s1); align-items: start; }
+  .tt-wrap.nodrawer { grid-template-columns: minmax(0, 1fr); }
+  @media (max-width: 1000px) { .tt-wrap { grid-template-columns: minmax(0, 1fr); } .tt-drawer { max-height: 220px; } }
+  .tt-drawer { border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; margin-top: var(--s1); max-height: min(70vh, 760px); overflow: auto; font-size: 13px; }
+  .tt-drawer summary { font-weight: 600; cursor: pointer; }
+  .dr-it { display: grid; grid-template-columns: 16px 1fr; gap: 0 6px; padding: 5px 6px; margin-top: 4px; border-radius: 6px; cursor: grab; touch-action: none;
+    background: hsl(var(--h) var(--ev-s) var(--ev-l2)); border-left: 3px solid hsl(var(--h) 60% 48%); user-select: none; }
+  .dr-it .dr-h { grid-row: span 2; opacity: .5; } .dr-it .dr-t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dr-it .meta { font-size: 11px; }
+  .tt-lines { position: absolute; inset: 0 0 0 44px; pointer-events: none; }
+  .tt-lines i { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); } .tt-lines i.hh { border-top: 1px dashed var(--fill2); }
+  .tt-col { background-image: none !important; z-index: 1; }
+  .tt-fold { position: absolute; left: 44px; right: 0; z-index: 2; border: 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line);
+    background: var(--fill); color: var(--text3); font-size: 11px; cursor: pointer; }
+  .daybar { height: 3px; border-radius: 2px; background: var(--fill2); margin: 3px 6px 0; overflow: hidden; }
+  .daybar i { display: block; height: 100%; background: var(--accent); } .daybar.over i { background: var(--danger); }
+  .ev.dim { opacity: .25; }
+  .rsz { position: absolute; left: 20%; right: 20%; bottom: 0; height: 6px; cursor: ns-resize; touch-action: none; border-radius: 3px; }
+  .ev:hover .rsz { background: hsl(var(--h) 50% 50% / .35); }
+  .tt.dense .ev { padding: 1px 20px 1px 5px; font-size: 11px; line-height: 1.15; } .tt.dense .ev-m { font-size: 10px; }
+  .tt.dense .tt-dh { padding: 3px 2px; font-size: 12px; }
+  body.dragging-now { cursor: grabbing; user-select: none; }
+  .pop { position: fixed; z-index: 60; width: min(320px, calc(100vw - 24px)); background: var(--elev); color: var(--text); border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; font-size: 13px; }
+  .pop:not(.pinned) { pointer-events: none; }
+  .pop-h { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; } .pop-h b { font-size: 14px; line-height: 1.35; }
+  .pop-m { color: var(--text2); margin-top: 4px; line-height: 1.5; }
+  .pop-a { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+  .pop .fl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text2); margin-top: 10px; }
+  .pop textarea { min-height: 64px; resize: vertical; font: inherit; } .pop-memo { margin-top: 8px; white-space: pre-wrap; color: var(--text2); }
+  .menu.ctx { position: fixed; z-index: 70; display: flex; flex-direction: column; min-width: 180px; padding: 4px; background: var(--elev);
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .menu.ctx button { text-align: left; padding: 8px 12px; border: 0; background: none; color: var(--text); border-radius: 6px; font-size: 13px; }
+  .menu.ctx button:hover, .menu.ctx button:focus-visible { background: var(--fill2); } .menu.ctx .danger { color: var(--danger); }
+  .review-card { border: 1px solid var(--accent); border-radius: 14px; padding: 12px 16px; margin: 0 0 var(--s3); background: color-mix(in srgb, var(--accent) 6%, var(--bg)); }
+  .review-card p { margin: 6px 0; }
   .schform .fl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text2); margin-top: 12px; }
   .schform textarea { min-height: 84px; resize: vertical; font: inherit; }
 
@@ -756,7 +802,8 @@ function render() {
     .filter(Boolean).join(" · ");
 
   const keep = document.activeElement?.closest?.("[data-row]")?.dataset.row;  // 30초 새로 고침에도 키보드 위치를 잃지 않게
-  $("view").innerHTML = view === "week" ? weekView(now, today) : todayView(now, today);
+  document.body.classList.toggle("ttwide", view === "week" && wkMode() === "grid");
+  $("view").innerHTML = reviewCardHtml(now, today) + (view === "week" ? weekView(now, today) : todayView(now, today));
   if (view === "week") gridAfterRender();
   $("title").textContent = view === "week" ? "주차별" : "오늘";
   $("more").innerHTML = moreHtml(now, today);
@@ -1096,30 +1143,46 @@ function weekView(now, today) {
   return h + `</div></section>`;
 }
 
-// ---- 주차별 시간표 (docs/week-grid-plan.md 1~3장): 요일 × 시간 칸 · 범위는 그 주 일정에 맞춤 · 겹치면 나란히 · 손잡이 ⠿ 로 끌기
-const HOUR_PX = 48, SNAP = 15;
-const wkMode = () => { try { return localStorage.getItem("pa.wkmode") || "grid"; } catch { return "grid"; } };
+// ---- 주차별 시간표 (docs/week-grid-plan.md): 요일 × 시간 · 범위는 그 주 일정에 맞춤 · 3시간 넘게 빈 곳은 접음 · 겹치면 나란히 ·
+//      손잡이 ⠿ 로 옮기기 (Alt = 복제) · 아래 끝으로 길이 · 누르면 작은 창(메모) · 마우스 올리면 미리보기 · 우클릭 · 서랍에서 끌어 넣기 ·
+//      확대·촘촘 · 과목 색 범례(누르면 걸러 보기, 길게 누르면 색 바꾸기) · 하루 합계 막대 · 단축키
+const SNAP = 15, FOLD_MIN = 180, FOLD_PX = 24;
+const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+let HOUR_PX = Math.max(24, Math.min(120, +lsGet("pa.hourpx", 48) || 48));
+const wkMode = () => lsGet("pa.wkmode", "grid");
 const hueOf = str => { let h = 7; for (const c of String(str || "")) h = (h * 31 + c.codePointAt(0)) % 360; return h; };
 const courseName = str => String(str || "").replace(/^[^\p{L}\p{N}]+/u, "").split(/\s*[·(\[]/)[0].trim();
+const courseKey = str => courseName(str).replace(/\s*[ⅠⅡⅢⅣⅤ\d]+$/u, "").trim();
+const hueFor = c => { const k = courseKey(c), o = (D.courseColors || {})[k]; return o != null ? o : hueOf(k); };
 const minOf = d => d.getHours() * 60 + d.getMinutes();
+const baseKey = k => String(k || "").split("#")[0];
+const habitName = k => (String(k || "").match(/^h:(.+)@/) || [])[1];
+const noteKey = k => habitName(k) ? "h:" + habitName(k) : baseKey(k);
+const noteOf = k => (D.notes || {})[noteKey(k)] || {};
+let EVS = [], TT = null;  // 이번에 그린 블록들 · 시간 ↔ 높이 (접힌 구간 포함)
+
 function gridEvents() {
   const ev = [];
   for (const b of D.busy || []) ev.push({ type: "busy", start: b.start, end: b.end, title: b.label.replace(/^\S*🏫\s*/u, ""), course: courseName(b.label) });
   for (const p of D.plan || []) {
+    if (p.habit) { ev.push({ type: "habit", key: p.key, start: p.start, end: p.end, title: habitName(p.key), course: "", why: p.why }); continue; }
     const t = findTask(p.task);
     ev.push({ type: "plan", key: p.key, start: p.start, end: p.end, fixed: p.fixed, kind: p.kind, t, why: p.why,
               title: t ? t.title : p.summary.replace(/^\[[^\]]+\]\s*/, ""), course: t ? t.course : "" });
   }
   for (const r of D.scheduleBlocks || []) ev.push({ type: "sched", id: r.id, start: r.start, end: r.end, title: r.title, action: r.action, every: r.every, course: "" });
-  return ev;
+  const f = UI.ttf || {}, solo = Object.keys(f).filter(k => f[k] === "solo");
+  return ev.filter(x => f[courseKey(x.course)] !== "hide").map(x => ({ ...x, dim: solo.length && !solo.includes(courseKey(x.course)) }));
 }
-function gridPieces(ev, d) {  // 그날 칸에 들어갈 조각 (자정을 넘으면 나눔) — s·e 는 그날 0시부터 분
+const shortOf = x => x.type === "plan" ? (noteOf(x.key).short || (x.t && (D.short || {})[x.t.key]) || x.title) : x.title;
+function gridPieces(ev, d) {  // 그날 칸의 조각 (자정을 넘으면 나눔) — s·e 는 그날 0시부터 분. 겹치면 묶음마다 칸 나누기
   const d0 = new Date(d + "T00:00:00"), d1 = new Date(d0.getTime() + 864e5), out = [];
   for (const x of ev) {
     const s = Math.max(dt(x.start), d0), e = Math.min(dt(x.end), d1);
     if (e > s) out.push({ x, s: (s - d0) / 6e4, e: (e - d0) / 6e4 });
   }
-  out.sort((a, b) => a.s - b.s || b.e - a.e);  // 겹치면 나란히: 묶음마다 칸 나누기
+  out.sort((a, b) => a.s - b.s || b.e - a.e);
   let group = [], ends = [], gEnd = -1;
   const flush = () => { group.forEach(p => p.n = ends.length); group = []; ends = []; };
   for (const p of out) {
@@ -1131,129 +1194,383 @@ function gridPieces(ev, d) {  // 그날 칸에 들어갈 조각 (자정을 넘�
   flush();
   return out;
 }
+function buildTT(h0, h1, pieces) {  // 3시간 넘게 아무것도 없는 구간(모든 요일 공통)은 얇은 띠로
+  const occ = pieces.map(p => [p.s, p.e]).sort((a, b) => a[0] - b[0]), merged = [];
+  for (const [s, e] of occ) { const l = merged[merged.length - 1]; if (l && s <= l[1]) l[1] = Math.max(l[1], e); else merged.push([s, e]); }
+  const folds = [];
+  if (!UI.ttUnfold) {
+    let prev = h0 * 60;
+    for (const [s, e] of [...merged, [h1 * 60, h1 * 60]]) {
+      const a = Math.ceil((prev + 30) / 60) * 60, b = Math.floor((s - 30) / 60) * 60;
+      if (s - prev >= FOLD_MIN && b - a >= 120) folds.push([a, b]);
+      prev = Math.max(prev, e);
+    }
+  }
+  const segs = [], ppm = HOUR_PX / 60;
+  let m = h0 * 60, y = 0;
+  for (const [a, b] of [...folds, [h1 * 60, h1 * 60]]) {
+    if (a > m) { segs.push({ a: m, b: a, y, ppm, fold: false }); y += (a - m) * ppm; }
+    if (b > a) { segs.push({ a, b, y, ppm: FOLD_PX / (b - a), fold: true }); y += FOLD_PX; }
+    m = b;
+  }
+  return { h0, h1, segs, height: y };
+}
+function minToY(m) {
+  const s = TT.segs.find(g => m >= g.a && m <= g.b) || (m < TT.h0 * 60 ? TT.segs[0] : TT.segs[TT.segs.length - 1]);
+  return s.y + (Math.max(s.a, Math.min(s.b, m)) - s.a) * s.ppm;
+}
+function yToMin(y) {
+  const s = TT.segs.find(g => y >= g.y && y <= g.y + (g.b - g.a) * g.ppm) || (y < 0 ? TT.segs[0] : TT.segs[TT.segs.length - 1]);
+  const m = s.a + (Math.max(0, y - s.y)) / s.ppm;
+  return s.fold ? (m - s.a < (s.b - s.a) / 2 ? s.a : s.b) : Math.max(TT.h0 * 60, Math.min(TT.h1 * 60, m));
+}
 function evIcon(x) {
   if (x.type === "sched") return (SCH_ICON[x.action] || "⏰") + " ";
+  if (x.type === "habit") return "🔁 ";
   if (x.type !== "plan") return "";
   const au = x.t && (D.autoSubmits || []).some(a => a.key === x.t.key);
-  return (x.fixed ? "📌" : "") + ({ lecture: "▶", quiz: "❓", review: "🔁" }[x.kind] || "") + (au ? "📤" : "") + (x.fixed || x.kind === "lecture" || au ? " " : "");
+  const ic = (x.fixed ? "📌" : "") + ({ lecture: "▶", quiz: "❓", review: "🔁" }[x.kind] || "") + (au ? "📤" : "") + (noteOf(x.key).memo ? "✎" : "");
+  return ic ? ic + " " : "";
+}
+function legendHtml(ev) {
+  const cs = [...new Set(ev.map(x => courseKey(x.course)).filter(Boolean))].sort(), f = UI.ttf || {};
+  const hidden = Object.keys(f).filter(k => f[k] === "hide" && !cs.includes(k));
+  return `<div class="tt-legend" role="group" aria-label="과목 — 누르면 그 과목만 · 한 번 더 누르면 숨기기 · 길게 누르면 색 바꾸기">${[...cs, ...hidden].map(c =>
+    `<button class="lg ${f[c] || ""}" data-act="lg" data-course="${esc(c)}" style="--h:${hueFor(c)}" title="누르면 ${f[c] === "solo" ? "숨기기" : f[c] === "hide" ? "다시 보이기" : "이 과목만"} · 길게 누르면 색 바꾸기">${esc(c)}</button>`).join("")}</div>`;
+}
+function drawerItems(now) {
+  const planned = new Set((D.plan || []).filter(p => dt(p.end) > now).map(p => p.task));
+  return [...(D.tasks || []).filter(t => t.status === "open" && !planned.has(t.key)), ...(D.someday || [])]
+    .filter((t, i, a) => a.findIndex(x => x.key === t.key) === i).slice(0, 40);
+}
+function drawerHtml(now) {
+  const L = drawerItems(now), open = lsGet("pa.drawer", "1") === "1";
+  return `<details class="tt-drawer" ${open ? "open" : ""} data-drawer><summary>할 일 서랍 <span class="meta">${L.length}</span></summary>
+    <p class="small">시간 안 정한 일 — 끌어서 시간표에 놓으면 그 시간에 📌</p>
+    <form class="inline" data-form="habit"><input class="field" name="h" placeholder="＋ 습관: 복습 ~1h 매일 저녁" aria-label="습관 추가 (예: 운동 ~40m 주3회 · 영어 ~20m 매주:월,수 아침)"
+      title="이름 ~길이 매일|주N회|매주:월,수 [아침|오후|저녁|19-22시] — 바쁜 날은 건너뜀"><button class="btn" type="submit" style="height:32px">추가</button></form>
+    ${L.map(t => `<div class="dr-it" data-key="${esc(t.key)}" data-min="${t.minutes || 60}" style="--h:${hueFor(t.course)}" title="${esc(t.title)}">
+      <span class="dr-h" aria-hidden="true">⠿</span><span class="dr-t">${esc((D.short || {})[t.key] || t.title)}</span>
+      <span class="meta">${[t.course && esc(t.course), t.due ? "마감 " + label(ymd(t.due)) : "기한 없음", dur(t.minutes || 60)].filter(Boolean).join(" · ")}</span></div>`).join("")
+      || `<p class="empty">모두 시간이 잡혀 있어요</p>`}</details>`;
 }
 function gridHtml(allDays, now, today, w) {
-  const narrow = window.innerWidth < 700, ev = gridEvents();
+  const narrow = window.innerWidth < 700, ev = gridEvents(), canMove = LIVE && !MOB;
   let days = allDays;
-  if (narrow) {  // 좁은 화면: 3일씩 (‹ › 로 넘기기)
+  if (narrow) {  // 좁은 화면: 3일씩
     if (UI.ttOff == null) UI.ttOff = Math.max(0, Math.min(4, allDays.indexOf(today)));
     UI.ttOff = Math.max(0, Math.min(4, UI.ttOff));
     days = allDays.slice(UI.ttOff, UI.ttOff + 3);
   }
   const per = days.map(d => gridPieces(ev, d)), all = per.flat();
-  let h0 = 9, h1 = 18;  // 일정이 없으면 9~18시
+  let h0 = 9, h1 = 18;
   if (all.length) {
     h0 = Math.max(0, Math.floor((Math.min(...all.map(p => p.s)) - 30) / 60));
     h1 = Math.min(24, Math.ceil((Math.max(...all.map(p => p.e)) + 30) / 60));
     if (h1 - h0 < 4) h1 = Math.min(24, h0 + 4);
   }
-  const px = HOUR_PX / 60, top = m => (m - h0 * 60) * px, n = days.length, canMove = LIVE && !MOB;
-  const open = w.items.filter(x => x.status === "open");
+  TT = buildTT(h0, h1, all);
+  EVS = [];
+  const n = days.length, open = w.items.filter(x => x.status === "open"), dense = lsGet("pa.dense", "0") === "1";
+  const tools = `<div class="tt-tools">${legendHtml(ev)}<span class="tt-zoom">
+    <button class="icon-btn" data-act="zoom" data-step="-12" aria-label="작게 (−)" title="작게 (−, Ctrl+휠)">−</button>
+    <button class="icon-btn" data-act="zoom" data-step="12" aria-label="크게 (+)" title="크게 (+, Ctrl+휠)">＋</button>
+    <button class="tbtn gray" data-act="dense" title="촘촘 / 넉넉">${dense ? "넉넉하게" : "촘촘하게"}</button>
+    ${UI.ttUnfold ? `<button class="tbtn gray" data-act="ttfold">빈 시간 접기</button>` : ""}</span></div>`;
+  const missed = LIVE && (D.missed || []).length ? `<div class="cline warn tt-missed"><b>놓친 블록 ${D.missed.length}개</b> <span class="meta">${D.missed.slice(0, 3).map(m => esc((D.short || {})[m.key] || m.title)).join(", ")}${D.missed.length > 3 ? " …" : ""}</span>
+    <button class="tbtn" data-act="replan" data-label="다시 짜기">다음 빈 시간으로 다시 짜기</button></div>` : "";
   const nav = narrow ? `<div class="ttnav"><button class="icon-btn" data-act="ttoff" data-step="-3" ${UI.ttOff ? "" : "disabled"} aria-label="앞 3일">‹</button>
     <span class="num">${label(days[0])} – ${label(days[n - 1])}</span><button class="icon-btn" data-act="ttoff" data-step="3" ${UI.ttOff >= 4 ? "disabled" : ""} aria-label="다음 3일">›</button></div>` : "";
   let hd = `<div class="tt-head" style="--n:${n}"><div class="tt-corner"></div>`;
   days.forEach((d, i) => {
     const dd = new Date(d + "T12:00:00"), dl = open.filter(x => ymd(x.due) === d).sort((a, b) => dt(a.due) - dt(b.due));
+    const mins = per[i].filter(p => p.x.type === "plan" || p.x.type === "habit").reduce((a, p) => a + p.e - p.s, 0), cap = D.cap || 240;
     hd += `<div class="tt-dh${d === today ? " today" : ""}"><b>${WD[dd.getDay()]}</b> <span class="num">${dd.getMonth() + 1}/${dd.getDate()}</span>
-      ${dl.slice(0, 3).map(x => `<button class="dl" data-act="evtask" data-key="${esc(x.key)}" title="마감 ${hm(x.due)} · ${esc(x.title)}">⏰ ${hm(x.due)} ${esc(x.title)}</button>`).join("")}
+      <div class="daybar${mins > cap ? " over" : ""}" title="계획 ${dur(mins)} / 하루 최대 ${dur(cap)}${mins > cap ? " — 넘침" : " · 여유 " + dur(cap - mins)}"><i style="width:${Math.min(100, mins / cap * 100)}%"></i></div>
+      ${dl.slice(0, 3).map(x => `<button class="dl" data-act="evtask" data-key="${esc(x.key)}" title="마감 ${hm(x.due)} · ${esc(x.title)}">⏰ ${hm(x.due)} ${esc((D.short || {})[x.key] || x.title)}</button>`).join("")}
       ${dl.length > 3 ? `<span class="dlmore">+${dl.length - 3}</span>` : ""}</div>`;
   });
   hd += `</div>`;
-  let body = `<div class="tt-body" id="ttBody"><div class="tt-grid" style="--n:${n};--hpx:${HOUR_PX}px;height:${(h1 - h0) * HOUR_PX}px" data-h0="${h0}">
-    <div class="tt-times">${Array.from({ length: h1 - h0 }, (_, i) => `<span style="top:${i * HOUR_PX}px">${String(h0 + i).padStart(2, "0")}</span>`).join("")}</div>`;
+  const lines = [];
+  for (const g of TT.segs) {
+    if (g.fold) { lines.push(`<button class="tt-fold" data-act="ttunfold" style="top:${g.y}px;height:${FOLD_PX}px">${String(g.a / 60).padStart(2, "0")}–${String(g.b / 60).padStart(2, "0")}시 비어 있음 · 펼치기</button>`); continue; }
+    for (let m = Math.ceil(g.a / 30) * 30; m < g.b; m += 30) lines.push(`<i class="${m % 60 ? "hh" : "h"}" style="top:${minToY(m)}px"></i>`);
+  }
+  const labels = TT.segs.filter(g => !g.fold).flatMap(g => { const o = []; for (let m = Math.ceil(g.a / 60) * 60; m < g.b; m += 60) o.push(`<span style="top:${minToY(m)}px">${String(m / 60).padStart(2, "0")}</span>`); return o; });
+  let body = `<div class="tt-body" id="ttBody"><div class="tt-grid" style="--n:${n};height:${TT.height}px"><div class="tt-times">${labels.join("")}</div>
+    <div class="tt-lines" aria-hidden="true">${lines.join("")}</div>`;
   days.forEach((d, i) => {
     body += `<div class="tt-col${d === today ? " today" : ""}" data-day="${d}">`;
     for (const p of per[i]) {
-      const x = p.x, hgt = Math.max((p.e - p.s) * px, 18), past = dt(x.end) <= now;
+      const x = p.x, y0 = minToY(p.s), hgt = Math.max(minToY(p.e) - y0, 18), past = dt(x.end) <= now, idx = EVS.push(x) - 1;
       const movable = canMove && !past && (x.type === "sched" || (x.type === "plan" && x.t && x.t.status === "open"));
-      const tip = [x.title, `${hm(x.start)}–${hm(x.end)}`, x.course, x.t && x.t.due ? "마감 " + label(ymd(x.t.due)) + " " + hm(x.t.due) : "", x.why, x.fixed ? "직접 정한 시간" : ""].filter(Boolean).join(" · ");
-      body += `<div class="ev ${x.type}${x.fixed ? " fixed" : ""}${past ? " past" : ""}${hgt < 32 ? " short" : ""}" tabindex="0" title="${esc(tip)}"
-        style="top:${top(p.s)}px;height:${hgt}px;left:calc(${p.c / p.n * 100}% + 2px);width:calc(${100 / p.n}% - 4px);--h:${hueOf(x.course || x.title)}"
+      body += `<div class="ev ${x.type}${x.fixed ? " fixed" : ""}${past ? " past" : ""}${x.dim ? " dim" : ""}${hgt < 32 ? " short" : ""}" tabindex="0" data-ev="${idx}"
+        style="top:${y0}px;height:${hgt}px;left:calc(${p.c / p.n * 100}% + 2px);width:calc(${100 / p.n}% - 4px);--h:${hueFor(x.course || x.title)}"
         ${x.type === "busy" ? "" : `data-act="evopen"`} data-type="${x.type}" data-key="${esc(x.key || (x.t ? x.t.key : ""))}" data-id="${x.id || ""}"
-        data-start="${x.start}" data-end="${x.end}" data-fixed="${x.fixed ? 1 : ""}">${movable ? `<button class="hdl" aria-label="끌어서 옮기기: ${esc(x.title)}" title="끌어서 옮기기 (15분 단위 · Esc 취소)">⠿</button>` : ""}
-        <div class="ev-t">${evIcon(x)}${esc(x.title)}</div><div class="ev-m">${hm(x.start)}–${hm(x.end)}${x.course ? " · " + esc(x.course) : ""}</div></div>`;
+        data-start="${x.start}" data-end="${x.end}" data-fixed="${x.fixed ? 1 : ""}">${movable ? `<button class="hdl" aria-label="끌어서 옮기기: ${esc(x.title)}" title="끌어서 옮기기 · Alt 누른 채 끌면 복제 · Esc 취소">⠿</button>` : ""}
+        <div class="ev-t">${evIcon(x)}${esc(shortOf(x))}</div><div class="ev-m">${hm(x.start)}–${hm(x.end)}${x.course ? " · " + esc(x.course) : ""}</div>
+        ${movable && hgt >= 32 ? `<span class="rsz" aria-hidden="true" title="끌어서 길이 바꾸기"></span>` : ""}</div>`;
     }
-    if (d === today && minOf(now) >= h0 * 60 && minOf(now) <= h1 * 60) body += `<div class="nowline" style="top:${top(minOf(now))}px"></div>`;
+    if (d === today && minOf(now) >= h0 * 60 && minOf(now) <= h1 * 60) body += `<div class="nowline" style="top:${minToY(minOf(now))}px"></div>`;
     body += `</div>`;
   });
-  return `${nav}<div class="tt">${hd}${body}</div></div></div>`;
+  return `${tools}${missed}${nav}<div class="tt-wrap${canMove ? "" : " nodrawer"}">${canMove ? drawerHtml(now) : ""}<div class="tt${dense ? " dense" : ""}">${hd}${body}</div></div></div></div>`;
 }
 function gridAfterRender() {  // 30초마다 다시 그려도 보던 위치 그대로. 처음엔 지금 시각이 보이게
   const tb = $("ttBody");
   if (!tb) return;
-  const g = tb.querySelector(".tt-grid"), h0 = +g.dataset.h0;
-  tb.scrollTop = UI.ttScroll != null ? UI.ttScroll : Math.max(0, (minOf(new Date()) - h0 * 60 - 60) * HOUR_PX / 60);
+  tb.scrollTop = UI.ttScroll != null ? UI.ttScroll : Math.max(0, minToY(minOf(new Date())) - 60);
   tb.onscroll = () => { UI.ttScroll = tb.scrollTop; };
 }
-// 끌기: 손잡이에서만 (몸통은 눌러서 메뉴·휴대폰 스크롤). 5px 넘게 움직여야 시작, 15분 맞춤, 다른 요일로도, Esc 취소, 끝 근처에서 자동 스크롤
+function setZoom(px, tb) {  // 보던 가운데 시각을 그대로
+  const center = tb && TT ? yToMin(tb.scrollTop + tb.clientHeight / 2) : null;
+  HOUR_PX = Math.max(24, Math.min(120, px)); lsSet("pa.hourpx", HOUR_PX);
+  render();
+  const nb = $("ttBody");
+  if (nb && center != null) { nb.scrollTop = Math.max(0, minToY(center) - nb.clientHeight / 2); UI.ttScroll = nb.scrollTop; }
+}
+
+// -- 작은 창: 누르면 고정(메모·이름 고치기), 마우스를 올리면 보기만
+function popEl() { let p = $("pop"); if (!p) { p = document.createElement("div"); p.id = "pop"; p.className = "pop"; p.hidden = true; p.setAttribute("role", "dialog"); document.body.appendChild(p); } return p; }
+function popHtml(x, pinned) {
+  const t = x.t, nk = noteKey(x.key || ""), note = noteOf(x.key || ""), today = ymdOf(new Date());
+  const au = t && (D.autoSubmits || []).find(a => a.key === t.key), played = t && (D.played || {})[t.key];
+  const meta = [x.course && esc(x.course), `${label(ymd(x.start))} ${hm(x.start)}–${hm(x.end)}`, t && t.due ? `마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})` : "",
+    t && t.kind === "lecture" && played ? `약 ${Math.max(0, (t.minutes || 0) - played)}분 남음 (비서가 ${played}분 틀어 줌)` : "",
+    x.fixed ? "📌 직접 정한 시간" : x.why ? esc(x.why) : "", au ? `📤 ${label(ymd(au.at))} ${hm(au.at)} 자동 제출` : "",
+    x.type === "sched" ? `${esc((D.scheduleMeta || { actions: {} }).actions[x.action] || "")}${x.every ? " · " + ((D.scheduleMeta || { every: {} }).every[x.every] || "") : ""}` : ""].filter(Boolean);
+  let main = "", more = "";
+  if (x.type === "plan" && t) {
+    const P = primaryOf(t);
+    main = P ? `<button class="btn primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>` : "";
+    more = LIVE && !MOB ? `<button class="tbtn" data-act="slot" data-key="${esc(t.key)}" data-pkey="${esc(x.key)}">시간 바꾸기</button><button class="icon-btn" data-act="popmenu" data-key="${esc(t.key)}" aria-label="더 보기">⋯</button>` : "";
+  } else if (x.type === "habit") main = LIVE ? `<button class="btn primary" data-act="habit-done" data-key="${esc(x.key)}">✓ 했음</button>` : "";
+  else if (x.type === "sched") { main = LIVE ? `<button class="btn primary" data-act="sched-run" data-id="${x.id}">지금 실행</button>` : ""; more = LIVE ? `<button class="tbtn" data-act="sched-edit" data-id="${x.id}">고치기</button>` : ""; }
+  const edit = pinned && LIVE && !MOB && x.type !== "busy";
+  return `<div class="pop-h"><b>${evIcon(x)}${esc(x.title)}</b>${pinned ? `<button class="icon-btn" data-ui="popclose" aria-label="닫기">✕</button>` : ""}</div>
+    <div class="pop-m">${meta.join("<br>")}</div>
+    ${main || more ? `<div class="pop-a">${main}${more}</div>` : ""}
+    ${edit ? `${x.type === "plan" ? `<label class="fl">블록에 보일 이름<input class="field" data-note="short" data-nk="${esc(nk)}" value="${esc(note.short || "")}" placeholder="${esc(shortOf({ ...x, key: "" }))}"></label>` : ""}
+      <label class="fl">메모<textarea class="field" data-note="memo" data-nk="${esc(nk)}" rows="3" placeholder="이 일에 대한 메모 — 적으면 저절로 저장">${esc(note.memo || "")}</textarea></label>`
+      : note.memo ? `<div class="pop-memo">✎ ${esc(note.memo)}</div>` : ""}`;
+}
+function showPop(el, pinned) {
+  const x = EVS[+el.dataset.ev];
+  if (!x) return;
+  const p = popEl();
+  p.innerHTML = popHtml(x, pinned); p.hidden = false; p.classList.toggle("pinned", pinned);
+  UI.pop = { el, pinned, ev: el.dataset.ev };
+  const r = el.getBoundingClientRect(), W = p.offsetWidth, H = p.offsetHeight;
+  let left = r.right + 8; if (left + W > innerWidth - 12) left = Math.max(12, r.left - W - 8);
+  let top = Math.max(12, Math.min(innerHeight - H - 12, r.top));
+  p.style.left = left + "px"; p.style.top = top + "px";
+  if (pinned) p.querySelector("[data-autofocus], .btn.primary, textarea")?.focus({ preventScroll: true });
+}
+function hidePop() { const p = $("pop"); if (p) p.hidden = true; UI.pop = null; }
+let popTimer, noteTimer;
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest?.(".ev");
+  if (!el || MOB || DRAG.on || (UI.pop && UI.pop.pinned)) return;
+  clearTimeout(popTimer); popTimer = setTimeout(() => showPop(el, false), 400);
+});
+document.addEventListener("mouseout", e => {
+  const el = e.target.closest?.(".ev");
+  if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
+  clearTimeout(popTimer);
+  if (UI.pop && !UI.pop.pinned) hidePop();
+});
+document.addEventListener("input", e => {  // 작은 창의 이름·메모: 적으면 저절로 저장
+  const f = e.target.dataset && e.target.dataset.note;
+  if (!f) return;
+  const nk = e.target.dataset.nk, v = e.target.value;
+  D.notes = D.notes || {}; D.notes[nk] = { ...(D.notes[nk] || {}), [f]: v };
+  clearTimeout(noteTimer); noteTimer = setTimeout(() => api("note", { key: nk, [f]: v }).catch(err => toast(err.message)), 700);
+});
+document.addEventListener("focusout", e => { if (e.target.dataset && e.target.dataset.note === "short") { clearTimeout(noteTimer); api("note", { key: e.target.dataset.nk, short: e.target.value }).then(() => { if (view === "week") render(); }); } });
+document.addEventListener("mousedown", e => {  // 작은 창·우클릭 메뉴 바깥을 누르면 닫기
+  if (e.target.closest('[data-ui="popclose"]')) { hidePop(); return; }
+  if (UI.pop && UI.pop.pinned && !e.target.closest("#pop") && !e.target.closest(".ev")) hidePop();
+  if (!e.target.closest("#ctx")) $("ctx")?.remove();
+});
+
+// -- 우클릭 메뉴
+document.addEventListener("contextmenu", e => {
+  if (!LIVE || MOB) return;
+  const lg = e.target.closest(".lg");
+  if (lg) { e.preventDefault(); colorSheet(lg.dataset.course); return; }
+  const el = e.target.closest(".ev"), col = e.target.closest(".tt-col");
+  if (!el && !col) return;
+  e.preventDefault(); hidePop(); $("ctx")?.remove();
+  const it = [];
+  if (el) {
+    const x = EVS[+el.dataset.ev], t = x && x.t, k = esc(x ? x.key || "" : "");
+    if (x && x.type === "plan" && t) {
+      it.push([`data-act="done" data-key="${esc(t.key)}"`, t.kind === "lecture" ? "들었음" : "완료"], [`data-act="slot" data-key="${esc(t.key)}" data-pkey="${k}"`, "시간 정하기…"]);
+      if (t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) { const au = (D.autoSubmits || []).some(a => a.key === t.key);
+        it.push([`data-act="${au ? "autosub-off" : "autosub-on"}" data-key="${esc(t.key)}"`, au ? "📤 자동 제출 끄기" : "📤 자동 제출 켜기"]); }
+      it.push([`data-act="dup" data-key="${k}" data-start="${x.start}" data-end="${x.end}"`, "복제 (바로 뒤에)"]);
+      if (x.fixed) it.push([`data-act="slot-clear" data-key="${k}"`, "정한 시간 풀기 (자동으로)"]);
+      it.push([`data-act="ignore" data-key="${esc(t.key)}" class="danger"`, "제외…"]);
+    } else if (x && x.type === "habit") it.push([`data-act="habit-done" data-key="${k}"`, "✓ 했음 (그날은 끝)"]);
+    else if (x && x.type === "sched") it.push([`data-act="sched-run" data-id="${x.id}"`, "지금 실행"], [`data-act="sched-edit" data-id="${x.id}"`, "고치기"],
+      [`data-act="sched-dup" data-id="${x.id}"`, "복제 (바로 뒤에)"], [`data-act="sched-del" data-id="${x.id}" class="danger"`, "지우기"]);
+  } else {
+    const g = col.closest(".tt-grid").getBoundingClientRect(), m = Math.floor(yToMin(e.clientY - g.top) / SNAP) * SNAP;
+    const at = new Date(col.dataset.day + "T00:00:00"); at.setMinutes(m);
+    it.push([`data-act="sched-here" data-at="${at.toISOString()}"`, `여기에 예약 (${hm(at.toISOString())})`]);
+  }
+  if (!it.length) return;
+  const m = document.createElement("div");
+  m.id = "ctx"; m.className = "menu ctx"; m.setAttribute("role", "menu");
+  m.innerHTML = it.map(([a, l]) => `<button role="menuitem" ${a}>${l}</button>`).join("");
+  document.body.appendChild(m);
+  m.style.left = Math.min(e.clientX, innerWidth - m.offsetWidth - 8) + "px";
+  m.style.top = Math.min(e.clientY, innerHeight - m.offsetHeight - 8) + "px";
+  m.querySelector("button").focus();
+});
+
+// -- 끌기: 손잡이 ⠿ (옮기기 · Alt = 복제) · 아래 끝 (길이) · 서랍 (새로 넣기). 5px 넘게 움직여야 시작, 15분 맞춤, Esc 취소, 끝 근처 자동 스크롤
 const DRAG = { on: false };
 function dragEnd(commit) {
   const g = DRAG;
   DRAG.on = false;
-  if (commit && g.moved && g.ns && g.ghost?.parentNode) {  // 놓자마자 그 자리로 (저장·다시 계획은 뒤에서)
+  document.body.classList.remove("dragging-now");
+  if (commit && g.moved && g.ns && g.ghost?.parentNode && g.mode === "move" && !g.copy) {  // 놓자마자 그 자리로
     g.ghost.parentNode.appendChild(g.ev);
-    Object.assign(g.ev.style, { top: g.ghost.style.top, left: "2px", width: "calc(100% - 4px)" });
-    g.ev.classList.add("fixed");
-    const m = g.ev.querySelector(".ev-m");
-    if (m) m.textContent = `${hm(g.ns.toISOString())}–${hm(g.ne.toISOString())} · 저장 중…`;
+    Object.assign(g.ev.style, { top: g.ghost.style.top, height: g.ghost.style.height, left: "2px", width: "calc(100% - 4px)" });
+    const m = g.ev.querySelector(".ev-m"); if (m) m.textContent = `${hm(g.ns.toISOString())}–${hm(g.ne.toISOString())} · 저장 중…`;
   }
-  g.ghost?.remove();
-  g.ev?.classList.remove("dragging");
-  if (g.moved) g.done = Date.now();  // 끈 뒤 손을 뗄 때 생기는 클릭은 무시 (취소했어도)
+  g.ghost?.remove(); g.ev?.classList.remove("dragging");
+  if (g.moved) g.done = Date.now();
   if (!commit || !g.moved || !g.ns) { if (render.pending) { render.pending = false; render(); } return; }
   const s = g.ns.toISOString(), e = g.ne.toISOString();
-  if (g.type === "sched")
-    run(() => post("schedule/move", { id: +g.ev.dataset.id, start: s, end: e, orig: g.start.toISOString() })).then(r => r &&
-      toast(r.message, () => post("schedule/move", { id: +g.ev.dataset.id, start: g.start.toISOString(), end: g.end.toISOString(), orig: s })));
-  else moveBlock(g.ev.dataset.key, s, e, g.ev.dataset.fixed ? [g.start.toISOString(), g.end.toISOString()] : null);
+  if (g.mode === "new") { moveBlock(g.key, s, e, null); return; }
+  if (g.type === "sched") {
+    const id = +g.ev.dataset.id, r = (D.schedules || []).find(x => x.id === id);
+    if (g.copy && r) { run(() => post("schedule/save", { title: r.title, start: s, end: e, every: r.every, action: r.action, args: r.args }), "예약을 복제했어요"); return; }
+    run(() => post("schedule/move", { id, start: s, end: e, orig: g.start.toISOString() })).then(r2 => r2 &&
+      toast(r2.message, () => post("schedule/move", { id, start: g.start.toISOString(), end: g.end.toISOString(), orig: s })));
+    return;
+  }
+  if (g.copy) { run(() => post("move", { key: g.ev.dataset.key, start: s, end: e, copy: true })).then(r => r && toast("복제했어요", () => post("unslot", { key: r.key }))); return; }
+  moveBlock(g.ev.dataset.key, s, e, g.ev.dataset.fixed ? [g.start.toISOString(), g.end.toISOString()] : null);
 }
 document.addEventListener("pointerdown", e => {
-  const hd = e.target.closest(".hdl");
-  if (!hd || e.button !== 0) return;
-  const ev = hd.closest(".ev"), body = ev.closest(".tt-body");
-  e.preventDefault(); e.stopPropagation();
-  hd.setPointerCapture(e.pointerId);
-  Object.assign(DRAG, { on: true, moved: false, ev, body, pid: e.pointerId, x0: e.clientX, y0: e.clientY, st0: body.scrollTop, ghost: null, ns: null,
-    type: ev.dataset.type, start: dt(ev.dataset.start), end: dt(ev.dataset.end), cols: [...body.querySelectorAll(".tt-col")],
-    col0: ev.closest(".tt-col"), h0: +body.querySelector(".tt-grid").dataset.h0 });
+  if (e.button !== 0 || !LIVE || MOB) return;
+  const hd = e.target.closest(".hdl"), rz = e.target.closest(".rsz"), dr = e.target.closest(".dr-it");
+  if (!hd && !rz && !dr) return;
+  const body = $("ttBody");
+  if (!body) return;
+  e.preventDefault(); e.stopPropagation(); hidePop();
+  (hd || rz || dr).setPointerCapture(e.pointerId);
+  const ev = (hd || rz) && (hd || rz).closest(".ev"), grid = body.querySelector(".tt-grid");
+  Object.assign(DRAG, { on: true, moved: false, ev, body, grid, pid: e.pointerId, x0: e.clientX, y0: e.clientY, ghost: null, ns: null,
+    mode: dr ? "new" : rz ? "resize" : "move", copy: !!(hd && e.altKey), cols: [...body.querySelectorAll(".tt-col")],
+    key: dr && dr.dataset.key, mins: dr && +dr.dataset.min, label: dr && dr.querySelector(".dr-t").textContent });
+  if (ev) {
+    Object.assign(DRAG, { type: ev.dataset.type, start: dt(ev.dataset.start), end: dt(ev.dataset.end), col0: ev.closest(".tt-col") });
+    DRAG.grab = e.clientY - ev.getBoundingClientRect().top;  // 블록 안에서 잡은 위치
+  }
 });
 document.addEventListener("pointermove", e => {
   if (!DRAG.on || e.pointerId !== DRAG.pid) return;
-  const g = DRAG, dy0 = e.clientY - g.y0;
-  if (!g.moved && Math.hypot(e.clientX - g.x0, dy0) < 5) return;
-  if (!g.moved) { g.moved = true; g.ev.classList.add("dragging"); }
+  const g = DRAG;
+  if (!g.moved && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < 5) return;
+  if (!g.moved) { g.moved = true; g.ev?.classList.add("dragging"); document.body.classList.add("dragging-now"); }
   const r = g.body.getBoundingClientRect();  // 위·아래 끝 40px 안 → 가까울수록 빠르게 스크롤
   if (e.clientY < r.top + 40) g.body.scrollTop -= (r.top + 40 - e.clientY) / 2;
   else if (e.clientY > r.bottom - 40) g.body.scrollTop += (e.clientY - r.bottom + 40) / 2;
-  const mins = Math.round((dy0 + g.body.scrollTop - g.st0) / (HOUR_PX / 60) / SNAP) * SNAP;
-  const col = g.cols.find(c => { const b = c.getBoundingClientRect(); return e.clientX >= b.left && e.clientX < b.right; }) || g.col0;
-  const days = (new Date(col.dataset.day + "T00:00:00") - new Date(g.col0.dataset.day + "T00:00:00")) / 864e5;
-  const dur = g.end - g.start;
-  g.ns = new Date(g.start.getTime() + mins * 6e4 + days * 864e5); g.ne = new Date(g.ns.getTime() + dur);
+  const col = g.cols.find(c => { const b = c.getBoundingClientRect(); return e.clientX >= b.left && e.clientX < b.right; });
+  if (!col) { g.ghost?.remove(); g.ghost = null; g.ns = null; return; }
+  const gy = e.clientY - g.grid.getBoundingClientRect().top, d0 = new Date(col.dataset.day + "T00:00:00"), snap = m => Math.round(m / SNAP) * SNAP;
+  if (g.mode === "resize") {
+    const day = new Date(g.col0.dataset.day + "T00:00:00"), em = snap(yToMin(gy));
+    g.ns = g.start; g.ne = new Date(Math.max(g.start.getTime() + SNAP * 6e4, day.getTime() + em * 6e4));
+  } else {
+    const dur = g.mode === "new" ? g.mins * 6e4 : g.end - g.start, sm = snap(yToMin(gy - (g.mode === "new" ? 0 : g.grab)));
+    g.ns = new Date(d0.getTime() + sm * 6e4); g.ne = new Date(g.ns.getTime() + dur);
+  }
+  const host = g.mode === "resize" ? g.col0 : col;
   if (!g.ghost) { g.ghost = document.createElement("div"); g.ghost.className = "ghost"; }
-  if (g.ghost.parentNode !== col) col.appendChild(g.ghost);
-  const d0 = new Date(col.dataset.day + "T00:00:00"), sm = (g.ns - d0) / 6e4;
+  if (g.ghost.parentNode !== host) host.appendChild(g.ghost);
+  const hd0 = new Date(host.dataset.day + "T00:00:00"), y1 = minToY((g.ns - hd0) / 6e4), y2 = minToY(Math.min(24 * 60, (g.ne - hd0) / 6e4));
   const hit = (D.busy || []).filter(b => dt(b.start) < g.ne && g.ns < dt(b.end)).map(b => b.label.replace(/^\S*🏫\s*/u, ""));
-  Object.assign(g.ghost.style, { top: (sm - g.h0 * 60) * HOUR_PX / 60 + "px", height: Math.max(dur / 6e4 * HOUR_PX / 60, 18) + "px" });
-  g.ghost.textContent = `${WD[g.ns.getDay()]} ${hm(g.ns.toISOString())}–${hm(g.ne.toISOString())}${hit.length ? " · " + hit.join(", ") + " 수업과 겹침 (괜찮아요)" : ""}`;
+  Object.assign(g.ghost.style, { top: y1 + "px", height: Math.max(y2 - y1, 18) + "px" });
+  g.ghost.textContent = `${g.copy ? "복제 · " : g.mode === "new" ? (g.label || "") + " · " : ""}${WD[g.ns.getDay()]} ${hm(g.ns.toISOString())}–${hm(g.ne.toISOString())}${hit.length ? " · " + hit.join(", ") + " 수업과 겹침 (괜찮아요)" : ""}`;
 });
-document.addEventListener("pointerup", e => { if (DRAG.on && e.pointerId === DRAG.pid) dragEnd(DRAG.ns && DRAG.ns > new Date()); });
+document.addEventListener("pointerup", e => { if (DRAG.on && e.pointerId === DRAG.pid) dragEnd(DRAG.ns && DRAG.ne > new Date()); });
 document.addEventListener("pointercancel", () => { if (DRAG.on) dragEnd(false); });
-document.addEventListener("keydown", e => { if (DRAG.on && e.key === "Escape") { e.preventDefault(); dragEnd(false); toast("옮기기 취소"); } }, true);
+document.addEventListener("keydown", e => {
+  if (DRAG.on && e.key === "Escape") { e.preventDefault(); dragEnd(false); toast("옮기기 취소"); return; }
+  if (e.key === "Escape" && UI.pop) { hidePop(); return; }
+  const el = document.activeElement && document.activeElement.classList?.contains("ev") ? document.activeElement : null;
+  if (!el || e.altKey || e.ctrlKey || e.metaKey || !LIVE || MOB) return;
+  const x = EVS[+el.dataset.ev];
+  if (!x || x.type === "busy") return;
+  if (e.key === "Enter") { e.preventDefault(); showPop(el, true); return; }
+  const step = { ArrowUp: -SNAP, ArrowDown: SNAP, ArrowLeft: -1440, ArrowRight: 1440 }[e.key];
+  if (step && dt(x.end) > new Date() && (x.type === "sched" || (x.type === "plan" && x.t))) {  // 키보드로 옮기기: ↑↓ 15분 · ←→ 하루
+    e.preventDefault();
+    const s = new Date(dt(x.start).getTime() + step * 6e4), en = new Date(dt(x.end).getTime() + step * 6e4);
+    if (x.type === "sched") run(() => post("schedule/move", { id: x.id, start: s.toISOString(), end: en.toISOString(), orig: x.start }), r => r.message);
+    else moveBlock(x.key, s.toISOString(), en.toISOString(), x.fixed ? [x.start, x.end] : null);
+    return;
+  }
+  if ((e.key === "Delete" || e.key === "Backspace") && x.fixed) { e.preventDefault(); run(() => post("unslot", { key: x.key }), "자동 배치로 되돌렸어요"); }
+}, true);
+document.addEventListener("keydown", e => {  // 주차별: + − 확대 · n 새 예약
+  if (view !== "week" || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) return;
+  if (e.key === "+" || e.key === "=") { e.preventDefault(); setZoom(HOUR_PX + 12, $("ttBody")); }
+  else if (e.key === "-") { e.preventDefault(); setZoom(HOUR_PX - 12, $("ttBody")); }
+  else if (e.key === "n" && LIVE && !MOB) { e.preventDefault(); schedSheet(null); }
+});
+document.addEventListener("wheel", e => {  // Ctrl+휠 = 확대·축소
+  if (!e.ctrlKey || !e.target.closest?.("#ttBody")) return;
+  e.preventDefault();
+  setZoom(HOUR_PX + (e.deltaY < 0 ? 8 : -8), $("ttBody"));
+}, { passive: false });
 document.addEventListener("dblclick", e => {  // 빈 칸 두 번 → 그 시각으로 예약 추가
   const col = e.target.classList?.contains("tt-col") ? e.target : null;
   if (!col || !LIVE || MOB) return;
-  const h0 = +col.closest(".tt-grid").dataset.h0, m = Math.floor((e.offsetY / (HOUR_PX / 60) + h0 * 60) / SNAP) * SNAP;
+  const g = col.closest(".tt-grid").getBoundingClientRect(), m = Math.floor(yToMin(e.clientY - g.top) / SNAP) * SNAP;
   const at = new Date(col.dataset.day + "T00:00:00"); at.setMinutes(m);
   schedSheet(null, at);
 });
+// 범례: 누르면 그 과목만 → 한 번 더 숨기기 → 원래대로. 길게 누르면(PC 는 우클릭) 색 바꾸기
+let lgTimer, lgLong = false;
+document.addEventListener("pointerdown", e => { const lg = e.target.closest?.(".lg"); if (!lg) return; lgLong = false; lgTimer = setTimeout(() => { lgLong = true; colorSheet(lg.dataset.course); }, 550); });
+document.addEventListener("pointerup", () => clearTimeout(lgTimer));
+function colorSheet(course) {
+  const h = hueFor(course);
+  openSheet(sheetTop(`${esc(course)} 색`, "시간표·목록 등 화면 전체에서 이 과목의 색") + `
+    <div class="frow" style="margin-top:16px"><input type="range" min="0" max="359" value="${h}" id="hueIn" style="flex:1" aria-label="색">
+      <span class="lg on" id="hueSw" style="--h:${h}">${esc(course)}</span></div>
+    <div class="confirm-acts"><button class="btn" data-act="hue-reset" data-course="${esc(course)}">기본 색으로</button>
+      <button class="btn primary" data-act="hue-save" data-course="${esc(course)}">저장</button></div>`);
+  $("hueIn").oninput = ev => $("hueSw").style.setProperty("--h", ev.target.value);
+}
 let ttResize;
 window.addEventListener("resize", () => { clearTimeout(ttResize); ttResize = setTimeout(() => { if (view === "week" && D) render(); }, 200); });
+
+// -- 하루 마무리 (습관 블록 '하루 마무리' 시간이 되면 맨 위에 — 바쁜 날은 블록이 없어 안 뜸)
+function reviewCardHtml(now, today) {
+  const b = (D.plan || []).find(p => p.key.startsWith(`h:하루 마무리@${today}`));
+  if (!b || dt(b.start) > now || now - dt(b.end) > 3 * 36e5 || UI.reviewHidden === today) return "";
+  const blocks = (D.plan || []).filter(p => !p.habit && ymd(p.start) === today);
+  const planned = blocks.reduce((a, p) => a + (dt(p.end) - dt(p.start)) / 6e4, 0);
+  const actual = (D.sessionsToday || []).reduce((a, s) => a + (s.minutes || 0), 0) + ((D.worklog || {}).today || []).reduce?.((a, w) => a + (w.minutes || 0), 0) || 0;
+  const left = blocks.filter(p => dt(p.end) <= now).map(p => findTask(p.task)).filter(t => t && t.status === "open");
+  const tmr = addDays(today, 1), tb = [...(D.busy || []).filter(x => ymd(x.start) === tmr).map(x => ({ s: x.start, t: "🏫 " + x.label.replace(/^\S*🏫\s*/u, "") })),
+    ...(D.plan || []).filter(p => ymd(p.start) === tmr && !p.habit).map(p => ({ s: p.start, t: (D.short || {})[p.task] || p.summary.replace(/^\[[^\]]+\]\s*/, "") }))].sort((a, c) => dt(a.s) - dt(c.s)).slice(0, 4);
+  const due = (D.tasks || []).filter(t => t.status === "open" && t.due && ymd(t.due) === tmr);
+  return `<section class="review-card" aria-label="하루 마무리"><div class="sec-h"><h2>🌙 하루 마무리</h2><span class="aside">${hm(b.start)}–${hm(b.end)} · 1분</span></div>
+    <p>오늘 계획 <b>${dur(Math.round(planned))}</b> · 실제 기록 <b>${dur(Math.round(actual))}</b> · 끝낸 것 <b>${(D.todayDone || []).length}</b>개</p>
+    ${left.length ? `<div class="rows">${left.map(t => `<div class="citem"><span class="tx">${esc((D.short || {})[t.key] || t.title)}<small>${t.course ? esc(t.course) + " · " : ""}못 끝냄</small></span>
+      <span class="ac">${LIVE ? `<button class="tbtn" data-act="slot" data-key="${esc(t.key)}">내일 시간 정하기</button><button class="tbtn gray" data-act="done" data-key="${esc(t.key)}">사실 끝냄</button>` : ""}</span></div>`).join("")}</div>
+      <p class="small">그대로 두면 비서가 다음 빈 시간에 다시 넣어요.</p>` : `<p class="small">오늘 계획한 건 다 끝냈어요 👍</p>`}
+    <p><b>내일</b> · ${tb.map(x => `${hm(x.s)} ${esc(x.t)}`).join(" · ") || "잡힌 일정 없음"}${due.length ? ` · 마감 ${due.map(t => esc((D.short || {})[t.key] || t.title)).join(", ")}` : ""}</p>
+    <div class="confirm-acts">${LIVE ? `<button class="btn primary" data-act="habit-done" data-key="${esc(b.key)}">마무리 끝</button>` : ""}<button class="btn" data-act="review-hide">닫기</button></div></section>`;
+}
 
 // ---- 고급 예약 (주차별): 정한 시각에 AI 지시 · 만들어 둔 기능 · PC 깨어 있기 (pa/schedules.py)
 const SCH_ICON = { prompt: "🤖", open_task: "▶", report_draft: "✍", summary: "📄", notices: "📢", sync: "⟳", timetable: "🗓", open_link: "🔗", awake: "☀️" };
@@ -1307,6 +1624,13 @@ function schedShow() {  // 고른 동작에 필요한 칸만
   f.querySelector(".f-link").hidden = act !== "open_link";
 }
 document.addEventListener("change", e => { if (e.target.form?.dataset.form === "sched" && e.target.name === "act") schedShow(); });
+document.addEventListener("submit", async e => {
+  if (e.target.dataset.form !== "habit") return;
+  e.preventDefault();
+  const inp = e.target.elements.namedItem("h");
+  if (inp.value.trim() && await run(() => post("habit-add", { text: inp.value }), r => r.message + " — 빈 시간에 넣어요 (바쁜 날은 건너뜀)")) inp.value = "";
+});
+document.addEventListener("toggle", e => { if (e.target.matches?.("[data-drawer]")) lsSet("pa.drawer", e.target.open ? "1" : "0"); }, true);
 document.addEventListener("submit", async e => {
   if (e.target.dataset.form !== "sched") return;
   e.preventDefault();
@@ -1899,7 +2223,8 @@ function actionSheet(t) {
 }
 function keysSheet() {
   const K = [["/", "또는 Ctrl+K — 새 할 일 입력"], ["t · w", "오늘 · 주차별 보기"], ["j · k", "다음 · 이전 줄로 (↓ ↑ 도 됨)"], ["Enter", "고른 줄의 주 행동"],
-    ["x", "고른 줄 완료 (되돌리기 가능)"], [".", "고른 줄의 ⋯ 메뉴"], ["← →", "주차별에서 이전 · 다음 주"], ["Esc", "메뉴 · 창 닫기"], ["?", "이 도움말"]];
+    ["x", "고른 줄 완료 (되돌리기 가능)"], [".", "고른 줄의 ⋯ 메뉴"], ["← →", "주차별에서 이전 · 다음 주"], ["+ − · Ctrl+휠", "시간표 크게 · 작게"], ["n", "새 예약 (주차별)"],
+    ["블록에서 Enter", "작은 창 (메모)"], ["블록에서 ↑↓ ←→", "15분 · 하루씩 옮기기"], ["블록에서 Delete", "정한 시간 풀기"], ["Alt + ⠿ 끌기", "복제"], ["Esc", "메뉴 · 창 닫기"], ["?", "이 도움말"]];
   openSheet(sheetTop("단축키") + `<dl class="keys">${K.map(([k, v]) => `<dt>${k.split(" ").map(x => /^[·또는]$/.test(x) ? x : `<kbd>${esc(x)}</kbd>`).join(" ")}</dt><dd>${v}</dd>`).join("")}</dl>`);
 }
 
@@ -2080,12 +2405,35 @@ document.addEventListener("click", async e => {
   if (act === "ttoff") { UI.ttOff = (UI.ttOff || 0) + +b.dataset.step; render(); return; }
   if (act === "evopen" || act === "evtask") {  // 시간표 블록 · 마감 칩: 할 일은 행동 시트, 예약은 고치기 (끈 직후의 클릭은 무시)
     if (DRAG.done && Date.now() - DRAG.done < 400) return;
+    if (act === "evopen" && !MOB && e.target.closest(".ev")) { showPop(b, true); return; }  // PC: 작은 창 (메모)
     if (b.dataset.type === "sched") { schedSheet((D.schedules || []).find(r => String(r.id) === b.dataset.id)); return; }
+    if (b.dataset.type === "habit") return;
     const tk = findTask(b.dataset.key);
-    if (tk) { if (act === "evopen" && LIVE && !MOB && b.dataset.key.includes("#")) UI.pkey = b.dataset.key; actionSheet(tk); }
+    if (tk) actionSheet(tk);
     return;
   }
   if (act === "sched-new") { schedSheet(null); return; }
+  if (UI.pop && e.target.closest("#pop") && act !== "popmenu") hidePop();
+  $("ctx")?.remove();
+  if (act === "popmenu") { openMenu(b, key); return; }
+  if (act === "habit-done") { await run(() => post("habit-done", { key }), "했음 — 그날은 끝"); return; }
+  if (act === "replan") { await run(() => post("replan", {}), r => r.message); return; }
+  if (act === "review-hide") { UI.reviewHidden = ymdOf(new Date()); render(); return; }
+  if (act === "zoom") { setZoom(HOUR_PX + +b.dataset.step, $("ttBody")); return; }
+  if (act === "dense") { lsSet("pa.dense", lsGet("pa.dense", "0") === "1" ? "0" : "1"); render(); return; }
+  if (act === "ttunfold" || act === "ttfold") { UI.ttUnfold = act === "ttunfold"; UI.ttScroll = null; render(); return; }
+  if (act === "lg") { if (lgLong) { lgLong = false; return; } const c = b.dataset.course, f = UI.ttf = UI.ttf || {};
+    f[c] = f[c] === "solo" ? "hide" : f[c] === "hide" ? undefined : "solo"; if (!f[c]) delete f[c]; render(); return; }
+  if (act === "hue-save" || act === "hue-reset") { const hue = act === "hue-save" ? +$("hueIn").value : null;
+    D.courseColors = { ...(D.courseColors || {}) }; if (hue == null) delete D.courseColors[b.dataset.course]; else D.courseColors[b.dataset.course] = hue;
+    closeSheet(); render(); await run(() => api("course-color", { course: b.dataset.course, hue }), "색을 바꿨어요"); return; }
+  if (act === "dup") { const s1 = dt(b.dataset.end), d1 = dt(b.dataset.end) - dt(b.dataset.start);
+    const r = await run(() => post("move", { key: b.dataset.key, start: s1.toISOString(), end: new Date(s1.getTime() + d1).toISOString(), copy: true }));
+    if (r) toast("바로 뒤에 복제했어요", () => post("unslot", { key: r.key })); return; }
+  if (act === "sched-dup") { const r = (D.schedules || []).find(x => String(x.id) === b.dataset.id); if (!r) return;
+    const d1 = dt(r.end) - dt(r.start), s1 = dt(r.end);
+    await run(() => post("schedule/save", { title: r.title, start: s1.toISOString(), end: new Date(s1.getTime() + d1).toISOString(), every: r.every, action: r.action, args: r.args }), "예약을 복제했어요"); return; }
+  if (act === "sched-here") { schedSheet(null, new Date(b.dataset.at)); return; }
   if (act === "sched-edit") { schedSheet((D.schedules || []).find(r => String(r.id) === b.dataset.id)); return; }
   if (act === "sched-run") { await run(() => post("schedule/run", { id: +b.dataset.id }), r => r.message); return; }
   if (act === "sched-del") { if (confirm("이 예약을 지울까요?")) await run(() => post("schedule/delete", { id: +b.dataset.id }), "예약을 지웠어요"); return; }

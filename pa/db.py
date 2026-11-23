@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS slots (              -- 직접 정한 할 시간. 계
   key TEXT NOT NULL,                            -- 할 일 키
   start TEXT NOT NULL,
   end TEXT NOT NULL,
-  part INTEGER NOT NULL DEFAULT 0,              -- 0 = 그 일 전체를 이 시간에 (자동 배치 안 함) / n = 나눈 조각 하나만 옮김 (나머지는 자동)
+  part INTEGER NOT NULL DEFAULT 0,              -- 0 = 그 일 전체를 이 시간에 (자동 배치 안 함) / n = 나눈 조각 하나만 옮김 (나머지는 자동) / -1 = 복제한 시간
   created TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS schedules (          -- 고급 예약: 정한 시각에 AI 지시·만들어 둔 기능 (pa/schedules.py)
@@ -103,6 +103,12 @@ CREATE TABLE IF NOT EXISTS schedules (          -- 고급 예약: 정한 시각�
   enabled INTEGER NOT NULL DEFAULT 1,
   last_run TEXT,                                -- 마지막으로 실행(또는 건너뛴) 회차의 시작
   created TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS task_notes (         -- 시간표 작은 창: 블록에 보일 짧은 이름 · 메모 (계획 키의 앞부분 = 할 일 키, 습관은 'h:이름')
+  key TEXT PRIMARY KEY,
+  short TEXT,
+  memo TEXT,
+  updated TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS worklog (            -- 한 일 기록 (직접 적은 것: 무엇을 · 몇 분)
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -286,3 +292,20 @@ def delete_slots(conn, key=None, sid=None):
     elif key is not None:
         conn.execute("DELETE FROM slots WHERE key = ?", (key,))
     log(conn, "slot_cleared", key, id=sid)
+
+
+def notes(conn):
+    return {r["key"]: {"short": r["short"], "memo": r["memo"]} for r in conn.execute("SELECT * FROM task_notes")}
+
+
+def set_note(conn, key, **fields):
+    """short · memo 중 준 것만 바꾼다 (빈 글자면 지움)."""
+    cur = conn.execute("SELECT short, memo FROM task_notes WHERE key = ?", (key,)).fetchone()
+    short, memo = (cur["short"], cur["memo"]) if cur else (None, None)
+    if "short" in fields:
+        short = (fields["short"] or "").strip()[:40] or None
+    if "memo" in fields:
+        memo = (fields["memo"] or "").strip()[:4000] or None
+    conn.execute("INSERT INTO task_notes (key, short, memo, updated) VALUES (?, ?, ?, ?) "
+                 "ON CONFLICT(key) DO UPDATE SET short = excluded.short, memo = excluded.memo, updated = excluded.updated",
+                 (key, short, memo, now().isoformat()))

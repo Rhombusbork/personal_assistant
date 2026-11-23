@@ -22,6 +22,7 @@ GET  /api/report-info?key=…  ✍ 창: Canvas 과제 설명 · 보고서 파일
 POST /api/submit-check, /api/submit  📤 Canvas 제출: 확인만 / 확인 후 제출 (휴대폰 대기열로도 — pa/submit.py)
 POST /api/submit-confirm {key} 자동 제출한 것 ✅ 완성 / POST /api/autosubmit {key, on} 과제마다 자동 제출 켜기·끄기 (pa/autosubmit.py)
 POST /api/move {key, start, end} 시간 정하기·옮기기 (겹쳐도 됨) / POST /api/unslot {key} 자동 배치로 되돌리기
+POST /api/note {key, short?, memo?} 블록 이름·메모 / POST /api/course-color {course, hue|null} / POST /api/habit-done {key} / POST /api/replan
 POST /api/schedule/save|delete|move|run  고급 예약 (AI 지시 · 만들어 둔 기능 · PC 깨어 있기 — pa/schedules.py)
 POST /api/report-pdf  보고서 .md → A4 PDF (쪽수 알려 줌) → 탐색기에서 선택해 보여 줌 / POST /api/reveal 탐색기에서 위치 보기
 POST /api/workspace  🗂 VSCode 새 창: 과제 → ~/report + 보고서 파일 / 강의 → ~/study_system + 맞는 노트
@@ -131,7 +132,7 @@ def parse_when(text):
     return (t if t.tzinfo else t.replace(tzinfo=KST)).astimezone(KST).replace(second=0, microsecond=0)
 
 
-def move_block(conn, key, start, end):
+def move_block(conn, key, start, end, copy=False):
     """계획 블록(또는 할 일)을 그 시간에 고정한다 → 새 계획 키. 겹쳐도 된다 (2026-11-22 사용자가 정함).
     inbox 할 일 전체는 inbox.md 의 할 시간(>…)으로, 그 밖(Canvas 항목·나눈 조각)은 slots 표로."""
     from pa.model import now as _now
@@ -143,10 +144,12 @@ def move_block(conn, key, start, end):
     row = conn.execute("SELECT source FROM tasks WHERE key = ? AND status = 'open'", (base,)).fetchone()
     if not row:
         raise ValueError("남은 할 일이 아니에요 (끝냈거나 없어짐)")
+    if copy:  # 복제 (Alt+끌기 · 우클릭): 그 일을 할 시간을 하나 더 — 원래 블록은 그대로
+        return f"{base}#고정{db.add_slot(conn, base, start, end, -1)}"
     if tail.startswith("고정") and tail[2:].isdigit():  # 이미 정한 시간 옮기기
         db.update_slot(conn, int(tail[2:]), start, end)
         return key
-    if row["source"] == "inbox" and tail in ("", "고정"):
+    if row["source"] == "inbox" and tail in ("", "고정") and "@" not in base:  # 반복 할 일의 한 회(…@11-25)는 slots 표로
         inbox.set_slot(base, start, end)
         return base + "#고정"
     sid = db.add_slot(conn, base, start, end, int(tail) if tail.isdigit() else 0)
@@ -160,7 +163,7 @@ def clear_block(conn, key):
         db.delete_slots(conn, sid=int(tail[2:]))
         return
     row = conn.execute("SELECT source, slot_end FROM tasks WHERE key = ?", (base,)).fetchone()
-    if row and row["source"] == "inbox" and row["slot_end"]:
+    if row and row["source"] == "inbox" and row["slot_end"] and "@" not in base:
         inbox.set_slot(base, None, None)
     db.delete_slots(conn, key=base)
 
@@ -369,11 +372,24 @@ class Handler(SimpleHTTPRequestHandler):
             elif action == "/api/exam-add":  # 시험 일정 후보 → inbox (시험 모드가 복습을 배치)
                 when = datetime.fromisoformat(f"{body['date']}T{body.get('time') or '09:00'}").replace(tzinfo=KST)
                 msg = inbox.add_task(title=body["title"], due=when, minutes=None, course=body.get("course", ""), every=None)
+            elif action == "/api/habit-add":
+                msg = inbox.add_habit(str(body.get("text", "")))
+            elif action in ("/api/habit-done", "/api/replan"):  # 습관 [했음] / 놓친 블록 다시 짜기 (지문을 지워 바로 다시 짬)
+                conn = db.connect()
+                try:
+                    if action == "/api/habit-done":
+                        from pa import habits
+                        habits.mark_done(conn, body["key"]); msg = "했음 — 그날은 끝"
+                    else:
+                        db.set_meta(conn, "plan_sig", ""); msg = "놓친 블록을 다음 빈 시간으로 다시 짜는 중 (몇 초)"
+                    conn.commit()
+                finally:
+                    conn.close()
             elif action in ("/api/move", "/api/unslot"):  # 시간 정하기 · 시간표에서 끌어 옮기기 / 자동으로 되돌리기
                 conn = db.connect()
                 try:
                     if action == "/api/move":
-                        extra["key"] = move_block(conn, body["key"], parse_when(body["start"]), parse_when(body["end"]))
+                        extra["key"] = move_block(conn, body["key"], parse_when(body["start"]), parse_when(body["end"]), bool(body.get("copy")))
                         msg = "시간을 정했어요"
                     else:
                         clear_block(conn, body["key"]); msg = "자동 배치로 되돌렸어요"
@@ -397,7 +413,8 @@ class Handler(SimpleHTTPRequestHandler):
                             "/api/google-login", "/api/ack", "/api/exam-dismiss",
                             "/api/link", "/api/unlink", "/api/link-download", "/api/report-brief", "/api/report-file", "/api/workspace", "/api/report-pdf", "/api/reveal",
                             "/api/submit-check", "/api/submit", "/api/submit-confirm", "/api/autosubmit", "/api/defaults",
-                            "/api/schedule/save", "/api/schedule/delete", "/api/schedule/move", "/api/schedule/run", "/api/default-open", "/api/folders", "/api/folder-suggest",
+                            "/api/schedule/save", "/api/schedule/delete", "/api/schedule/move", "/api/schedule/run",
+                            "/api/note", "/api/course-color", "/api/default-open", "/api/folders", "/api/folder-suggest",
                             "/api/open-request"):
                 out = self.side_action(action, body)
                 self._forward(action, body)
@@ -561,6 +578,18 @@ def side_action(action, body, remote=False, applied=None):
                 raise ValueError(str(e)) from None
             return {"ok": True, **r, "message": f"제출됨: {r['name']} ({r['attempt']}번째" + (", 늦은 제출" if r["late"] else "")
                     + ") — Canvas 에서 다시 확인함" + ("" if remote else " · 탐색기에 띄움")}
+        if action in ("/api/note", "/api/course-color"):  # 시간표 작은 창의 짧은 이름·메모 / 과목 색 (범례 길게 누르기)
+            if action == "/api/note":
+                db.set_note(conn, body["key"].split("#")[0], **{k: body[k] for k in ("short", "memo") if k in body})
+            else:
+                colors = json.loads(db.get_meta(conn, "course_colors") or "{}")
+                if body.get("hue") is None:
+                    colors.pop(body["course"], None)
+                else:
+                    colors[body["course"]] = int(body["hue"]) % 360
+                db.set_meta(conn, "course_colors", json.dumps(colors, ensure_ascii=False))
+            conn.commit()
+            return {"ok": True}
         if action.startswith("/api/schedule/"):  # 고급 예약: 저장 · 지우기 · 옮기기 · 지금 실행 (pa/schedules.py)
             from pa import schedules
             sid = int(body.get("id") or 0)
