@@ -156,6 +156,20 @@ def move_block(conn, key, start, end, copy=False):
     return f"{base}#고정{sid}"
 
 
+def patch_plan(conn, old_key, new_key, start, end, copy=False):
+    """옮긴 블록을 저장된 계획표에도 바로 — 뒤에서 계획을 다시 짜기 전에 화면이 옛 자리로 돌아가지 않게.
+    캘린더 일정(event_id)은 그대로 넘겨 다음 계획 때 새로 만들지 않고 고친다."""
+    row = conn.execute("SELECT summary, event_id FROM plan WHERE key = ?", (old_key,)).fetchone()
+    if row is None:
+        t = conn.execute("SELECT title FROM tasks WHERE key = ?", (new_key.partition("#")[0],)).fetchone()
+        summ, ev = (t["title"] if t else new_key), None
+    else:
+        summ, ev = row["summary"], (None if copy else row["event_id"])
+        if not copy and old_key != new_key:
+            conn.execute("DELETE FROM plan WHERE key = ?", (old_key,))
+    conn.execute("INSERT OR REPLACE INTO plan VALUES (?, ?, ?, ?, ?)", (new_key, start.isoformat(), end.isoformat(), summ, ev))
+
+
 def clear_block(conn, key):
     """정한 시간을 풀어 다시 자동 배치 — 블록 하나(…#고정<id>, inbox 의 …#고정) 또는 할 일 키면 그 일 전부."""
     base, _, tail = key.partition("#")
@@ -389,7 +403,9 @@ class Handler(SimpleHTTPRequestHandler):
                 conn = db.connect()
                 try:
                     if action == "/api/move":
-                        extra["key"] = move_block(conn, body["key"], parse_when(body["start"]), parse_when(body["end"]), bool(body.get("copy")))
+                        st, en, cp = parse_when(body["start"]), parse_when(body["end"]), bool(body.get("copy"))
+                        extra["key"] = move_block(conn, body["key"], st, en, cp)
+                        patch_plan(conn, body["key"], extra["key"], st, en, cp)
                         msg = "시간을 정했어요"
                     else:
                         clear_block(conn, body["key"]); msg = "자동 배치로 되돌렸어요"
@@ -400,6 +416,13 @@ class Handler(SimpleHTTPRequestHandler):
                 inbox.keep(body["key"]); msg = "이 과제는 계속 보이기"
             elif action == "/api/unignore":
                 inbox.unignore(body["text"]); msg = "제외 취소"
+            elif action == "/api/job-dismiss":  # 실패한 작업 알림 지우기
+                conn = db.connect()
+                try:
+                    conn.execute("DELETE FROM jobs WHERE id = ? AND status = 'failed'", (int(body["id"]),))
+                    conn.commit(); msg = "지웠어요"
+                finally:
+                    conn.close()
             elif action == "/api/remove":
                 inbox.remove(body["key"]); msg = "삭제"
             elif action == "/api/today":
