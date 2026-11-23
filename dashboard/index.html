@@ -1097,13 +1097,13 @@ function weekView(now, today) {
   const cur = curWeekIdx(today), i = wkIdx === null ? cur : Math.max(0, Math.min(ws.length - 1, wkIdx));
   const w = ws[i], days = [...Array(7)].map((_, k) => addDays(w.start, k)), maxMin = Math.max(60, ...ws.map(x => x.minutes));
   HERO_KEY = null;
-  let h = critHtml(now) + `<section class="hero" style="margin-top:32px"><div class="wk-nav"><button class="icon-btn" data-wk="${i - 1}" ${i === 0 ? "disabled" : ""} aria-label="이전 주">‹</button>
+  const nav = `<section class="hero" style="margin-top:16px"><div class="wk-nav"><button class="icon-btn" data-wk="${i - 1}" ${i === 0 ? "disabled" : ""} aria-label="이전 주">‹</button>
     <b>${i + 1}주차</b><span class="r num">${label(w.start)} – ${label(days[6])}</span><button class="icon-btn" data-wk="${i + 1}" ${i === ws.length - 1 ? "disabled" : ""} aria-label="다음 주">›</button>
-    ${i !== cur ? `<button class="link push" data-wk="${cur}">이번 주로</button>` : `<span class="r push">이번 주</span>`}</div>
-    <div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""} ${x.items.some(y => y.exam) ? "ex" : ""}" data-wk="${j}"
+    ${i !== cur ? `<button class="link push" data-wk="${cur}">이번 주로</button>` : `<span class="r push">이번 주</span>`}</div></section>`;
+  const strip = `<section class="sec"><div class="sec-h"><h2>학기</h2><span class="aside">주차를 누르면 그 주로</span></div><div class="strip">${ws.map((x, j) => `<button class="sw ${j === i ? "sel" : ""} ${j === cur ? "cur" : ""} ${j < cur ? "past" : ""} ${x.items.some(y => y.exam) ? "ex" : ""}" data-wk="${j}"
       title="${j + 1}주차 · 마감 ${x.items.length}개 · 남은 일 ${dur(x.minutes)}"><em></em><i style="height:${Math.max(3, Math.round(x.minutes / maxMin * 32))}px"></i><span>${j + 1}</span></button>`).join("")}</div>
     <p class="strip-note">막대 = 그 주에 남은 일의 양 · 빨간 점 = 시험</p></section>`;
-  h += schedListHtml();
+  let h = critHtml(now) + nav;  // 맨 위: 주 이동 → 시간표 → 학기 띠 → 예약 → 마감 (2026-11-23 사용자: 시간표를 맨 위로)
 
   const seg = `<span class="seg mini" role="tablist" aria-label="보기">${[["grid", "시간표"], ["list", "목록"]].map(([m, n]) =>
     `<button data-act="wkmode" data-mode="${m}" role="tab" class="${wkMode() === m ? "on" : ""}" aria-selected="${wkMode() === m}">${n}</button>`).join("")}</span>`;
@@ -1125,6 +1125,8 @@ function weekView(now, today) {
   }
   h += `</div></section>`;
   }
+
+  h += strip + schedListHtml();
 
   const its = w.items, openIts = its.filter(x => x.status === "open"), doneIts = its.filter(x => x.status === "done");
   h += `<section class="sec"><div class="sec-h"><h2>이 주에 마감</h2><span class="aside">${openIts.length}개 남음 / 전체 ${its.length}개</span></div><div class="rows">`;
