@@ -257,10 +257,32 @@ def _auto_open():
                 n = power.sync_wakes(conn)
                 if n is not None:
                     log(f"예약 전 깨우기 {n}개로 맞춤")
+                n = power.sync_phone_check(conn)
+                if n is not None:
+                    log(f"휴대폰 요청 확인: 충전 중 {n}분마다 잠깐 깨움" if n else "휴대폰 요청 확인용 깨우기 끔")
             except Exception as e:
                 log(f"⚠️ 예약 전 깨우기 실패: {str(e)[:120]}")
     finally:
         conn.close()
+
+
+def _phone_sleep():
+    """휴대폰 💤 요청: 진행 중인 AI 작업이 없으면 휴대폰 화면을 올린 뒤 절전."""
+    from pa import power
+    conn = db.connect()
+    try:
+        if not db.get_meta(conn, "pc_sleep_at"):
+            return
+        if conn.execute("SELECT 1 FROM jobs WHERE status IN ('queued', 'running') LIMIT 1").fetchone():
+            return
+        db.set_meta(conn, "pc_sleep_at", "")
+        db.set_meta(conn, "pc_slept_at", now().isoformat())
+        conn.commit()
+    finally:
+        conn.close()
+    log("휴대폰 요청으로 절전")
+    _safe(lambda: mobile.publish(force=True))
+    power.sleep_now()
 
 
 _wake_memo = {"at": 0}
@@ -483,9 +505,17 @@ def watch():
     last_open = 0
     login_file = db.PATH.parent / "browser-state.json"  # 강의 플랫폼 로그인
     login_seen = login_file.stat().st_mtime if login_file.exists() else 0
+    last_tick = time.time()
     while True:
         time.sleep(POLL)
         try:  # 한 번 실패해도 감시는 계속 (예전엔 오류 하나로 엔진이 꺼졌다)
+            if time.time() - last_tick > 90:  # 절전에서 깸 → 휴대폰 요청(☀️ 깨워 두기 등)을 바로 읽고 화면도 바로 올림
+                log("절전에서 깸 — 휴대폰 요청 확인")
+                if _pull_phone():
+                    seen["dirty"] = True
+                _safe(lambda: mobile.publish(force=True))
+            last_tick = time.time()
+            _phone_sleep()
             if time.time() - last_code >= 5:
                 last_code = time.time()
                 _restart_if_code_changed(code_state)

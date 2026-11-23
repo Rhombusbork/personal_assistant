@@ -145,3 +145,20 @@ def test_phone_add_keeps_task_when_slot_is_bad(tmp_path, monkeypatch):
     conn = db.connect()
     assert conn.execute("SELECT COUNT(*) FROM events WHERE type = 'phone_input_failed'").fetchone()[0] == 0
     conn.close()
+
+
+def test_phone_awake_sleep_and_new_actions(tmp_path, monkeypatch):
+    """휴대폰 ☀️ 깨워 두기 · 💤 절전 · 시간 정하기 같은 요청은 이 PC 서버로 그대로 (진짜 절전·Windows 는 안 씀)."""
+    from pa import db, mobile, peer, power, server
+    monkeypatch.setattr(db, "PATH", tmp_path / "pa.db")
+    woke, sent = [], []
+    monkeypatch.setattr(power, "keep_awake", lambda m: woke.append(m))
+    monkeypatch.setattr(peer, "_replay_http", lambda a, b: sent.append((a, b)))
+    mobile.apply_entry({"op": "awake", "minutes": 90})
+    c = db.connect()
+    assert woke == [90] and db.get_meta(c, "pc_awake_until")
+    mobile.apply_entry({"op": "sleep"})
+    assert db.get_meta(db.connect(), "pc_sleep_at") and not db.get_meta(db.connect(), "pc_awake_until")
+    mobile.apply_entry({"op": "act", "action": "/api/move", "body": {"key": "m1"}})
+    assert sent == [("/api/move", {"key": "m1"})]
+    assert "/api/submit-confirm" in server.PHONE_ACTIONS and "/api/habit-done" in server.PHONE_HTTP

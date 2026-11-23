@@ -588,7 +588,7 @@ const clip = t => { const n = links(t).length;
 const taskOf = findTask;
 
 // ---- 행동 정의: 종류마다 '주 행동' 하나, 나머지는 ⋯ 안으로
-const MOB_OK = new Set(["open", "done", "ignore", "remove", "redo-today", "redo-day", "redo-clear", "report", "sumfor", "submit"]);
+const MOB_OK = new Set(["open", "done", "ignore", "remove", "redo-today", "redo-day", "redo-clear", "report", "sumfor", "submit", "slot", "autosub-on", "autosub-off"]);
 const redoOf = t => t && D.redo && D.redo[t.key];  // 마감이 지난 일을 하기로 한 날
 // 마감이 지났고, 할 날을 정하지 않았거나 정한 날도 지난 일 → 맨 위 줄
 const overdueOpen = () => { const today = ymdOf(new Date());
@@ -617,10 +617,10 @@ function menuItems(t) {
   if (t.url && t.kind !== "todo") g[0].push({ act: "open", label: openName, strong: P.act === "open" });
   if (t.kind === "assignment" || (t.kind === "todo" && t.due)) g[0].push({ act: "report", label: "보고서 작성", hint: "설명·자료·지침", strong: P.act === "report" });
   if (t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) g[0].push({ act: "submit", label: "📤 제출", hint: "확인 후 · .md 는 PDF 로" });
-  if (LIVE && t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) { const au = (D.autoSubmits || []).find(a => a.key === t.key);
+  if ((LIVE || MOB) && t.kind === "assignment" && /\/assignments\/\d+/.test(t.url || "")) { const au = (D.autoSubmits || []).find(a => a.key === t.key);
     g[0].push(au ? { act: "autosub-off", label: "📤 자동 제출 끄기", hint: `예정 ${label(ymd(au.at))} ${hm(au.at)}` }
                  : { act: "autosub-on", label: "📤 자동 제출 켜기", hint: "늦어도 마감 6시간 전 · 초안 없으면 AI" }); }
-  if (LIVE && t.status === "open") { const fx = (D.plan || []).find(p => p.task === t.key && p.fixed && dt(p.end) > new Date());
+  if ((LIVE || MOB) && t.status === "open") { const fx = (D.plan || []).find(p => p.task === t.key && p.fixed && dt(p.end) > new Date());
     g[0].push({ act: "slot", label: "시간 정하기…", hint: fx ? `${label(ymd(fx.start))} ${hm(fx.start)} 정함` : "그 시각에 자동으로 열기" }); }
   if (t.course) g[1].push({ act: "mat", label: "자료", hint: links(t).length ? `연결 ${links(t).length}` : "고르기" });
   if (t.kind === "lecture") g[1].push({ act: "sumfor", label: "내용정리", hint: AI() + " 사용" },
@@ -699,7 +699,10 @@ async function phonePost(action, body) {
   if (action === "open-quiz") { window.open(D.quiz.url, "_blank"); return {}; }
   const act = (action, body) => ({ op: "act", action: "/api/" + action, body });  // 대기열: PC 가 켜지면 실행
   const toOp = { sync: () => act("sync"), "job/report": b => act("job/report", { key: b.key }), "job/summary-for": b => act("job/summary-for", { key: b.key }),
-                 "job/notices": () => act("job/notices"), submit: b => act("submit", { key: b.key }), "notice/read": b => act("notice/read", { id: b.id }),
+                 "job/notices": () => act("job/notices"), submit: b => act("submit", { key: b.key }),
+                 ...Object.fromEntries(["submit-confirm", "autosubmit", "note", "schedule/save", "schedule/delete", "schedule/move", "schedule/run",
+                   "move", "unslot", "habit-done", "habit-add", "replan"].map(a => [a, b => act(a, b)])),
+                 "pc-awake": b => ({ op: "awake", minutes: b.minutes || 60 }), "pc-sleep": () => ({ op: "sleep" }), "notice/read": b => act("notice/read", { id: b.id }),
                  quick: b => ({ op: "add", text: b.text }), add: b => ({ op: "add", fields: b }), done: b => ({ op: "done", key: b.key }),
                  ignore: b => ({ op: "ignore", key: b.key, pattern: !!b.pattern }), keep: b => ({ op: "keep", key: b.key }), "exam-dismiss": b => ({ op: "exam-dismiss", id: b.id }), unignore: b => ({ op: "unignore", text: b.text }), remove: b => ({ op: "remove", key: b.key }), today: b => ({ op: "today", key: b.key }), redo: b => ({ op: "redo", key: b.key, day: b.day || "" }), undone: b => ({ op: "undone", key: b.key }) }[action];
   if (!toOp) throw new Error("이 기능은 PC 대시보드에서만 됩니다");
@@ -962,11 +965,18 @@ function critHtml(now) {
   }
   for (const j of (D.jobs || []).filter(j => j.status === "failed"))
     L.push({ sev: 1, t: `작업 실패 · ${j.title}`, s: j.error || "", b: LIVE ? `<button class="tbtn" data-act="jobretry" data-kind="${esc(j.kind)}" data-key="${esc(j.key)}" data-label="작업 다시 시도">다시 시도</button><button class="tbtn gray" data-act="jobdel" data-id="${j.id}" data-vanish data-label="알림 지우기">지우기</button>` : "" });
+  if (MOB && D.pc) {  // 휴대폰: PC 상태 + 깨워 두기·절전 (PC 는 충전 중 checkEvery 분마다 잠깐 깨어 요청을 읽음)
+    const pc = D.pc, awake = pc.awakeUntil && dt(pc.awakeUntil) > new Date(), age = Math.round((Date.now() - dt(D.generated)) / 6e4);
+    L.push({ sev: 0, t: awake ? `🖥 PC 깨어 있음 · ${hm(pc.awakeUntil)} 까지` : pc.sleepAsked ? "🖥 PC 절전 요청 보냄" : age > 20 ? `🖥 PC 소식 ${age}분 전 — 절전 중일 수 있어요` : `🖥 PC 켜져 있음 (${age}분 전)`,
+      s: `깨워 두기를 누르면 PC 가 다음 확인 때(충전 중이면 ${pc.checkEvery || 30}분 안) 깨어서 그 시간 동안 안 잠들어요 — Remote Control 쓸 때`,
+      b: `<button class="tbtn" data-act="pc-awake" data-min="60">☀️ 1시간 깨워 두기</button><button class="tbtn" data-act="pc-awake" data-min="180">3시간</button>`
+       + `<button class="tbtn gray" data-act="pc-sleep">💤 절전</button>` });
+  }
   // 자동 제출 (먼저 내고 나중에 ✅ 완성): 확인할 것 · 못 낸 것 · 하루 안에 낼 것
   for (const r of D.reviews || [])
     L.push({ sev: 1, t: `📤 자동 제출함 — 확인해 주세요 · ${r.title}`, s: [r.course, r.name, r.pages ? r.pages + "쪽" : "", r.attempt ? r.attempt + "번째" : "", stamp(r.ts), "안 눌러도 제출은 그대로"].filter(Boolean).join(" · "),
       b: `<button class="tbtn" data-act="open" data-key="${esc(r.key)}" data-url="${esc(r.url || "")}" data-label="Canvas 에서 보기">Canvas 에서 보기</button>`
-       + (LIVE ? `<button class="tbtn" data-act="review-ok" data-key="${esc(r.key)}" data-label="완성">✅ 완성</button>`
+       + (LIVE || MOB ? `<button class="tbtn" data-act="review-ok" data-key="${esc(r.key)}" data-label="완성">✅ 완성</button>`
        + (findTask(r.key) ? `<button class="tbtn gray" data-act="report" data-key="${esc(r.key)}" data-label="고쳐서 다시 내기">고쳐서 다시 내기</button>` : "") : "") });
   for (const a of D.autoSubmits || []) {
     if (a.state === "failed") L.push({ sev: 2, t: `📤 자동 제출 못 함 · ${a.title}`, s: `${a.why} · 마감 ${label(ymd(a.due))} ${hm(a.due)}`,
@@ -1356,7 +1366,7 @@ function popHtml(x, pinned) {
     const P = primaryOf(t);
     main = P ? `<button class="btn primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>` : "";
     more = LIVE && !MOB ? `<button class="tbtn" data-act="slot" data-key="${esc(t.key)}" data-pkey="${esc(x.key)}">시간 바꾸기</button><button class="icon-btn" data-act="popmenu" data-key="${esc(t.key)}" aria-label="더 보기">⋯</button>` : "";
-  } else if (x.type === "habit") main = LIVE ? `<button class="btn primary" data-act="habit-done" data-key="${esc(x.key)}">✓ 했음</button>` : "";
+  } else if (x.type === "habit") main = LIVE || MOB ? `<button class="btn primary" data-act="habit-done" data-key="${esc(x.key)}">✓ 했음</button>` : "";
   else if (x.type === "sched") { main = LIVE ? `<button class="btn primary" data-act="sched-run" data-id="${x.id}">지금 실행</button>` : ""; more = LIVE ? `<button class="tbtn" data-act="sched-edit" data-id="${x.id}">고치기</button>` : ""; }
   const edit = pinned && LIVE && !MOB && x.type !== "busy";
   return `<div class="pop-h"><b>${evIcon(x)}${esc(x.title)}</b>${pinned ? `<button class="icon-btn" data-ui="popclose" aria-label="닫기">✕</button>` : ""}</div>
@@ -1581,7 +1591,7 @@ function reviewCardHtml(now, today) {
       <span class="ac">${LIVE ? `<button class="tbtn" data-act="slot" data-key="${esc(t.key)}">내일 시간 정하기</button><button class="tbtn gray" data-act="done" data-key="${esc(t.key)}">사실 끝냄</button>` : ""}</span></div>`).join("")}</div>
       <p class="small">그대로 두면 비서가 다음 빈 시간에 다시 넣어요.</p>` : `<p class="small">오늘 계획한 건 다 끝냈어요 👍</p>`}
     <p><b>내일</b> · ${tb.map(x => `${hm(x.s)} ${esc(x.t)}`).join(" · ") || "잡힌 일정 없음"}${due.length ? ` · 마감 ${due.map(t => esc((D.short || {})[t.key] || t.title)).join(", ")}` : ""}</p>
-    <div class="confirm-acts">${LIVE ? `<button class="btn primary" data-act="habit-done" data-key="${esc(b.key)}">마무리 끝</button>` : ""}<button class="btn" data-act="review-hide">닫기</button></div></section>`;
+    <div class="confirm-acts">${LIVE || MOB ? `<button class="btn primary" data-act="habit-done" data-key="${esc(b.key)}">마무리 끝</button>` : ""}<button class="btn" data-act="review-hide">닫기</button></div></section>`;
 }
 
 // ---- 고급 예약 (주차별): 정한 시각에 AI 지시 · 만들어 둔 기능 · PC 깨어 있기 (pa/schedules.py)
@@ -1596,10 +1606,10 @@ function schedListHtml() {
   const L = D.schedules || [];
   if (!LIVE && !L.length) return "";
   return `<section class="sec"><div class="sec-h"><h2>예약</h2><span class="aside">정한 시각에 비서가 실행 · 끝나면 결과가 여기에</span>
-    ${LIVE ? `<button class="tbtn" data-act="sched-new" data-label="예약 추가">＋ 예약 추가</button>` : ""}</div><div class="rows">
+    ${LIVE || MOB ? `<button class="tbtn" data-act="sched-new" data-label="예약 추가">＋ 예약 추가</button>` : ""}</div><div class="rows">
     ${L.map(r => `<div class="citem"><span class="tx">${SCH_ICON[r.action] || "⏰"} ${esc(r.title)}<small>${[esc(r.actionName), r.everyName,
       r.next ? `다음 ${label(ymd(r.next))} ${hm(r.next)}` : "끝남", schedLast(r.last)].filter(Boolean).join(" · ")}</small></span>
-      ${LIVE ? `<span class="ac"><button class="tbtn" data-act="sched-run" data-id="${r.id}" data-label="지금 실행">지금 실행</button>
+      ${LIVE || MOB ? `<span class="ac"><button class="tbtn" data-act="sched-run" data-id="${r.id}" data-label="지금 실행">지금 실행</button>
         <button class="tbtn" data-act="sched-edit" data-id="${r.id}" data-label="고치기">고치기</button>
         <button class="tbtn gray" data-act="sched-del" data-id="${r.id}" data-label="지우기" aria-label="지우기: ${esc(r.title)}">✕</button></span>` : ""}</div>`).join("")
       || `<p class="empty">아직 없음 — ＋ 예약 추가 (예: 매주 토 9시 "이번 주 노트로 퀴즈 10문제")</p>`}</div></section>`;
@@ -2237,7 +2247,11 @@ function actionSheet(t) {
   const items = menuItems(t).flat().filter(x => !(x.act === P.act));
   openSheet(sheetTop(t.title) + `<p class="asheet-meta">${[KIND[t.kind], t.course && esc(t.course), t.due && `마감 ${label(ymd(t.due))} ${hm(t.due)} (${ddayText(t.due, today)})`].filter(Boolean).join(" · ")}</p>
     <div class="ways"><button class="primary" data-act="${P.act}" data-key="${esc(t.key)}" data-label="${esc(P.label)}">${esc(P.label)}</button>
-    </div><div class="alist">${items.map(x => `<button data-act="${x.act}" data-key="${esc(t.key)}" data-label="${esc(x.label)}" class="${x.danger ? "danger" : ""}">${esc(x.label)}${x.hint && x.hint.length > 1 ? `<small>${esc(x.hint)}</small>` : ""}</button>`).join("")}</div>`);
+    </div><div class="alist">${items.map(x => `<button data-act="${x.act}" data-key="${esc(t.key)}" data-label="${esc(x.label)}" class="${x.danger ? "danger" : ""}">${esc(x.label)}${x.hint && x.hint.length > 1 ? `<small>${esc(x.hint)}</small>` : ""}</button>`).join("")}</div>
+    ${MOB ? `<label class="fl" style="display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:13px">메모
+      <textarea class="field" data-memo rows="3">${esc(noteOf(t.key).memo || "")}</textarea></label>
+      <div class="confirm-acts"><button class="btn" data-act="memo-save" data-key="${esc(t.key)}">메모 저장</button></div>`
+      : noteOf(t.key).memo ? `<p class="small">✎ ${esc(noteOf(t.key).memo)}</p>` : ""}`);
 }
 function keysSheet() {
   const K = [["/", "또는 Ctrl+K — 새 할 일 입력"], ["t · w", "오늘 · 주차별 보기"], ["j · k", "다음 · 이전 줄로 (↓ ↑ 도 됨)"], ["Enter", "고른 줄의 주 행동"],
@@ -2434,6 +2448,9 @@ document.addEventListener("click", async e => {
   if (UI.pop && e.target.closest("#pop") && act !== "popmenu") hidePop();
   $("ctx")?.remove();
   if (act === "popmenu") { openMenu(b, key); return; }
+  if (act === "pc-awake") { await run(() => post("pc-awake", { minutes: +b.dataset.min }), `PC 에 깨워 두기 ${b.dataset.min}분 요청 — PC 가 확인하면 위에 '깨어 있음'`); return; }
+  if (act === "pc-sleep") { if (confirm("PC 를 절전시킬까요? (진행 중인 AI 작업이 끝난 뒤)")) await run(() => post("pc-sleep", {}), "절전 요청 보냄"); return; }
+  if (act === "memo-save") { const ta = $("sheet").querySelector("textarea[data-memo]"); await run(() => post("note", { key: b.dataset.key, memo: ta.value }), "메모 저장 — PC 가 반영하면 보여요"); return; }
   if (act === "habit-done") { await run(() => post("habit-done", { key }), "했음 — 그날은 끝"); return; }
   if (act === "replan") { await run(() => post("replan", {}), r => r.message); return; }
   if (act === "review-hide") { UI.reviewHidden = ymdOf(new Date()); render(); return; }

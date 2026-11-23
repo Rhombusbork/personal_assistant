@@ -216,13 +216,36 @@ def apply_entry(op):
             conn.close()
     elif kind == "today":
         inbox.set_due(op["key"], datetime.now(KST).replace(hour=23, minute=59, second=0, microsecond=0))
-    elif kind == "act":  # 대기열: 동기화·보고서 초안·내용정리·공지 정리 (PC 가 켜져 있을 때 실행, 결과는 다음 화면에)
+    elif kind == "act":  # 대기열: 동기화·보고서 초안·제출·시간 정하기·예약·메모 … (PC 가 켜져 있을 때 실행, 결과는 다음 화면에)
         from pa import server
+        if op.get("action") in server.PHONE_HTTP:
+            from pa import peer
+            peer._replay_http(op["action"], op.get("body") or {})
+            return
         if op.get("action") not in server.PHONE_ACTIONS:
             raise ValueError(f"휴대폰에서 맡길 수 없는 요청: {op.get('action')}")
         r = server.side_action(op["action"], op.get("body") or {}, remote=True)
         if not r.get("ok"):
             raise ValueError(r.get("error") or "실패")
+    elif kind == "awake":  # ☀️ PC 깨워 두기: 이 시간 동안 절전 안 함 (Remote Control 쓰기)
+        from pa import power
+        mins = max(10, min(600, int(op.get("minutes") or 60)))
+        power.keep_awake(mins)
+        conn = db.connect()
+        try:
+            db.set_meta(conn, "pc_awake_until", (datetime.now(KST) + timedelta(minutes=mins)).isoformat())
+            db.set_meta(conn, "pc_sleep_at", "")
+            conn.commit()
+        finally:
+            conn.close()
+    elif kind == "sleep":  # 💤 PC 절전: 진행 중인 AI 작업이 끝난 뒤 (엔진이 1분마다 확인)
+        conn = db.connect()
+        try:
+            db.set_meta(conn, "pc_sleep_at", datetime.now(KST).isoformat())
+            db.set_meta(conn, "pc_awake_until", "")
+            conn.commit()
+        finally:
+            conn.close()
     else:
         raise ValueError(f"모르는 입력: {kind}")
 

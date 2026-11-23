@@ -302,6 +302,9 @@ def dashboard_data(conn):
         "courseColors": json.loads(db.get_meta(conn, "course_colors") or "{}"),
         "played": plan_mod._played(conn),              # 강의: 비서가 틀어 준 분 (남은 분 짐작)
         "missed": missed(conn, t_now),                 # 놓친 블록 (다시 짜기 버튼)
+        "pc": {"awakeUntil": db.get_meta(conn, "pc_awake_until") or None, "sleepAsked": db.get_meta(conn, "pc_sleep_at") or None,
+               "sleptAt": db.get_meta(conn, "pc_slept_at") or None,
+               "checkEvery": int((load_timetable().get("power") or {}).get("phone_check_minutes", 30) or 0)},
         "autoSubmits": autosubmit.upcoming(conn, t_now),  # 자동 제출 예정·결과
         "schedules": schedules.listing(conn, t_now),       # 고급 예약 목록
         "scheduleBlocks": schedules.blocks(conn, t_now - timedelta(days=t_now.weekday() + 7), t_now + timedelta(days=28)),

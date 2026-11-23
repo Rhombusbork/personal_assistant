@@ -175,7 +175,36 @@ def keep_awake(minutes):
 
 def cfg():
     from pa.config import load_timetable
-    return {"wake_for_reservations": True, "wake_before_minutes": 5, **(load_timetable().get("power") or {})}
+    return {"wake_for_reservations": True, "wake_before_minutes": 5, "phone_check_minutes": 30, **(load_timetable().get("power") or {})}
+
+
+POLL_TASK = "PA-PhoneCheck"
+
+
+def sync_phone_check(conn):
+    """휴대폰 요청 확인용: 충전 중일 때 phone_check_minutes 마다 절전에서 잠깐 깨운다 (깨면 3분 동안 절전 안 함 →
+    엔진이 휴대폰 입력을 읽음). 2026-11-23 시험: 예약 깨우기는 됨(덮개 닫아도), 휴대폰 Wi-Fi 매직 패킷은 안 됨 → 이 방식. 0 이면 끔."""
+    from pa import db
+    if not (osutil.IS_WINDOWS or osutil.IS_WSL):
+        return None
+    every = int(cfg()["phone_check_minutes"] or 0)
+    if db.get_meta(conn, "phone_check_sig") == str(every):
+        return None
+    if every <= 0:
+        _ps(f"Unregister-ScheduledTask -TaskName '{POLL_TASK}' -Confirm:$false -ErrorAction SilentlyContinue")
+    else:
+        ok, out = _ps(
+            "$f = Join-Path $env:LOCALAPPDATA 'pa-awake3.ps1'\n"
+            "@'\n" + AWAKE.format(secs=180) + "\n'@ | Set-Content -Path $f -Encoding UTF8\n"
+            f"$t = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes {every}) -RepetitionDuration (New-TimeSpan -Days 3650)\n"
+            "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"' + $f + '\"')\n"
+            "$s = New-ScheduledTaskSettingsSet -WakeToRun -MultipleInstances IgnoreNew\n"  # 기본값: 배터리일 때는 안 함 (충전 중만)
+            f"Register-ScheduledTask -TaskName '{POLL_TASK}' -Action $a -Trigger $t -Settings $s -Force | Out-Null; 'ok'")
+        if not ok or not out.endswith("ok"):
+            raise RuntimeError("휴대폰 확인용 깨우기를 만들지 못함: " + out[-200:])
+    db.set_meta(conn, "phone_check_sig", str(every))
+    conn.commit()
+    return every
 
 
 def wake_times(conn, t_now=None, days=7):

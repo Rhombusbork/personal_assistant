@@ -152,13 +152,13 @@ Wi-Fi 카드(Intel 8265)는 **'깨우기 가능 장치'** 이고 드라이버에
 준비 (했음): '절전 모드 해제 타이머 허용' 충전 중 → **사용** (되돌리기: `bin/pa power allow-timers off`).
 매 시험 뒤 `bin/pa power results` → "몇 시 잠 → 몇 시 깸 · 깨운 것". 시험 땐 키보드·마우스를 건드리지 않는다.
 
-| # | 하는 것 | 성공이면 | 결과 |
+| # | 하는 것 | 성공이면 | 결과 (2026-11-23 사용자 시험) |
 |---|---|---|---|
 | A1 | 충전기 꽂고 `bin/pa power test-wake 3` → 20초 뒤 절전 → 3분 기다림 | 화면이 저절로 켜지고 시험 기록에 '깨어남' | |
-| A2 | A1 + 20초 안에 **덮개 닫기** → 4분 뒤 열어 봄 | 시험 기록 '깨어남' 시각이 예약 시각 | |
+| A2 | A1 + 20초 안에 **덮개 닫기** → 4분 뒤 열어 봄 | 시험 기록 '깨어남' 시각이 예약 시각 | ✅ 12:51→12:53:56 (덮개 닫고) |
 | A3 | 충전기 뽑고 `test-wake 3 --battery` (배터리 쪽 설정은 '사용 안 함' → 안 깨는 게 정상일 수 있음) | 기록 | |
 | A4 | `test-wake 3 --no-sleep` 후 시작 → 전원 → **최대 절전** (메뉴에 없으면 건너뜀) | 기록 | |
-| B1 | 휴대폰을 같은 Wi-Fi 에 → WoL 앱(안드로이드 "Wake On Lan", 아이폰 "Mocha WOL")에 이 PC Wi-Fi 주소(MAC, `bin/pa power` 에 나옴)·포트 9 → PC 절전(`bin/pa power sleep`) → 30초 뒤 [Wake] | 깨운 것 = Intel Wireless | |
+| B1 | 휴대폰을 같은 Wi-Fi 에 → WoL 앱(안드로이드 "Wake On Lan", 아이폰 "Mocha WOL")에 이 PC Wi-Fi 주소(MAC, `bin/pa power` 에 나옴)·포트 9 → PC 절전(`bin/pa power sleep`) → 30초 뒤 [Wake] | 깨운 것 = Intel Wireless | ❌ 한 번도 Wi-Fi 로 안 깸 → 휴대폰은 '주기적 확인' 방식으로 |
 | B2 | B1 을 덮개 닫고 / 배터리로 / 절전 30분 뒤에 | 각각 기록 | |
 | B3 | 다른 노트북에서 `bin/pa power wol <MAC>` (휴대폰 앱 대신) | B1 과 같음 | |
 | C | Remote Control 켠 채 절전 → A 나 B 로 깨움 → 휴대폰 Claude 앱에서 말 걸기 (짧게 잔 뒤 / 30분 넘게 잔 뒤) | 답이 옴 | |

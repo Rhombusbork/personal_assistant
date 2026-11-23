@@ -68,7 +68,9 @@ _remote_memo = {"at": 0.0, "hosts": set()}
 PC_ONLY = {"/api/open", "/api/open-quiz", "/api/notice/open", "/api/open-file", "/api/reveal", "/api/workspace",
            "/api/default-open", "/api/browser-login", "/api/google-login", "/api/open-request"}
 # GitHub 휴대폰 화면이 대기열(phone-inbox)로 맡길 수 있는 요청
-PHONE_ACTIONS = {"/api/sync", "/api/job/report", "/api/job/summary-for", "/api/job/notices", "/api/notice/read", "/api/submit"}
+PHONE_ACTIONS = {"/api/sync", "/api/job/report", "/api/job/summary-for", "/api/job/notices", "/api/notice/read", "/api/submit",
+                 "/api/submit-confirm", "/api/autosubmit", "/api/note", "/api/schedule/save", "/api/schedule/delete", "/api/schedule/move", "/api/schedule/run"}
+PHONE_HTTP = {"/api/move", "/api/unslot", "/api/habit-done", "/api/habit-add", "/api/replan"}  # 휴대폰 대기열 → 이 PC 서버에 그대로 (inbox·계획을 바꾸는 요청)
 
 
 def tailscale_name():
