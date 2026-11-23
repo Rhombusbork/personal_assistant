@@ -7,6 +7,12 @@
   - 누르기는 버튼의 기본 동작(Invoke)으로. 그게 없으면 그 버튼 한가운데를 클릭
 못 찾으면 아무것도 안 누른다. 페이지가 뜨는 동안 몇 번 다시 찾는다 (pa/autoopen.py 에서 부름).
 Windows·WSL 에서만 (리눅스·Mac 은 건너뜀).
+
+강의 블록 동안 지켜보기 (watch, 2026-11-23 — 출석을 '돕는' 것까지만):
+  - "계속 보시겠습니까?" 같은 확인 버튼이 뜨면: 내가 최근 2분 안에 키보드·마우스를 썼으면(자리에 있음) 눌러 주고,
+    자리에 없으면 누르지 않고 그 창을 앞으로 + 대시보드 알림 (자리 비운 동안 출석을 채우지 않음)
+  - 배속: config auto_open.speed 에 과목별로 적으면 재생 뒤 그 배속 버튼을 찾아 누름 (버튼 이름을 못 찾으면 그대로)
+  - 탭을 닫으면 그만 지켜봄.  확인: python -m pa.autoplay --list <강의 제목>  (그 창의 버튼 이름 목록)
 """
 import base64
 import subprocess
@@ -21,6 +27,7 @@ SCRIPT = r"""
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $want = '__TITLE__'
 $names = @(__NAMES__)
+$list = $__LIST__
 $dry = $__DRY__
 $A = [Windows.Automation.AutomationElement]
 $wins = $A::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition) |
@@ -38,6 +45,7 @@ foreach ($w in $wins) {
   }
   $cond = New-Object Windows.Automation.PropertyCondition($A::ControlTypeProperty, [Windows.Automation.ControlType]::Button)
   foreach ($b in $w.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)) {
+    if ($list) { if (-not $b.Current.IsOffscreen -and $b.Current.Name) { 'BTN ' + $b.Current.Name }; continue }
     if ($b.Current.IsOffscreen -or $names -notcontains $b.Current.Name) { continue }
     if ($dry) { 'found'; exit }
     $p = $null
@@ -57,13 +65,48 @@ def _key(title):
     return title.strip()[:20].replace("'", "''")
 
 
-def press_play(title, dry=False):
-    """'invoked' · 'clicked' · 'none' · 'skip'(Windows 아님). dry=True 면 찾기만 ('found')."""
+def press(title, names, dry=False):
+    """그 강의 창에서 이름이 names 중 하나인 버튼을 누른다 (누를 때는 창을 앞으로). 'invoked' · 'clicked' · 'none' · 'skip' (dry → 'found')."""
     if not (osutil.IS_WSL or osutil.IS_WINDOWS):
         return "skip"
-    script = SCRIPT.replace("__TITLE__", _key(title)).replace("__NAMES__", ", ".join(f"'{n}'" for n in NAMES)).replace("__DRY__", "true" if dry else "false")
+    script = (SCRIPT.replace("__TITLE__", _key(title)).replace("__NAMES__", ", ".join("'" + n.replace("'", "''") + "'" for n in names))
+              .replace("__DRY__", "true" if dry else "false").replace("__LIST__", "false"))
     out = _ps(script)
     return out[-1] if out else "none"
+
+
+def press_play(title, dry=False):
+    """'invoked' · 'clicked' · 'none' · 'skip'(Windows 아님). dry=True 면 찾기만 ('found')."""
+    return press(title, NAMES, dry)
+
+
+def buttons(title):
+    """그 강의 창에 보이는 버튼 이름 목록 (배속·확인 버튼 이름을 알아낼 때)."""
+    if not (osutil.IS_WSL or osutil.IS_WINDOWS):
+        return []
+    script = SCRIPT.replace("__TITLE__", _key(title)).replace("__NAMES__", "''").replace("__DRY__", "true").replace("__LIST__", "true")
+    return sorted({l[4:] for l in _ps(script) if l.startswith("BTN ")})
+
+
+IDLE = r"""
+Add-Type -Name I -Namespace W -MemberDefinition '[StructLayout(LayoutKind.Sequential)] public struct L { public uint s; public uint t; }
+[DllImport("user32.dll")] public static extern bool GetLastInputInfo(ref L l);'
+$l = New-Object W.I+L; $l.s = 8; [W.I]::GetLastInputInfo([ref]$l) | Out-Null
+[int](([Environment]::TickCount - $l.t) / 1000)
+"""
+
+
+def idle_seconds():
+    """마지막 키보드·마우스 입력 뒤 몇 초. 모르면 큰 값 (= 자리에 없다고 봄)."""
+    try:
+        out = _ps(IDLE)
+        return int(out[-1]) if out else 10 ** 6
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return 10 ** 6
+
+
+CONTINUE = ("계속 보기", "계속 시청", "계속 학습", "계속 학습하기", "이어서 보기", "이어 보기", "계속하기", "Continue", "계속")
+SPEED_BTN = ("재생 속도", "배속", "속도", "Playback speed", "Speed")
 
 
 def _ps(script):
@@ -113,7 +156,43 @@ def play_when_ready(title, tries=12, every=5, log=lambda m: None):
     return "none"
 
 
-if __name__ == "__main__":  # python -m pa.autoplay [--find] <강의 제목>
+def set_speed(title, speed, log=lambda m: None):
+    """배속 버튼 → 그 배속 항목 (예: 1.5 → '1.5x' · '1.5배' · '1.5'). 못 찾으면 그대로 두고 알림."""
+    if press(title, SPEED_BTN) in ("invoked", "clicked"):
+        time.sleep(1)
+        got = press(title, (f"{speed}x", f"{speed}X", f"x{speed}", f"{speed}배", f"{speed}배속", str(speed)))
+        if got in ("invoked", "clicked"):
+            log(f"강의 배속 {speed}")
+            return True
+    log(f"배속 버튼을 못 찾음 ({speed}) — python -m pa.autoplay --list '{title}' 로 버튼 이름 확인")
+    return False
+
+
+def watch(title, until, idle_limit=120, every=60, log=lambda m: None, alert=lambda m: None):
+    """강의 블록이 끝날 때까지 (또는 탭을 닫을 때까지) 확인창을 지켜본다. 자리에 없으면 누르지 않고 알린다."""
+    import datetime as _dt
+    from pa.model import now
+    alerted = False
+    while now() < until:
+        time.sleep(every)
+        if tab_open(title) is False:
+            log("강의 탭이 닫혀 지켜보기 끝")
+            return
+        if press(title, CONTINUE, dry=True) != "found":
+            alerted = False
+            continue
+        if idle_seconds() <= idle_limit:
+            log(f"강의 확인창 '계속' 누름 ({press(title, CONTINUE)}) — 자리에 있음")
+        elif not alerted:  # 자리에 없음 → 누르지 않고 알림 (출석을 대신 채우지 않음)
+            press(title, ("__없는 버튼__",))  # 누르는 것 없이 창만 앞으로
+            alert(f"강의가 확인창에서 멈췄어요: {title} — 돌아와서 '계속'을 눌러 주세요")
+            alerted = True
+
+
+if __name__ == "__main__":  # python -m pa.autoplay [--find | --list] <강의 제목>
     import sys
-    dry = "--find" in sys.argv
-    print(press_play(" ".join(a for a in sys.argv[1:] if a != "--find"), dry=dry))
+    rest = " ".join(a for a in sys.argv[1:] if not a.startswith("--"))
+    if "--list" in sys.argv:
+        print("\n".join(buttons(rest)) or "(버튼 없음 — 창 제목에 강의 제목이 있는 브라우저 창이 있어야 함)")
+    else:
+        print(press_play(rest, dry="--find" in sys.argv))

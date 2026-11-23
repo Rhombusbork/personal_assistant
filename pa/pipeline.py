@@ -235,8 +235,12 @@ def _auto_open():
             log(f"계획 시간 — 열었음: {key}")
         if autoopen.review_due(conn, now()):  # 하루 마무리 시간 → 대시보드를 띄움 (마무리 카드)
             open_dashboard("하루 마무리 시간")
-        if autoopen.ended(conn, now()):  # 블록이 끝남 → 수강·제출을 바로 확인 (끝냈으면 완료로)
-            threading.Thread(target=lambda: _safe(_quick_check), daemon=True).start()
+        ended = autoopen.ended(conn, now())
+        if ended:  # 블록이 끝남 → 수강·제출을 바로 확인 (끝냈으면 완료로, 안 잡혔으면 알림)
+            threading.Thread(target=lambda: _safe(lambda: _quick_check(ended)), daemon=True).start()
+        for title, issues in autoopen.precheck(conn, now()):  # 퀴즈·시험 30분 전 점검
+            log(f"시험·퀴즈 점검: {title} — " + (" / ".join(issues) or "문제 없음"))
+            STATE["job_done"] = True
         for key in autosubmit.tick(conn, now()):
             log(f"자동 제출함 (확인 필요): {key}")
             STATE["job_done"] = True  # 화면·휴대폰에 바로
@@ -263,13 +267,23 @@ _wake_memo = {"at": 0}
 WAKE_EVERY = 300
 
 
-def _quick_check():
+def _quick_check(keys=()):
+    """끝난 블록의 일: 끝냈으면 완료. 강의인데 출석이 안 잡혔거나, 퀴즈·과제가 하루 안 마감인데 안 냈으면 알림."""
     conn = db.connect()
     try:
         n = collect_canvas.quick_done(conn)
         if n:
             log(f"블록이 끝나 확인 — 끝낸 것 {n}개 완료")
-            STATE["job_done"] = True
+        for k in keys:
+            t = next(iter(db.tasks(conn, "key = ? AND status = 'open'", (k,))), None)
+            if not t:
+                continue
+            if t.kind == "lecture":
+                db.log(conn, "attendance_missing", k, title=t.title, due=t.due.isoformat() if t.due else None)
+            elif t.kind in ("quiz", "assignment") and t.due and t.due - now() < timedelta(hours=24):
+                db.log(conn, "submit_missing", k, title=t.title, due=t.due.isoformat())
+        conn.commit()
+        STATE["job_done"] = True
     finally:
         conn.close()
 

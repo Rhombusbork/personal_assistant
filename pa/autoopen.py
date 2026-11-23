@@ -19,7 +19,8 @@ from pa import db, osutil
 from pa.config import load_timetable
 from pa.model import parse_dt
 
-DEFAULTS = {"lecture": True, "play": True, "quiz": True, "assignment": True, "draft_hours_before": 3, "late_limit_minutes": 15}
+DEFAULTS = {"lecture": True, "play": True, "quiz": True, "assignment": True, "draft_hours_before": 3, "late_limit_minutes": 15,
+            "watch": True, "idle_seconds": 120, "speed": {}, "exam_check_minutes": 30}
 
 
 def cfg():
@@ -60,15 +61,36 @@ def open_task(conn, task):
         osutil.open_url(url)
         opened.append("제출 페이지" if task["kind"] == "assignment" else "페이지")
     if url and task["kind"] == "lecture" and (cfg() or {}).get("play"):
-        threading.Thread(target=_play, args=(task["title"],), daemon=True).start()
+        threading.Thread(target=_play, args=(task["title"], task.get("_end"), task.get("course", "")), daemon=True).start()
         opened.append("재생")
     return opened
 
 
-def _play(title):
-    from pa import autoplay
+def _play(title, end=None, course=""):
+    """▶ → (과목 배속) → 블록 동안 절전 막기 · 확인창 지켜보기 (자리에 없으면 누르지 않고 알림)."""
+    from pa import autoplay, power
+    from pa.model import now
     from pa.pipeline import log
-    autoplay.play_when_ready(title, log=log)
+    c = cfg() or DEFAULTS
+    if autoplay.play_when_ready(title, log=log) not in ("invoked", "clicked"):
+        return
+    speed = next((v for k, v in (c.get("speed") or {}).items() if k and k in (course or "")), None)
+    if speed:
+        time.sleep(3)
+        autoplay.set_speed(title, speed, log=log)
+    until = parse_dt(end) if end else None
+    if until and until > now():
+        power.keep_awake(int((until - now()).total_seconds() // 60) + 5)
+        if c.get("watch"):
+            def alert(msg):
+                conn = db.connect()
+                try:
+                    db.log(conn, "lecture_alert", None, msg=msg)
+                    conn.commit()
+                finally:
+                    conn.close()
+                log(msg)
+            autoplay.watch(title, until, idle_limit=int(c.get("idle_seconds", 120)), log=log, alert=alert)
 
 
 def ended(conn, t_now, window=timedelta(minutes=10)):
@@ -82,6 +104,37 @@ def ended(conn, t_now, window=timedelta(minutes=10)):
                 keys.append(task["key"])
     conn.commit()
     return keys
+
+
+def precheck(conn, t_now):
+    """퀴즈·시험 블록 exam_check_minutes(30)분 전 점검 (한 번): 배터리·충전 · 인터넷·Canvas · 그 시간 동안 절전 막기.
+    걸리는 것을 events 'exam_check' 로 (대시보드 알림). 시험 중에는 아무것도 대신 누르지 않는다."""
+    c = cfg()
+    if not c:
+        return []
+    ahead = timedelta(minutes=float(c.get("exam_check_minutes", 30)))
+    out = []
+    for pkey, start, end, task in _blocks(conn):
+        if task["kind"] != "quiz" or not (start - ahead <= t_now < start - ahead + timedelta(minutes=10)):
+            continue
+        mark = f"autoopen:check:{pkey}:{start.isoformat()}"
+        if db.get_meta(conn, mark):
+            continue
+        db.set_meta(conn, mark, t_now.isoformat())
+        from pa import canvas, power
+        issues = []
+        pct, plugged = power.battery()
+        if pct is not None and not plugged and pct < 80:
+            issues.append(f"배터리 {pct}% — 충전기를 꽂아 두세요")
+        try:
+            canvas.get("/users/self")
+        except Exception as e:
+            issues.append(f"Canvas 연결 안 됨 ({str(e)[:60]}) — 인터넷·로그인 확인")
+        power.keep_awake(int((end - t_now).total_seconds() // 60) + 10)
+        db.log(conn, "exam_check", task["key"], title=task["title"], start=start.isoformat(), issues=issues)
+        out.append((task["title"], issues))
+    conn.commit()
+    return out
 
 
 def review_due(conn, t_now):
@@ -123,7 +176,7 @@ def check(conn, t_now, opener=open_task):
             db.log(conn, "autoopen_missed", task["key"], start=start.isoformat())
             continue
         try:
-            what = opener(conn, task)
+            what = opener(conn, {**task, "_end": end.isoformat()})
             db.log(conn, "autoopen", task["key"], opened=what, start=start.isoformat(), end=end.isoformat())
             done.append(task["key"])
         except Exception as e:  # 열기 실패해도 엔진은 계속

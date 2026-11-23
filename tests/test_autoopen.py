@@ -89,7 +89,7 @@ def test_plan_reminder_at_start():
 def test_lecture_page_then_play_button(conn, monkeypatch):
     calls = []
     monkeypatch.setattr(autoopen.osutil, "open_url", lambda u: calls.append(u))
-    monkeypatch.setattr(autoopen, "_play", lambda title: calls.append("play:" + title))
+    monkeypatch.setattr(autoopen, "_play", lambda title, *a: calls.append("play:" + title))
     task = dict(conn.execute("SELECT * FROM tasks WHERE key = 'l1'").fetchone())
     assert autoopen.open_task(conn, task) == ["페이지", "재생"]
     import time

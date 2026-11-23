@@ -149,6 +149,18 @@ AWAKE = ("Add-Type -Name P -Namespace W -MemberDefinition "
          "[W.P]::SetThreadExecutionState(0x80000000) | Out-Null")
 
 
+def battery():
+    """(남은 %, 충전기 꽂힘) — 배터리가 없거나 모르면 (None, True)."""
+    if not (osutil.IS_WINDOWS or osutil.IS_WSL):
+        return None, True
+    ok, out = _ps("$b = Get-CimInstance Win32_Battery | Select-Object -First 1; if ($b) { '{0}|{1}' -f $b.EstimatedChargeRemaining, $b.BatteryStatus }")
+    try:
+        pct, st = out.splitlines()[-1].split("|")
+        return int(pct), int(st) != 1  # BatteryStatus 1 = 배터리로 쓰는 중
+    except (ValueError, IndexError):
+        return None, True
+
+
 def keep_awake(minutes):
     """그 시간 동안 절전하지 않게 — 숨은 PowerShell 이 잡고 있다가 끝나면 놓는다 (화면은 꺼져도 됨). Windows·WSL 만."""
     import subprocess

@@ -219,6 +219,21 @@ def dashboard_data(conn):
             return f"{fmt_time(r['ts'])} {name}{why}".strip()
         warns.append(f"휴대폰 입력 {len(fails)}건을 반영하지 못했습니다 ({' / '.join(what(r) for r in fails[:3])}) "
                      "— 휴대폰에서 다시 입력해 주세요 [ack:phone]")
+    ack = db.get_meta(conn, "ack_auto") or "0"  # 자동 조작 알림: 출석 안 잡힘 · 안 냄 · 확인창에서 멈춤 · 시험 30분 전 점검
+    for r in conn.execute("SELECT e.type, e.key, e.ts, e.detail, t.status FROM events e LEFT JOIN tasks t ON t.key = e.key "
+                          "WHERE e.type IN ('attendance_missing', 'submit_missing', 'lecture_alert', 'exam_check') AND e.ts > ? AND e.ts >= ? ORDER BY e.id",
+                          (ack, (t_now - timedelta(hours=12)).isoformat())):
+        d = json.loads(r["detail"] or "{}")
+        if r["key"] and r["status"] != "open":
+            continue
+        if r["type"] == "attendance_missing":
+            warns.append(f"출석이 아직 안 잡혔어요: {d.get('title')} (마감 {fmt_time(d.get('due'))}) — 남은 부분을 들어 주세요 [ack:auto]")
+        elif r["type"] == "submit_missing":
+            warns.append(f"아직 안 냈어요: {d.get('title')} (마감 {fmt_time(d.get('due'))}) [ack:auto]")
+        elif r["type"] == "lecture_alert":
+            warns.append(f"{d.get('msg')} [ack:auto]")
+        elif d.get("issues"):
+            warns.append(f"시험·퀴즈 {fmt_time(d.get('start'))} 전 점검: {d.get('title')} — {' / '.join(d['issues'])} [ack:auto]")
     ack = db.get_meta(conn, "ack_hidden") or "0"
     for r in conn.execute("SELECT e.key, e.detail, t.title, t.due FROM events e JOIN tasks t ON t.key = e.key "
                           "WHERE e.type = 'rule_hidden' AND e.ts > ? AND t.status = 'ignored' ORDER BY e.ts", (ack,)):
