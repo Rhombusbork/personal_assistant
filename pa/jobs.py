@@ -62,6 +62,16 @@ def recent(conn):
         "WHERE status IN ('queued', 'running') OR updated_at >= ? ORDER BY id DESC LIMIT 10", (since,))]
 
 
+HOLD = "대시보드를 열면 시작"
+
+
+def hold(conn):
+    """PC 대시보드가 닫혀 있는 동안: AI 작업은 기다리게 하고 화면(휴대폰)에 이유를 보인다 (2026-11-26 사용자가 정함 —
+    Claude 토큰을 쓰는 것만 대시보드가 켜져 있을 때)."""
+    if conn.execute("UPDATE jobs SET step = ? WHERE status = 'queued' AND COALESCE(step, '') != ?", (HOLD, HOLD)).rowcount:
+        conn.commit()
+
+
 def run_next(conn, quick=False):
     """대기 중인 작업 하나를 처리. 처리했으면 True.
     quick=True: 퀴즈 풀이만 (따로 도는 스레드 — 몇 분 걸리는 보고서 초안 뒤에서 기다리지 않게). False: 그 밖의 작업."""

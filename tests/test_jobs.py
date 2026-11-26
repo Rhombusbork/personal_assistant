@@ -80,3 +80,10 @@ def test_brief_and_blank_file(conn, tmp_path, monkeypatch):
     assert p.read_text(encoding="utf-8").startswith("# 리바이어던 텍스트 제출") and "2024 홍길동" in p.read_text(encoding="utf-8")
     p.write_text(p.read_text(encoding="utf-8") + "내가 쓴 문장\n", encoding="utf-8")
     assert jobs.blank_report(conn, "a5").read_text(encoding="utf-8").endswith("내가 쓴 문장\n")  # 있는 파일은 건드리지 않음
+
+
+def test_hold_marks_queued_jobs_until_dashboard_opens(conn):
+    jobs.enqueue(conn, "report", "h1", "과제")
+    jobs.hold(conn)
+    j = jobs.recent(conn)[0]
+    assert j["status"] == "queued" and j["step"] == jobs.HOLD  # 기다리기만, 실패로 안 바꿈

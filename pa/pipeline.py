@@ -327,6 +327,10 @@ def _job_runner(quick=False):
                     last_tab = time.time()
                     if quizhelp.watch_tab(conn):
                         log("퀴즈 탭을 닫아 퀴즈 도움 끔")
+            if not server.viewer_count():  # AI(토큰) 작업은 PC 대시보드가 열려 있을 때만
+                jobs.hold(conn)
+                time.sleep(2)
+                continue
             if jobs.run_next(conn, quick=quick):
                 log("에이전트 작업 하나 처리")
                 STATE["job_done"] = True  # 감시 순환이 화면(휴대폰 포함)을 다시 올리게
