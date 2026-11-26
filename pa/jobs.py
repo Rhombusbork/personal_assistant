@@ -68,8 +68,12 @@ HOLD = "대시보드를 열면 시작"
 def hold(conn):
     """PC 대시보드가 닫혀 있는 동안: AI 작업은 기다리게 하고 화면(휴대폰)에 이유를 보인다 (2026-11-26 사용자가 정함 —
     Claude 토큰을 쓰는 것만 대시보드가 켜져 있을 때)."""
-    if conn.execute("UPDATE jobs SET step = ? WHERE status = 'queued' AND COALESCE(step, '') != ?", (HOLD, HOLD)).rowcount:
-        conn.commit()
+    if conn.execute("SELECT 1 FROM jobs WHERE status = 'queued' AND step != ? LIMIT 1", (HOLD,)).fetchone():  # 읽기만 — 쓸 게 있을 때만 씀
+        try:
+            conn.execute("UPDATE jobs SET step = ? WHERE status = 'queued' AND step != ?", (HOLD, HOLD))
+            conn.commit()
+        except Exception:  # 다른 쪽이 쓰는 중이면 다음에
+            conn.rollback()
 
 
 def run_next(conn, quick=False):
