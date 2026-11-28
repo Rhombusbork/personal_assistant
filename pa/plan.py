@@ -394,6 +394,12 @@ def sync_calendar(service, plan, old, t_now, remind=0, force=False):
     page = service.events().list(calendarId=cal_id, timeMin=t_now.isoformat(), maxResults=2500,
                                  privateExtendedProperty="pa_source=plan").execute()
     for ev in page.get("items", []):
-        if ev["id"] not in keep_ids and parse_dt(ev["start"]["dateTime"]) >= t_now:
+        if ev["id"] in keep_ids:
+            continue
+        if parse_dt(ev["start"]["dateTime"]) >= t_now:
             service.events().delete(calendarId=cal_id, eventId=ev["id"]).execute()
+        elif parse_dt(ev["end"]["dateTime"]) > t_now:  # 진행 중에 끝낸 일: 지금 끝난 것으로 줄이고 알림도 뺀다
+            ev["end"] = {"dateTime": t_now.replace(second=0, microsecond=0).isoformat(), "timeZone": TZ}
+            ev["reminders"] = popup(0)
+            service.events().update(calendarId=cal_id, eventId=ev["id"], body=ev).execute()
     return rows
