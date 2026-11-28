@@ -149,8 +149,10 @@ def review_due(conn, t_now):
     return False
 
 
-def check(conn, t_now, opener=open_task):
-    """지금 시작한 블록을 열고, 곧 시작할 과제 블록의 초안을 미리 맡긴다. 연 할 일 키 목록을 돌려준다."""
+def check(conn, t_now, opener=open_task, viewing=True):
+    """지금 시작한 블록을 열고, 곧 시작할 과제 블록의 초안을 미리 맡긴다. 연 할 일 키 목록을 돌려준다.
+    viewing: PC 대시보드가 열려 있나. 닫혀 있으면 열지 않는다 (2026-11-28 사용자가 정함 — VSCode 를 닫아도 그렇게).
+    표시를 남기지 않으므로 늦게(late_limit_minutes 안에) 대시보드를 열면 그때 연다."""
     c = cfg()
     if not c:
         return []
@@ -170,6 +172,8 @@ def check(conn, t_now, opener=open_task):
             continue
         mark = f"autoopen:{pkey}:{start.isoformat()}"
         if db.get_meta(conn, mark):
+            continue
+        if not viewing and t_now - start <= late:
             continue
         db.set_meta(conn, mark, t_now.isoformat())
         if t_now - start > late:

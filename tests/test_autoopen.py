@@ -95,3 +95,10 @@ def test_lecture_page_then_play_button(conn, monkeypatch):
     import time
     time.sleep(0.1)  # 재생은 뒤에서 (페이지가 뜰 때까지 기다리므로)
     assert calls == ["https://canvas/lecture", "play:10주차 강의"]
+
+
+def test_dashboard_closed_does_not_open(conn):
+    got = []
+    autoopen.check(conn, T0 + timedelta(minutes=2), opener=lambda c, task: got.append(task["key"]) or [], viewing=False)
+    assert got == []
+    assert _opened(conn, T0 + timedelta(minutes=5)) == ["l1"]  # 늦게라도 대시보드를 열면 그때 연다

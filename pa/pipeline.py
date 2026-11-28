@@ -231,7 +231,7 @@ def _auto_open():
         return
     conn = db.connect()
     try:
-        for key in autoopen.check(conn, now()):
+        for key in autoopen.check(conn, now(), viewing=server.viewer_count() > 0):  # 대시보드가 닫혀 있으면 안 엶
             log(f"계획 시간 — 열었음: {key}")
         if autoopen.review_due(conn, now()):  # 하루 마무리 시간 → 대시보드를 띄움 (마무리 카드)
             open_dashboard("하루 마무리 시간")
